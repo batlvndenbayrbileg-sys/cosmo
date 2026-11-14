@@ -61,6 +61,17 @@ export const checkinStrings: AreaDicts = {
     "checkin.captions.toggle": "Captions",
     "checkin.captions.transcribing": "Writing down what you said…",
 
+    "checkin.faceFollow.toggle": "Cosmo looks at you",
+    "checkin.faceFollow.privacy": "Uses your camera so Cosmo can follow your face. The video is processed only in this browser and is never uploaded, saved or sent anywhere. Turning this on downloads the face-detection model from Google, and the face-detection library sends Google anonymous usage statistics (never video or images).",
+    "checkin.faceFollow.on": "Camera on",
+    "checkin.faceFollow.denied": "Camera access is blocked, so Cosmo keeps her usual look. You can allow the camera in the browser settings.",
+    "checkin.faceFollow.unavailable": "No camera found, so Cosmo keeps her usual look.",
+    "checkin.faceFollow.unsupported": "The camera can't be used on this page (the browser needs a secure https address), so Cosmo keeps her usual look.",
+    "checkin.faceFollow.error": "Face following could not start, so Cosmo keeps her usual look.",
+
+    "checkin.companion.back": "Back to the check-in",
+    "checkin.companion.say": "let's continue",
+
     "checkin.bubbles.title": "Captured today",
     "checkin.bubble.bp": "Blood pressure",
     "checkin.card.captured": "Captured {label}: {value}, {status}",
@@ -145,6 +156,17 @@ export const checkinStrings: AreaDicts = {
 
     "checkin.captions.toggle": "Хадмал",
     "checkin.captions.transcribing": "Таны хэлснийг бичиж байна…",
+
+    "checkin.faceFollow.toggle": "Cosmo тан руу харна",
+    "checkin.faceFollow.privacy": "Cosmo таны нүүрийг дагахын тулд камер ашиглана. Дүрс зөвхөн энэ хөтөч дотор боловсруулагдах бөгөөд хаашаа ч илгээгдэхгүй, хадгалагдахгүй. Асаахад нүүр илрүүлэх загварыг Google-ээс татаж авах бөгөөд нүүр илрүүлэх сан Google руу нэргүй хэрэглээний статистик илгээдэг (дүрс, зураг хэзээ ч илгээхгүй).",
+    "checkin.faceFollow.on": "Камер асаалттай",
+    "checkin.faceFollow.denied": "Камерын зөвшөөрөл хаалттай тул Cosmo ердийнхөөрөө харна. Хөтчийн тохиргооноос камерыг зөвшөөрч болно.",
+    "checkin.faceFollow.unavailable": "Камер олдсонгүй, Cosmo ердийнхөөрөө харна.",
+    "checkin.faceFollow.unsupported": "Энэ хуудсанд камер ашиглах боломжгүй (хөтөчид аюулгүй https хаяг хэрэгтэй), Cosmo ердийнхөөрөө харна.",
+    "checkin.faceFollow.error": "Нүүр дагах горим эхэлсэнгүй, Cosmo ердийнхөөрөө харна.",
+
+    "checkin.companion.back": "Шалгалт руу буцах",
+    "checkin.companion.say": "үргэлжлүүлье",
 
     "checkin.bubbles.title": "Өнөөдөр бүртгэсэн",
     "checkin.bubble.bp": "Цусны даралт",

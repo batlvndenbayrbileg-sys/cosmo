@@ -2,6 +2,7 @@ import "server-only";
 import type {
   ApiErrorCode,
   ConversationState,
+  CrewPublic,
   KpiKey,
   Lang,
   MeasurementSource,
@@ -22,12 +23,23 @@ import { getDb } from "@/server/db/client";
 import { confirmCheckIn, getCheckIn } from "@/server/db/repos/checkin";
 import { getCrewPublic } from "@/server/db/repos/crew";
 import { appendTurn, listTurns } from "@/server/db/repos/turn";
-import { ALERT_SPOKEN_NOTICE, createAlertsForCheckIn } from "@/server/alerts";
+import { ALERT_SPOKEN_NOTICE, createAlertsForCheckIn, raiseCrisisAlert } from "@/server/alerts";
 import { loadHistory, loadMachineCtx, loadTodayValues, saveMachineCtx } from "@/server/checkin/service";
 import { composeTemplateSummary } from "@/server/dashboard/template";
 import { LlmUnavailable, type Agent, type AgentDecision, type Emotion } from "./agent";
 import { ClaudeAgent, HISTORY_TURNS } from "./claudeAgent";
-import type { InterpretedRecord } from "./interpret";
+import { interpretAnswer, interpretCorrection, interpretStart, interpretYesNo, type InterpretedRecord } from "./interpret";
+import {
+  companionLeaveLine,
+  companionReply,
+  crisisReply,
+  dashboardLine,
+  isSaneCompanionReply,
+  namesConditionOrDrug,
+  planCompanion,
+  resumeLead,
+  type CompanionPlan,
+} from "./companion";
 import {
   cursorQuestion,
   questionOfKey,
@@ -356,7 +368,147 @@ function renderTemplate(
       return T.askWhatToChange(lang);
     case "closing":
       return T.closing(lang);
+    // friend mode replies are worded by companionTurn (they never reach the check-in path); these keep the switch whole
+    case "companion":
+      return companionReply(lang, 1, userText);
+    case "companionLeave":
+      return companionLeaveLine(lang, 0);
+    case "crisis":
+      return crisisReply(lang, effect.crisis ?? "self");
   }
+}
+
+/* ───────────── friend mode (companion.ts) ───────────── */
+
+/**
+ * Does the utterance answer what the check-in is waiting for with a value? Then a feeling or a "listen to me" in it
+ * ("I feel down" to the mood question, "сонсооч, би 7 цаг унтсан") is recorded as usual instead of opening a companion
+ * conversation, and while talking a plain answer to the open question ends the conversation and is recorded.
+ * Rule-based reading only.
+ */
+function answersOpenQuestion(ctx: MachineCtx, expected: QuestionId | null, text: string, lang: Lang): boolean {
+  // the day note takes any words, so while talking (friend mode) nothing said is "the note": it would end the talk
+  // and store the conversation as the note (found in a live replay 2026-11-15)
+  if (ctx.companion && expected === "day_note") return false;
+  if (ctx.state === "KPI_CAPTURE" && expected !== null) return interpretAnswer(getQuestion(expected), text, lang).records.length > 0;
+  if (ctx.companion) return false;
+  if (ctx.state === "CONFIRM") return interpretCorrection(text, lang).result.records.length > 0;
+  return false;
+}
+
+/** an utterance that begins by agreeing ("yes ...", "sure, ...", "тийм ...", "за ...") */
+const LEADING_YES = /^\s*(?:yes|yeah|yep|yup|sure|ok(?:ay)?|alright|all\s+right|of\s+course|let'?s|тийм|за(?![\p{L}])|болно|эхэлье|зөв)/iu;
+
+/**
+ * Does the utterance say yes to what is open: the proposal to start the measurements, or the read-back? Then a
+ * feeling in the same sentence ("yes let's start, I'm a little stressed") does not swallow the yes.
+ */
+function agreesToOpenQuestion(ctx: MachineCtx, text: string, lang: Lang): boolean {
+  if (ctx.companion || !LEADING_YES.test(text)) return false;
+  if (ctx.state === "SMALL_TALK") return interpretStart(text, lang) === "yes";
+  if (ctx.state === "CONFIRM") return interpretYesNo(text, lang) === true;
+  return false;
+}
+
+/** where the check-in stands, said again after the companion conversation */
+function resumeText(effect: ReplyEffect, ctx: MachineCtx, values: Partial<Record<KpiKey, MeasurementValue>>, lang: Lang): string {
+  switch (effect.resume) {
+    case "propose":
+      return T.proposeMeasurements(lang);
+    case "question":
+      return effect.question ? join(resumeLead(lang), T.askQuestion(getQuestion(effect.question), lang)) : resumeLead(lang);
+    case "readBack":
+      return join(resumeLead(lang), missingNotice(ctx, lang), T.readBack(values, lang));
+    case "dashboard":
+    case undefined:
+      return dashboardLine(lang);
+  }
+}
+
+/**
+ * One friend-mode turn. Nothing is recorded and no clarification is made: the machine only sets the companion fields
+ * (or, on leaving, resumes where the check-in was). The supportive reply is the model's wording when it passes
+ * isSaneCompanionReply, otherwise a template; the crisis reply is ALWAYS the template, and a crisis turn raises a red
+ * alert (idempotent). The reply, the alert and the context are written together.
+ */
+async function companionTurn(p: {
+  crewId: string;
+  checkInId: string;
+  crew: CrewPublic;
+  ctx0: MachineCtx;
+  plan: CompanionPlan;
+  text: string;
+  lang: Lang;
+  history: TurnRow[];
+  agent: Agent;
+}): Promise<{ events: TurnEvent[]; llmMs: number }> {
+  const { crewId, checkInId, ctx0, plan, text, lang } = p;
+  const event: MachineEvent =
+    plan.kind === "crisis"
+      ? { type: "CRISIS", kind: plan.crisis }
+      : plan.kind === "leave"
+        ? { type: "COMPANION_LEAVE" }
+        : plan.kind === "enter"
+          ? { type: "COMPANION_ENTER" }
+          : { type: "COMPANION_TURN" };
+  const { ctx, effects } = transition(ctx0, event);
+  const effect: ReplyEffect = effects.find((e): e is ReplyEffect => e.type === "reply") ?? { type: "reply", kind: "companion" };
+
+  let llmMs = 0;
+  let spoken: string;
+  let emotion: Emotion;
+  if (effect.kind === "crisis") {
+    spoken = crisisReply(lang, effect.crisis ?? "self");
+    emotion = "concerned";
+  } else if (effect.kind === "companionLeave") {
+    const values = (await loadTodayValues(crewId, checkInId)).values;
+    spoken = join(companionLeaveLine(lang, ctx0.companionTurns), resumeText(effect, ctx, values, lang));
+    emotion = "happy";
+  } else {
+    spoken = companionReply(lang, ctx.companionTurns, text, ctx0.companionCrisis);
+    emotion = "neutral";
+    if (p.agent.companionReply) {
+      const askedAt = performance.now();
+      try {
+        const worded = await p.agent.companionReply({
+          crew: p.crew,
+          ctx: ctx0,
+          turn: ctx.companionTurns,
+          text,
+          lang,
+          history: p.history,
+        });
+        // after a crisis the wording must keep pointing to the medical officer, or the AFTER_CRISIS template stands
+        if (worded && isSaneCompanionReply(worded, lang, text, ctx0.companionCrisis)) spoken = worded.trim();
+      } catch {
+        // the template stands
+      }
+      llmMs = Math.round(performance.now() - askedAt);
+    }
+  }
+
+  const db = await getDb();
+  const cosmoTurn = await db.transaction(async () => {
+    const turn = await appendTurn(crewId, checkInId, { speaker: "cosmo", text: spoken, language: lang, createdAt: now() });
+    if (effect.kind === "crisis") await raiseCrisisAlert(crewId, checkInId, effect.crisis ?? "self");
+    await saveMachineCtx(crewId, checkInId, ctx);
+    return turn;
+  });
+
+  return {
+    llmMs,
+    events: [
+      // while talking no question is open (question-specific screens such as the vision card stay hidden); leaving
+      // sends the resumed question again
+      {
+        type: "state",
+        state: ctx.state,
+        expectedQuestion: ctx.state === "KPI_CAPTURE" && !ctx.companion ? cursorQuestion(ctx) : null,
+        companion: ctx.companion,
+      },
+      { type: "assistant", turnId: cosmoTurn.id, text: spoken, language: lang, emotion },
+    ],
+  };
 }
 
 /**
@@ -399,7 +551,9 @@ async function* runTurnInner(args: RunTurnArgs, started: number): AsyncGenerator
 
   const checkIn = await getCheckIn(crewId, checkInId); // NotFoundError for another crew member's check-in
   const crew = await getCrewPublic(crewId);
-  const ctx0 = await loadMachineCtx(checkIn);
+  const loadedCtx = await loadMachineCtx(checkIn);
+  /** where the check-in stands for this turn (friend mode switched off when a plain answer ends it, step 0) */
+  let ctx0: MachineCtx = loadedCtx;
 
   const history: TurnRow[] = await listTurns(crewId, checkInId, { limit: HISTORY_TURNS });
   // Team decision (2026-11-14): Cosmo keeps ONE language for the whole check-in - the check-in's language (the crew
@@ -427,6 +581,35 @@ async function* runTurnInner(args: RunTurnArgs, started: number): AsyncGenerator
   });
 
   const out: TurnEvent[] = [];
+
+  /* ── 0. friend mode: a conversation on the side, at any point of the check-in (companion.ts) ── */
+  const plan = planCompanion(ctx0, text, answersOpenQuestion(ctx0, expected, text, lang), agreesToOpenQuestion(ctx0, text, lang));
+  if (plan?.kind === "answer") {
+    // a plain answer while talking ("7 hours"): friend mode ends quietly and the answer is read as usual below
+    ctx0 = transition(ctx0, { type: "COMPANION_LEAVE" }).ctx;
+  } else if (plan) {
+    const { events, llmMs: companionMs } = await companionTurn({
+      crewId,
+      checkInId,
+      crew,
+      ctx0,
+      plan,
+      text,
+      lang,
+      history,
+      agent: args.agent ?? defaultAgent(),
+    });
+    out.push(...events);
+    out.push({
+      type: "timing",
+      sttMs: Math.max(0, Math.round(input.sttMs ?? 0)),
+      llmMs: companionMs,
+      totalMs: Math.round(performance.now() - started),
+    });
+    out.push({ type: "done" });
+    for (const event of out) yield event;
+    return;
+  }
 
   // the personal history (baselines) is needed both to answer a question asked back and to judge new values
   const history14 = await loadHistory(crewId, checkIn.localDate);
@@ -654,7 +837,7 @@ async function* runTurnInner(args: RunTurnArgs, started: number): AsyncGenerator
     assistantText = spoken;
     emotion =
       findings.redFlags.length > 0 || findings.overall === "red" ? "concerned" : findings.overall === "green" ? "happy" : "neutral";
-    out.push({ type: "state", state: finalState, expectedQuestion: null });
+    out.push({ type: "state", state: finalState, expectedQuestion: null, companion: false });
     out.push({ type: "assistant", turnId: cosmoTurn.id, text: assistantText, language: lang, emotion });
     out.push({ type: "summary", summary: summaryPayload });
   } else {
@@ -679,8 +862,16 @@ async function* runTurnInner(args: RunTurnArgs, started: number): AsyncGenerator
         }
         llmMs += Math.round(performance.now() - askedAt);
       }
+      // the same backstop as every other model text: no diagnosis, condition, drug, supplement or treatment named
       assistantText =
-        answer && answer.length <= 600 && numeralsAreGrounded(answer, facts, text) ? answer : offlineResultsAnswer(facts, lang);
+        answer &&
+        answer.length <= 600 &&
+        !FORBIDDEN_REPLY.test(answer) &&
+        !namesConditionOrDrug(answer) &&
+        !/\p{Extended_Pictographic}/u.test(answer) &&
+        numeralsAreGrounded(answer, facts, text)
+          ? answer
+          : offlineResultsAnswer(facts, lang);
     }
     // the model's wording replaces the template only where the machine leaves room for it: never when a question was
     // just skipped (the template carries the "add it at the confirmation" notice), never at the read-back
@@ -720,6 +911,7 @@ async function* runTurnInner(args: RunTurnArgs, started: number): AsyncGenerator
       type: "state",
       state: ctx.state,
       expectedQuestion: ctx.state === "KPI_CAPTURE" ? cursorQuestion(ctx) : null,
+      companion: false,
     });
     out.push({ type: "assistant", turnId: cosmoTurn.id, text: assistantText, language: lang, emotion });
   }

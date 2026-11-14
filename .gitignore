@@ -34,6 +34,9 @@ yarn-error.log*
 .env*
 !.env.example
 
+# MediaPipe runtime copied from node_modules before dev / build (scripts/copy-mediapipe-wasm.mjs)
+/public/mediapipe/
+
 # local SQLite database (seeded by `pnpm db:seed`)
 /data/
 

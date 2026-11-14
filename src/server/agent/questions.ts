@@ -15,7 +15,7 @@ import { KPI_DEFS, formatValue, getQuestion, rangeText } from "@/lib/kpi/registr
  * the facts the model is allowed to use.
  */
 
-export type AskedKind = "normal" | "why" | "how" | "repeat" | "other";
+export type AskedKind = "normal" | "why" | "how" | "repeat" | "greeting" | "other";
 
 const QUESTION_MARK = /[?？]\s*$/u;
 
@@ -48,10 +48,15 @@ const KIND_PATTERNS: Array<{ kind: AskedKind; mn: RegExp; en: RegExp }> = [
   },
 ];
 
+/** a greeting on its own ("Сайн уу", "Сайн байна уу", "hi Cosmo"): greeted back, not taken for a question */
+const GREETING_ONLY =
+  /^(?:(?:сайн\s+(?:уу|байна\s+уу|байцгаана\s+уу)|сайн\s+байна|мэнд\s+(?:хүргэе|ээ)|hi|hello|hey|good\s+(?:morning|afternoon|evening))(?:[\s,]+(?:cosmo|космо))?)[\s.!?]*$/iu;
+
 /** The astronaut asked something (instead of answering), and what kind of thing; null when it is not a question. */
 export function detectAskedQuestion(text: string, lang: Lang): AskedKind | null {
   const t = text.trim();
   if (!t) return null;
+  if (GREETING_ONLY.test(t)) return "greeting";
   const isQuestion =
     QUESTION_MARK.test(t) || MN_QUESTION.test(t) || EN_QUESTION.test(t) || KIND_PATTERNS.some((k) => k.mn.test(t) || k.en.test(t));
   if (!isQuestion) return null;
@@ -189,6 +194,8 @@ export function answerAskedQuestion(
   switch (kind) {
     case "repeat":
       return lang === "mn" ? "Дахиад асууя." : "Sure, again.";
+    case "greeting":
+      return lang === "mn" ? "Сайн байна, баярлалаа!" : "Hi again!";
     case "normal":
       return join([
         normalSentence(id, lang) ?? WHY[id][lang],

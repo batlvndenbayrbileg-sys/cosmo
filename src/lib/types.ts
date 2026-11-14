@@ -342,7 +342,13 @@ export interface CheckInSnapshot {
 /** Server-sent events returned by POST /api/checkins/:id/turn (see docs/PLAN.md §5.1) */
 export type TurnEvent =
   | { type: "transcript"; turnId: string; text: string; language: Lang }
-  | { type: "state"; state: ConversationState; expectedQuestion: QuestionId | null }
+  | {
+      type: "state";
+      state: ConversationState;
+      expectedQuestion: QuestionId | null;
+      /** friend mode is on (a conversation on the side; the client offers a way back to the check-in) */
+      companion?: boolean;
+    }
   | {
       type: "measurement";
       key: KpiKey;

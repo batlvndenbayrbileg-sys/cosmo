@@ -24,6 +24,7 @@ import {
   BackControl,
   Corner,
   DemoControl,
+  FaceFollowControl,
   GLASS,
   KeyboardControl,
   LanguageCaptionControls,
@@ -40,9 +41,12 @@ import { ShieldAlert } from "lucide-react";
 import { bubbleItems, computeStageLayout } from "./bubbles";
 import type { CheckInError } from "./state";
 import { useDemoRunner } from "./useDemoRunner";
+import { faceFollowPref } from "./face-follow-pref";
+import type { FaceTrackFailure } from "./face-tracker";
 import { DashboardView } from "@/components/dashboard";
 import { parseStoredCrew, readSelectedCrewRaw } from "@/components/crew/selectedCrew";
 import { useCheckIn } from "@/hooks/useCheckIn";
+import { useFaceGaze } from "@/hooks/useFaceGaze";
 import { useRecorder } from "@/hooks/useRecorder";
 import { useSpeechPlayer, type SpeakTurn, type SpeechPlayer } from "@/hooks/useSpeechPlayer";
 import { useI18n } from "@/i18n/I18nProvider";
@@ -57,6 +61,8 @@ const RELISTEN_DELAY_MS = 450;
 const MIN_AUDIO_BYTES = 1200;
 /** The "preparing" moment lasts at least this long, so the dashboard never just flashes in. */
 const PREPARE_MIN_MS = 1200;
+/** how long the "camera blocked / not found" hint stays up */
+const FACE_HINT_MS = 7000;
 
 type Phase = "conversation" | "preparing" | "dashboard";
 
@@ -140,6 +146,9 @@ export function CheckInExperience() {
   /** index into the transcript where the after-check-in conversation starts */
   const [talkFrom, setTalkFrom] = useState(0);
   const tourCancelled = useRef(false);
+  /** "Cosmo looks at you" (camera face following): off unless turned on here before */
+  const faceFollow = useSyncExternalStore(faceFollowPref.subscribe, faceFollowPref.read, () => false);
+  const [faceHint, setFaceHint] = useState<FaceTrackFailure | null>(null);
   /** mirror of the transcript length, read when the after-check-in conversation opens */
   const transcriptLengthRef = useRef(0);
   const alive = useRef(true);
@@ -268,10 +277,19 @@ export function CheckInExperience() {
   }, [lang, state.checkInId, state.status, state.language, setConversationLanguage]);
 
   const player = useSpeechPlayer({ onStatusChange: setSpeech });
+  /** a "barge-in" recording is open while Cosmo speaks; `heard` once the person started talking over her */
+  const bargeIn = useRef({ active: false, heard: false });
   const recorder = useRecorder({
     onUtterance: (blob) => {
+      bargeIn.current = { active: false, heard: false };
       if (blob.size < MIN_AUDIO_BYTES) return;
       void sendAudio(blob);
+    },
+    // the person talks over Cosmo: she stops at once and listens (team feedback 2026-11-15)
+    onSpeechStart: ({ bargeIn: overCosmo }) => {
+      if (!overCosmo) return;
+      bargeIn.current = { active: true, heard: true };
+      player.stop();
     },
     onRecordingChange: setRecording,
     onError: (error) => {
@@ -301,6 +319,28 @@ export function CheckInExperience() {
       cancelled = true;
     };
   }, [createCheckIn]);
+
+  /* ───────────── "Cosmo looks at you" ───────────── */
+
+  // the camera runs only while the check-in stage is on screen (not on the dashboard) and the tab is visible;
+  // a blocked or missing camera turns the feature off again and leaves a short hint
+  const face = useFaceGaze({
+    enabled: faceFollow,
+    active: phase !== "dashboard",
+    onFailure: (failure) => {
+      faceFollowPref.write(false);
+      setFaceHint(failure);
+    },
+  });
+  const toggleFaceFollow = useCallback((on: boolean) => {
+    faceFollowPref.write(on);
+    setFaceHint(null);
+  }, []);
+  useEffect(() => {
+    if (!faceHint) return;
+    const timer = setTimeout(() => setFaceHint(null), FACE_HINT_MS);
+    return () => clearTimeout(timer);
+  }, [faceHint]);
 
   /* ───────────── derived facts ───────────── */
 
@@ -401,8 +441,10 @@ export function CheckInExperience() {
     };
   }, [canTalk, micUsable, startListening, stopRecorder]);
 
-  // hands-free: after Cosmo has finished, listen again (half-duplex: never while she speaks)
+  // hands-free: listen again after Cosmo has finished, and also WHILE she speaks in "barge-in" mode, so the person can
+  // interrupt her by talking (her own echo is learned as the room; see BARGE_IN_VAD). Tapping Cosmo or Space works too.
   useEffect(() => {
+    const speaking = state.speech === "playing";
     if (
       !conversationMode ||
       !micUsable ||
@@ -413,15 +455,19 @@ export function CheckInExperience() {
       // during the check-in a finished conversation stops listening; on the dashboard it is the Q&A
       (talking && state.conversation === "DONE") ||
       state.busy ||
-      state.speech !== "idle" ||
+      (state.speech !== "idle" && !speaking) ||
       recorder.recording ||
       demo.running
     ) {
       return;
     }
-    const timer = setTimeout(() => {
-      void startRecorder({ vad: true });
-    }, RELISTEN_DELAY_MS);
+    const timer = setTimeout(
+      () => {
+        bargeIn.current = { active: speaking, heard: false };
+        void startRecorder({ vad: true, bargeIn: speaking });
+      },
+      speaking ? 0 : RELISTEN_DELAY_MS,
+    );
     return () => clearTimeout(timer);
   }, [
     conversationMode,
@@ -438,6 +484,16 @@ export function CheckInExperience() {
     startRecorder,
     demo.running,
   ]);
+
+  // Cosmo finished and nobody talked over her: close the barge-in recording (tuned to her echo) and let the normal
+  // listening above start fresh
+  useEffect(() => {
+    if (state.speech !== "idle") return;
+    if (bargeIn.current.active && !bargeIn.current.heard && recorder.recording) {
+      bargeIn.current = { active: false, heard: false };
+      cancelRecorder();
+    }
+  }, [state.speech, recorder.recording, cancelRecorder]);
 
   const handleSendText = useCallback(
     (text: string) => {
@@ -614,6 +670,14 @@ export function CheckInExperience() {
   } else if (state.error) {
     toasts.push({ id: "error", tone: "error", text: errorText(t, state.error), onDismiss: checkIn.dismissError });
   }
+  if (faceHint) {
+    toasts.push({
+      id: "faceFollow",
+      tone: "info",
+      text: t(`checkin.faceFollow.${faceHint}`),
+      onDismiss: () => setFaceHint(null),
+    });
+  }
   if (demo.failed) {
     toasts.push({ id: "demo", tone: "error", text: t("checkin.demo.failed"), onDismiss: () => dismiss("demo") });
   }
@@ -644,6 +708,7 @@ export function CheckInExperience() {
       emotion={state.emotion}
       amplitude={player.amplitude}
       label={t("checkin.stage.label")}
+      gaze={face.gaze}
     />
   );
 
@@ -806,7 +871,11 @@ export function CheckInExperience() {
 
             {/* the vision self-check needs something to read: show it while Cosmo asks that question */}
             <AnimatePresence>
-              {!preparing && phase !== "dashboard" && state.conversation === "KPI_CAPTURE" && state.expectedQuestion === "vision" ? (
+              {!preparing &&
+              phase !== "dashboard" &&
+              !state.companion &&
+              state.conversation === "KPI_CAPTURE" &&
+              state.expectedQuestion === "vision" ? (
                 <VisionCard key="vision" />
               ) : null}
             </AnimatePresence>
@@ -899,6 +968,33 @@ export function CheckInExperience() {
                 </motion.div>
               ) : null}
             </AnimatePresence>
+
+            {/* friend mode: a plain way back to the check-in (it says "let's continue" for the astronaut) */}
+            <AnimatePresence>
+              {!preparing && !showTapToStart && phase !== "dashboard" && state.companion ? (
+                <motion.div
+                  key="companion-back"
+                  className="absolute inset-x-0 flex justify-center"
+                  style={{ top: mascot.y + mascot.size * 1.02 }}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                >
+                  <button
+                    type="button"
+                    data-slot="companion-back"
+                    onClick={() => handleSendText(t("checkin.companion.say"))}
+                    disabled={!ready || state.busy || demo.running}
+                    className={cn(
+                      GLASS,
+                      "flex h-11 items-center rounded-full px-5 text-[15px] font-medium text-[var(--aegis-ink)] outline-none focus-visible:ring-4 focus-visible:ring-[var(--aegis-accent)]/40 disabled:opacity-60",
+                    )}
+                  >
+                    {t("checkin.companion.back")}
+                  </button>
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
           </div>
 
           <StageToasts toasts={visibleToasts} onAction={handleToastAction} />
@@ -907,6 +1003,7 @@ export function CheckInExperience() {
             <BackControl />
           </Corner>
           <Corner className="fixed top-4 right-4">
+            <FaceFollowControl on={faceFollow} status={face.status} onToggle={toggleFaceFollow} />
             <LanguageCaptionControls captions={captions} onCaptions={setCaptions} />
           </Corner>
           {!preparing ? (

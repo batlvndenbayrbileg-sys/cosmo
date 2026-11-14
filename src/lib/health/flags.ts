@@ -71,6 +71,82 @@ export function findSeriousWords(text: string): string[] {
   return hits;
 }
 
+/**
+ * Crisis words (companion mode, src/server/agent/companion.ts): self-harm, suicide, wanting to die, harming others.
+ * Patterns, not plain words, because the phrasing varies ("I want to die", "I don't want to live anymore"). Matched on
+ * the normalised text; Mongolian stems match inside words. Editable like the lists above. These never feed the
+ * dashboard flags: they make Cosmo answer with the crisis template and raise a red alert at once.
+ */
+/** words that make a reflexive "hurt / cut / injure myself" intentional ("I want to hurt myself", not "I hurt myself on the treadmill") */
+const SELF_HARM_INTENT =
+  "(?:want(?:s|ed)?\\s+to|wanna|going\\s+to|gonna|thinking\\s+(?:about|of)|think\\s+(?:about|of)|thought\\s+(?:about|of)|feel(?:ing)?\\s+like|felt\\s+like|might|could|will|would|'ll|urge\\s+to|tempted\\s+to|try(?:ing)?\\s+to|tried\\s+to|plan(?:ning)?\\s+to)";
+const HARM_VERB = "(?:hurt(?:ing)?|cut(?:ting)?|injur(?:e|ing)|harm(?:ing)?)";
+const OTHERS = "(?:someone|somebody|him|her|them|people|everyone|everybody|a\\s+crewmate|my\\s+crewmates?|the\\s+crew)";
+
+export const CRISIS_PATTERNS_EN: RegExp[] = [
+  // killing / harming oneself counts in any form; hurting / cutting / injuring oneself is often an accident, so it needs
+  // a word of intent in front, or an ongoing form that is not an accident ("I've been cutting myself")
+  /\bkill(?:ing|ed)?\s+(?:my\s*self|myself)\b/u,
+  /\bharm(?:ing)?\s+(?:my\s*self|myself)\b/u,
+  // one word may sit in between ("might really hurt myself"), but not "have" / "never" ("could have hurt myself")
+  new RegExp(`\\b${SELF_HARM_INTENT}\\s+(?:(?!have\\b|never\\b|not\\b)\\w+\\s+)?${HARM_VERB}\\s+(?:my\\s*self|myself)\\b`, "u"),
+  /\b(?:hurting|cutting|injuring)\s+(?:my\s*self|myself)\b(?!\s+(?:on|while|when|with|shaving|by\s+accident|accidentally|at|during|in|again\s+on|playing|exercising|working))/u,
+  /\bsuicid[a-z]*/u,
+  /\bself[\s-]?harm/u,
+  // "end it all", "take my own life" - never "take it all back"
+  /\b(?:end(?:ing|ed)?|tak(?:e|ing))\s+my\s+(?:own\s+)?life\b/u,
+  /\bend(?:ing)?\s+it\s+all\b/u,
+  /\b(?:want|going|wish|like|ready|deserve)\s+to\s+die\b/u,
+  /\bwanna\s+(?:to\s+)?die\b/u,
+  /\bwish\s+i\s+(?:was|were)\s+dead\b/u,
+  /\b(?:better\s+off|rather\s+be)\s+dead\b/u,
+  /\b(?:don'?t|do\s+not|no\s+longer)\s+want\s+to\s+(?:live|be\s+alive|exist|wake\s+up)\b/u,
+  /\b(?:don'?t|do\s+not|no\s+longer)\s+want\s+to\s+be\s+(?:here|around)(?:\s+any\s*more|\s+any\s+longer)?\b(?!\s+(?:for|at|doing|right\s+now|today|tonight|in\s+this))/u,
+  /\bno\s+(?:reason|point)\s+(?:to|in)\s+(?:live|living|going\s+on)\b/u,
+  new RegExp(
+    `\\b(?:want\\s+to|wanna|going\\s+to|gonna|will|could|might|feel(?:ing)?\\s+like|felt\\s+like|thinking\\s+(?:about|of))\\s+(?:kill(?:ing)?|hurt(?:ing)?|harm(?:ing)?|attack(?:ing)?|stab(?:bing)?)\\s+${OTHERS}\\b`,
+    "u",
+  ),
+];
+
+/** Mongolian typed in Latin letters ("uhmeer baina", "amia horlomoor bna"): typed input is accepted, so it is checked too */
+const CRISIS_PATTERNS_MN_LATIN: RegExp[] = [
+  /(?<![\p{L}])[uü]+k?h(?:ch(?:i|ih)?)?m+e+r(?![\p{L}])/u,
+  /(?<![\p{L}])amia?\s*k?horl/u,
+  /(?<![\p{L}])[uoö]{1,2}r[iy]{1,2}g[uoö]{1,2}\s+(?:al(?:a?k?h|maar|chih|chmaar|ya|ii)|gemtee)/u,
+  /(?<![\p{L}])amid?(?:a?r|ra)(?:k?h)?\s+k?h[uü]s(?:el)?(?:gui|\s+(?:alga|baihgui|bhgui|ugui))/u,
+  /(?<![\p{L}])amid?a?rmaa?r\s*gui/u,
+  /(?<![\p{L}])amid?ra(?:k?h)?[iy]+g\s+k?h[uü]s(?:e(?:k?h)?)?gui/u,
+  /(?<![\p{L}])[uü]+k?hs[eö]n\s+(?:ni?|n)\s+deer/u,
+];
+
+export const CRISIS_PATTERNS_MN: RegExp[] = [
+  /амиа\s*(?:хорло|егүүт|бусниул)/u,
+  /амь\s+насаа\s+(?:хорло|егүүт|тасл)/u,
+  /үхмээр|үхчихмээр|үхэхийг\s+хүс|үхье(?![\p{L}])|үхэх\s+хүсэл/u,
+  /амьдрахыг\s+хүсэхгүй|амьдармааргүй|амьдрах\s+(?:хүсэл|утга)\s*(?:алга|байхгүй|үгүй)|амьдрах\s+(?:утгагүй|хүсэлгүй)/u,
+  /амьд\s+байх(?:ыг)?\s+хүсэхгүй|амьд\s+байх\s+хүсэл(?:гүй|\s+(?:алга|байхгүй))/u,
+  /үхсэн\s+(?:нь|минь)\s+дээр/u,
+  /өөрийгөө\s+(?:гэмтээ|хорло|зүс|ал(?:ах|маар|чих|ъя))/u,
+  /өөртөө\s+(?:гэмтэл|хор)\s+(?:учруул|хүргэ)/u,
+  /(?:хүн|хүнийг|бусдыг|түүнийг|тэднийг|багийнхнаа|багийн\s+гишүүнийг)\s+(?:алмаар|алах\s+гэж|алчихмаар|алъя|гэмтээмээр|гэмтээх\s+гэж|зодмоор)/u,
+  // without an object: "алчихмаар байна" (I want to kill [someone])
+  /(?<![\p{L}])(?:алчихмаар|алмаар)(?![\p{L}])/u,
+  ...CRISIS_PATTERNS_MN_LATIN,
+];
+
+/** the crisis phrases found in what was said (empty array when none) */
+export function findCrisisWords(text: string): string[] {
+  const t = normalise(text);
+  if (t.length === 0) return [];
+  const hits: string[] = [];
+  for (const re of [...CRISIS_PATTERNS_EN, ...CRISIS_PATTERNS_MN]) {
+    const m = re.exec(t);
+    if (m) hits.push(m[0]);
+  }
+  return hits;
+}
+
 function readout(key: KpiKey, value: MeasurementValue, lang: "en" | "mn"): string {
   return `${KPI_DEFS[key].labels[lang]} ${formatValue(key, value, lang)}`;
 }

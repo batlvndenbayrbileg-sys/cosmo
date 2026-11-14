@@ -17,7 +17,9 @@
  *    is repeated;
  *  - CONFIRM: a correction updates that key and asks again, "no" without a usable correction asks what to change,
  *    "yes" moves to SUMMARY;
- *  - DONE: further turns get a closing reply and every write event is refused.
+ *  - DONE: further turns get a closing reply and every write event is refused;
+ *  - friend mode (COMPANION_* / CRISIS, any state but SUMMARY): a conversation on the side that only sets the
+ *    companion fields; COMPANION_LEAVE resumes exactly where the check-in was.
  * The context is persisted in check_in.state_json (the `state` column holds ctx.state).
  */
 
@@ -46,7 +48,23 @@ export interface MachineCtx {
   skipped: QuestionId[];
   /** keys that hold a value (reconciled from the database at the start of every turn) */
   filled: KpiKey[];
+  /**
+   * Friend mode (companion.ts): the astronaut asked to talk or shared how they feel. While it is on, turns are a
+   * conversation: nothing is recorded, nothing counts as a failed answer, and `state`, the cursor and clarifyCount stay
+   * exactly as they were, so leaving resumes the same question (or read-back, or dashboard).
+   */
+  companion: boolean;
+  /** turns spent in the current companion conversation (varies the offline replies) */
+  companionTurns: number;
+  /** crisis words were heard in this check-in and a red alert was raised (kept for the rest of the check-in) */
+  companionCrisis: boolean;
 }
+
+/** what was heard in a crisis turn: self-harm / harming others, or a possible medical emergency */
+export type CrisisKind = "self" | "medical";
+
+/** where the check-in picks up again when the astronaut leaves the companion conversation */
+export type ResumePoint = "propose" | "question" | "readBack" | "dashboard";
 
 export type MachineEvent =
   /** the astronaut spoke in GREETING / SMALL_TALK / DONE; `start` is the rule-based reading of the answer */
@@ -71,7 +89,15 @@ export type MachineEvent =
   /** at the confirmation: yes / no / neither (null) */
   | { type: "CONFIRMATION"; confirmed: boolean | null }
   /** the summary has been produced and handed to the voice */
-  | { type: "SUMMARY_SPOKEN" };
+  | { type: "SUMMARY_SPOKEN" }
+  /** friend mode: the astronaut asked to talk, or shared a feeling (companion.ts) */
+  | { type: "COMPANION_ENTER" }
+  /** friend mode: one more turn of the conversation */
+  | { type: "COMPANION_TURN" }
+  /** friend mode: the astronaut is ready to go on; the check-in resumes where it was */
+  | { type: "COMPANION_LEAVE" }
+  /** crisis words: the crisis template is said, an alert is raised, and friend mode stays on */
+  | { type: "CRISIS"; kind: CrisisKind };
 
 export type ReplyKind =
   | "smallTalk"
@@ -83,7 +109,10 @@ export type ReplyKind =
   | "readBack"
   | "correctionAck"
   | "askWhatToChange"
-  | "closing";
+  | "closing"
+  | "companion"
+  | "companionLeave"
+  | "crisis";
 
 export type Effect =
   | {
@@ -98,6 +127,10 @@ export type Effect =
       keys?: KpiKey[];
       /** set when a question was skipped after failed clarifications: Cosmo says it can be added later */
       skippedQuestion?: QuestionId;
+      /** companionLeave: what Cosmo repeats so the check-in goes on (with `question` for "question") */
+      resume?: ResumePoint;
+      /** crisis: what was heard */
+      crisis?: CrisisKind;
     }
   | { type: "computeSummary" }
   | { type: "refused"; reason: "done" | "illegal_state" };
@@ -110,7 +143,17 @@ export interface TransitionResult {
 /* ───────────── construction and persistence ───────────── */
 
 export function initialCtx(): MachineCtx {
-  return { state: "GREETING", smallTalkTurns: 0, proposed: false, clarifyCount: {}, skipped: [], filled: [] };
+  return {
+    state: "GREETING",
+    smallTalkTurns: 0,
+    proposed: false,
+    clarifyCount: {},
+    skipped: [],
+    filled: [],
+    companion: false,
+    companionTurns: 0,
+    companionCrisis: false,
+  };
 }
 
 const QUESTION_IDS = new Set<string>(QUESTIONS.map((q) => q.id));
@@ -153,6 +196,12 @@ export function parseCtx(state: ConversationState, json: string | null | undefin
   if (Array.isArray(o.filled)) {
     ctx.filled = o.filled.filter((k): k is KpiKey => typeof k === "string" && KEY_SET.has(k));
   }
+  // friend mode (absent in contexts written before it existed: off)
+  if (typeof o.companion === "boolean") ctx.companion = o.companion;
+  if (typeof o.companionTurns === "number" && Number.isFinite(o.companionTurns) && o.companionTurns >= 0) {
+    ctx.companionTurns = Math.trunc(o.companionTurns);
+  }
+  if (typeof o.companionCrisis === "boolean") ctx.companionCrisis = o.companionCrisis;
   return ctx;
 }
 
@@ -244,6 +293,8 @@ function failedAnswer(ctx: MachineCtx, question: QuestionId, reason: ClarifyReas
  * no effects (or a `refused` effect for writes in DONE / SUMMARY).
  */
 export function transition(ctx: MachineCtx, event: MachineEvent): TransitionResult {
+  const companion = fromCompanion(ctx, event);
+  if (companion) return companion;
   switch (ctx.state) {
     case "GREETING":
     case "SMALL_TALK":
@@ -258,6 +309,61 @@ export function transition(ctx: MachineCtx, event: MachineEvent): TransitionResu
     case "DONE":
       if (event.type === "USER_TURN") return { ctx, effects: [reply({ kind: "closing" })] };
       return isWrite(event) ? { ctx, effects: [{ type: "refused", reason: "done" }] } : { ctx, effects: [] };
+  }
+}
+
+/**
+ * Friend mode, in every state but SUMMARY (that one only finishes the summary). Entering, talking and a crisis touch
+ * nothing but the companion fields; leaving switches friend mode off and repeats where the check-in stands. Null for
+ * every other event.
+ */
+function fromCompanion(ctx: MachineCtx, event: MachineEvent): TransitionResult | null {
+  if (
+    event.type !== "COMPANION_ENTER" &&
+    event.type !== "COMPANION_TURN" &&
+    event.type !== "COMPANION_LEAVE" &&
+    event.type !== "CRISIS"
+  ) {
+    return null;
+  }
+  if (ctx.state === "SUMMARY") return { ctx, effects: [] };
+  switch (event.type) {
+    case "COMPANION_ENTER":
+      return { ctx: { ...ctx, companion: true, companionTurns: 1 }, effects: [reply({ kind: "companion" })] };
+    case "COMPANION_TURN":
+      return {
+        ctx: { ...ctx, companion: true, companionTurns: ctx.companion ? ctx.companionTurns + 1 : 1 },
+        effects: [reply({ kind: "companion" })],
+      };
+    case "CRISIS":
+      return {
+        ctx: { ...ctx, companion: true, companionTurns: ctx.companionTurns + 1, companionCrisis: true },
+        effects: [reply({ kind: "crisis", crisis: event.kind })],
+      };
+    case "COMPANION_LEAVE": {
+      if (!ctx.companion) return { ctx, effects: [] };
+      const base: MachineCtx = { ...ctx, companion: false, companionTurns: 0 };
+      switch (ctx.state) {
+        case "GREETING":
+        case "SMALL_TALK":
+          // the next step of the check-in is the measurements: propose them (the next answer is read as the reply)
+          return {
+            ctx: { ...base, state: "SMALL_TALK", proposed: true },
+            effects: [reply({ kind: "companionLeave", resume: "propose" })],
+          };
+        case "KPI_CAPTURE": {
+          const next = cursorQuestion(base);
+          if (next === null) {
+            return { ctx: { ...base, state: "CONFIRM" }, effects: [reply({ kind: "companionLeave", resume: "readBack" })] };
+          }
+          return { ctx: base, effects: [reply({ kind: "companionLeave", resume: "question", question: next })] };
+        }
+        case "CONFIRM":
+          return { ctx: base, effects: [reply({ kind: "companionLeave", resume: "readBack" })] };
+        case "DONE":
+          return { ctx: base, effects: [reply({ kind: "companionLeave", resume: "dashboard" })] };
+      }
+    }
   }
 }
 

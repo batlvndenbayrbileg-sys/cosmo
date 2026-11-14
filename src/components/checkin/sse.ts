@@ -174,7 +174,12 @@ function validateTurnEvent(type: string, raw: Rec): TurnEvent | null {
       const expected = isOneOf(QUESTION_IDS, raw.expectedQuestion)
         ? (raw.expectedQuestion as QuestionId)
         : null;
-      return { type, state: raw.state, expectedQuestion: expected };
+      return {
+        type,
+        state: raw.state,
+        expectedQuestion: expected,
+        ...(typeof raw.companion === "boolean" ? { companion: raw.companion } : {}),
+      };
     }
     case "measurement": {
       if (!isOneOf(KPI_KEYS, raw.key)) return null;

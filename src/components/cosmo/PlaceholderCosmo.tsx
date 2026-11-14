@@ -7,6 +7,9 @@
  * Performance: everything that changes every frame (mouth, blink, breathing, tilt, halo) is written
  * straight to SVG attributes from one requestAnimationFrame loop, so React does not re-render at
  * 60 fps. React only re-renders for state, emotion, variant and size changes.
+ *
+ * With a `gaze` source ("Cosmo looks at you") the eyes and brows shift a few units toward the person
+ * (they stay on the face plate) and the body leans a little (no lean with reduced motion).
  */
 import { useEffect, useRef, type CSSProperties } from "react";
 import { MOUTH_SMOOTHING, mouthOpenFromAmplitude, smoothAmplitude } from "./amplitude";
@@ -23,6 +26,7 @@ import {
   scaleYAbout,
   type EyeKind,
 } from "./face";
+import { GAZE_CENTRE, gazeLean, lerpGaze, smoothingFactor, type Gaze, type GazeSource } from "./gaze";
 import type { CosmoEmotion, CosmoProps, CosmoState } from "./types";
 import { usePrefersReducedMotion } from "./usePrefersReducedMotion";
 import { variantFor, type FaceDetail } from "./variants";
@@ -48,9 +52,14 @@ interface Live {
   emotion: CosmoEmotion;
   amplitude: number;
   reduced: boolean;
+  gaze: GazeSource | undefined;
 }
 
 const f2 = (n: number) => Math.round(n * 100) / 100;
+
+/** furthest the eyes move toward the person, viewBox units (the face plate leaves room for more) */
+const GAZE_EYE_X = 5;
+const GAZE_EYE_Y = 3.5;
 
 function Eye({ cx, kind, transition }: { cx: number; kind: EyeKind; transition: string }) {
   const show = (k: EyeKind): CSSProperties => ({ opacity: kind === k ? 1 : 0, transition });
@@ -128,14 +137,15 @@ export function PlaceholderCosmo({
   size,
   className,
   label,
+  gaze,
 }: CosmoProps) {
   const reduced = usePrefersReducedMotion();
   const look = emotionLook(emotion);
   const v = variantFor(variant);
 
-  const live = useRef<Live>({ state, emotion, amplitude, reduced });
+  const live = useRef<Live>({ state, emotion, amplitude, reduced, gaze });
   useEffect(() => {
-    live.current = { state, emotion, amplitude, reduced };
+    live.current = { state, emotion, amplitude, reduced, gaze };
   });
 
   const tiltRef = useRef<SVGGElement>(null);
@@ -144,6 +154,8 @@ export function PlaceholderCosmo({
   const mouthRef = useRef<SVGPathElement>(null);
   const eyeLeftRef = useRef<SVGGElement>(null);
   const eyeRightRef = useRef<SVGGElement>(null);
+  const browLeftRef = useRef<SVGGElement>(null);
+  const browRightRef = useRef<SVGGElement>(null);
 
   useEffect(() => {
     let raf = 0;
@@ -154,6 +166,8 @@ export function PlaceholderCosmo({
     let haloOpacity = 0;
     let blinkStart = Number.NEGATIVE_INFINITY;
     let nextBlinkAt = last + nextBlinkDelay();
+    let gazeNow: Gaze = { ...GAZE_CENTRE };
+    let leanDeg = 0;
     const written = new Map<string, string>();
 
     const put = (key: string, el: Element | null, attr: string, value: string) => {
@@ -181,9 +195,18 @@ export function PlaceholderCosmo({
         }
         closure = blinkClosure(now - blinkStart);
       }
+      // gaze: eyes (and brows) shift toward the person, also with reduced motion; back to centre without
+      const seen = cur.gaze?.current ?? null;
+      gazeNow = lerpGaze(gazeNow, seen ?? GAZE_CENTRE, smoothingFactor(dt, seen ? 90 : 380));
+      const gx = f2(gazeNow.x * GAZE_EYE_X);
+      const gy = f2(gazeNow.y * GAZE_EYE_Y);
       const eyeScale = 1 - 0.92 * closure;
-      put("eyeL", eyeLeftRef.current, "transform", scaleYAbout(EYE_Y, eyeScale));
-      put("eyeR", eyeRightRef.current, "transform", scaleYAbout(EYE_Y, eyeScale));
+      const eyeT = `translate(${gx} ${gy}) ${scaleYAbout(EYE_Y, eyeScale)}`;
+      put("eyeL", eyeLeftRef.current, "transform", eyeT);
+      put("eyeR", eyeRightRef.current, "transform", eyeT);
+      const browT = `translate(${f2(gx * 0.6)} ${f2(gy * 0.6)})`;
+      put("browL", browLeftRef.current, "transform", browT);
+      put("browR", browRightRef.current, "transform", browT);
 
       // breathing in idle only, never with reduced motion
       const breathTarget = cur.state === "idle" && !cur.reduced ? 1 : 0;
@@ -200,7 +223,10 @@ export function PlaceholderCosmo({
       // attentive head tilt while listening (a pose, so it stays with reduced motion but does not glide)
       const tiltTarget = cur.state === "listening" ? 5 : 0;
       tilt = cur.reduced ? tiltTarget : smoothAmplitude(tilt, tiltTarget, dt, { attackMs: 170, releaseMs: 170 });
-      put("tilt", tiltRef.current, "transform", `rotate(${f2(tilt)} 100 ${TILT_PIVOT_Y})`);
+      // and a small lean toward the person (none with reduced motion)
+      const leanTarget = gazeLean(seen ? gazeNow : null, cur.reduced).rotateDeg;
+      leanDeg = cur.reduced ? leanTarget : leanDeg + (leanTarget - leanDeg) * smoothingFactor(dt, 260);
+      put("tilt", tiltRef.current, "transform", `rotate(${f2(tilt + leanDeg)} 100 ${TILT_PIVOT_Y})`);
 
       // halo: slow opacity and scale pulse while thinking (steady, no pulse, with reduced motion)
       const wave = 0.5 + 0.5 * Math.sin((Math.PI * 2 * now) / 2400 - Math.PI / 2);
@@ -286,28 +312,32 @@ export function PlaceholderCosmo({
           <g ref={eyeRightRef}>
             <Eye cx={EYE_RIGHT_X} kind={look.eye} transition={t} />
           </g>
-          <line
-            x1={EYE_LEFT_X - 9}
-            x2={EYE_LEFT_X + 9}
-            y1={BROW_Y}
-            y2={BROW_Y}
-            stroke={INK}
-            strokeWidth={3.2}
-            strokeLinecap="round"
-            opacity={look.browOpacity}
-            style={browStyle("left")}
-          />
-          <line
-            x1={EYE_RIGHT_X - 9}
-            x2={EYE_RIGHT_X + 9}
-            y1={BROW_Y}
-            y2={BROW_Y}
-            stroke={INK}
-            strokeWidth={3.2}
-            strokeLinecap="round"
-            opacity={look.browOpacity}
-            style={browStyle("right")}
-          />
+          <g ref={browLeftRef}>
+            <line
+              x1={EYE_LEFT_X - 9}
+              x2={EYE_LEFT_X + 9}
+              y1={BROW_Y}
+              y2={BROW_Y}
+              stroke={INK}
+              strokeWidth={3.2}
+              strokeLinecap="round"
+              opacity={look.browOpacity}
+              style={browStyle("left")}
+            />
+          </g>
+          <g ref={browRightRef}>
+            <line
+              x1={EYE_RIGHT_X - 9}
+              x2={EYE_RIGHT_X + 9}
+              y1={BROW_Y}
+              y2={BROW_Y}
+              stroke={INK}
+              strokeWidth={3.2}
+              strokeLinecap="round"
+              opacity={look.browOpacity}
+              style={browStyle("right")}
+            />
+          </g>
           <path
             ref={mouthRef}
             d={mouthPath(look, 0)}

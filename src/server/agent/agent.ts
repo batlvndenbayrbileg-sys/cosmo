@@ -104,4 +104,22 @@ export interface Agent {
    * astronaut's words; null means "use the template".
    */
   answerAboutResults?(args: { facts: ResultsFacts; question: string; lang: Lang; history: TurnRow[] }): Promise<string | null>;
+  /**
+   * Optional: friend mode (companion.ts). Word a warm, short reply to what the astronaut shared. Never called for a
+   * crisis turn (that reply is always the code template). The pipeline accepts the text only when it passes
+   * companion.isSaneCompanionReply; null (or a throw) means "use the template".
+   */
+  companionReply?(args: CompanionReplyArgs): Promise<string | null>;
+}
+
+export interface CompanionReplyArgs {
+  crew: CrewPublic;
+  /** the context at the start of the turn: the state the check-in waits in, companionTurns, companionCrisis */
+  ctx: MachineCtx;
+  /** turn of the companion conversation, 1 for the first */
+  turn: number;
+  text: string;
+  lang: Lang;
+  /** earlier turns of this check-in, oldest first, WITHOUT the current utterance */
+  history: TurnRow[];
 }

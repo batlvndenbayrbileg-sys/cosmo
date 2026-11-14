@@ -67,6 +67,8 @@ export class ScriptedAgent implements Agent {
 
       case "KPI_CAPTURE": {
         if (expected === null) return base;
+        // a bare greeting ("Сайн уу") is greeted back, never read as an answer ("сайн" would be mood 4)
+        if (detectAskedQuestion(text, lang) === "greeting") return { ...base, asked: { kind: "greeting" } };
         const question = getQuestion(expected);
         const result = interpretAnswer(question, text, lang);
         const own = result.records;

@@ -26,6 +26,47 @@ export const ALERT_SPOKEN_NOTICE: Bilingual = {
   mn: "Энэ нь анхааруулга. Багийн эмнэлгийн офицер болон газрын хяналтад мэдэгдэж байна, эмнэлгийн офицертойгоо удахгүй ярилцахыг зөвлөе.",
 };
 
+/** what the ground console shows for a crisis heard in conversation: never the crew member's own words */
+export const CRISIS_ALERT_TEXT: Record<"self" | "medical", Bilingual> = {
+  self: {
+    en: "Alert: during a conversation with Cosmo the crew member said something that needs immediate support. Crew medical officer and ground informed.",
+    mn: "Анхааруулга: Cosmo-той ярилцах үед багийн гишүүн яаралтай дэмжлэг шаардах зүйл хэллээ. Багийн эмнэлгийн офицер болон газрын хяналтад мэдэгдлээ.",
+  },
+  medical: {
+    en: "Alert: during a conversation with Cosmo the crew member described a possible medical emergency. Crew medical officer and ground informed.",
+    mn: "Анхааруулга: Cosmo-той ярилцах үед багийн гишүүн яаралтай байж болзошгүй эрүүл мэндийн байдлыг дурдлаа. Багийн эмнэлгийн офицер болон газрын хяналтад мэдэгдлээ.",
+  },
+};
+
+/**
+ * A red alert raised the moment Cosmo hears crisis words in conversation (companion mode, any state of the check-in),
+ * in the same way as POST /api/emergency/alert: one deterministic id per check-in and kind, inserted only when absent,
+ * so a repeated phrase or a retried turn never creates a second alert. The text never quotes what was said.
+ */
+export async function raiseCrisisAlert(crewId: string, checkInId: string, kind: "self" | "medical"): Promise<AlertRow> {
+  return insertAlert(crewId, {
+    id: `al-${checkInId}-companion-${kind}`,
+    ifAbsent: true,
+    checkInId,
+    level: "red",
+    rule: "SERIOUS_SYMPTOM_WORD",
+    text: CRISIS_ALERT_TEXT[kind],
+  });
+}
+
+/**
+ * Alerts that are not the summary's: raised by raiseCrisisAlert (companion conversation) or POST /api/emergency/alert,
+ * by their deterministic ids, or (emergency alerts from before those ids) by their text.
+ */
+function isRaisedOutsideSummary(alert: AlertRow, checkInId: string): boolean {
+  return (
+    alert.id.startsWith(`al-${checkInId}-companion-`) ||
+    alert.id.startsWith(`al-${checkInId}-emergency-`) ||
+    alert.text.en.startsWith("Emergency guidance opened:") ||
+    Object.values(CRISIS_ALERT_TEXT).some((t) => t.en === alert.text.en)
+  );
+}
+
 /** returns every alert of this check-in that belongs to the red rules (existing and newly created) */
 export async function createAlertsForCheckIn(
   crewId: string,
@@ -39,8 +80,10 @@ export async function createAlertsForCheckIn(
       ? summary.redFlags.map((f) => ({ rule: f.rule, text: f.text }))
       : [{ rule: "OVERALL", text: OVERALL_TEXT }];
 
-  // listAlerts is crew-scoped, so another member's alerts can never be matched here
-  const existing = (await listAlerts(crewId)).filter((a) => a.checkInId === checkInId);
+  // listAlerts is crew-scoped, so another member's alerts can never be matched here. Only the summary's own alerts
+  // count: a crisis heard in conversation or an opened emergency scenario is stored under SERIOUS_SYMPTOM_WORD too,
+  // and must not stand in for the symptom-word alert of the notes (ground would miss what the summary flagged)
+  const existing = (await listAlerts(crewId)).filter((a) => a.checkInId === checkInId && !isRaisedOutsideSummary(a, checkInId));
   const have = new Set<string>(existing.map((a) => a.rule));
 
   const created: AlertRow[] = [];

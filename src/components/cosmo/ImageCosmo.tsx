@@ -11,7 +11,10 @@
  *     gradient and glow, plus a small glowing mouth while talking;
  *  3. adds CSS-free SVG glow overlays on the ear rings (pulse while listening) and the collar
  *     (slow pulse while thinking), and a gentle float / breath / tilt of the whole body;
- *  4. rotates the hue of the neon parts per crew variant (the white body stays white).
+ *  4. rotates the hue of the neon parts per crew variant (the white body stays white);
+ *  5. with a `gaze` source ("Cosmo looks at you"), moves the drawn eyes toward the person, as far as the
+ *     visor allows (gaze.ts), and leans the whole body a few degrees toward them (no lean with reduced
+ *     motion). The lean is inside this SVG, so the shared layoutId wrapper's own transform is untouched.
  *
  * Everything lives in ONE SVG whose viewBox is the pixel size of the render, so the picture and the
  * face can never drift apart whatever size the avatar is drawn at.
@@ -30,6 +33,7 @@ import {
   browPath,
   collarGlowTarget,
   earGlowTarget,
+  eyeExtentU,
   eyeParamsFor,
   eyePath,
   eyeTransform,
@@ -45,10 +49,25 @@ import {
   type EyeParams,
 } from "./image-face";
 import {
+  GAZE_CENTRE,
+  NO_LEAN,
+  easeGazeScale,
+  gazeEyeShiftU,
+  gazeLean,
+  lerpGaze,
+  safeGazeScale,
+  settleGaze,
+  smoothingFactor,
+  type Gaze,
+  type GazeSource,
+  type Lean,
+} from "./gaze";
+import {
   MASCOT_POSE_IDS,
   MASCOT_POSES,
   mascotPose,
   outlinePoints,
+  outlineToPx,
   poseGeometry,
   type MascotPoseChoice,
   type MascotPoseId,
@@ -73,6 +92,7 @@ interface Live {
   amplitude: number;
   reduced: boolean;
   poseChoice: MascotPoseChoice;
+  gaze: GazeSource | undefined;
 }
 
 const IMG_W = 822;
@@ -106,21 +126,25 @@ export function ImageCosmo({
   pose: poseChoice = "auto",
   debug = false,
   onLoadError,
+  gaze,
 }: ImageCosmoProps) {
   const reduced = usePrefersReducedMotion();
   const uid = useId().replace(/[^a-zA-Z0-9]/g, "");
   const [displayPose, setDisplayPose] = useState<MascotPoseId>(() => resolvePoseChoice(poseChoice, state, emotion));
   const pose = mascotPose(displayPose);
   const geo = useMemo(() => poseGeometry(pose), [pose]);
+  const visorPx = useMemo(() => outlineToPx(pose), [pose]);
   const neon = mascotNeon(variant, pose);
 
-  const live = useRef<Live>({ state, emotion, amplitude, reduced, poseChoice });
+  const live = useRef<Live>({ state, emotion, amplitude, reduced, poseChoice, gaze });
   const geoRef = useRef(geo);
+  const visorRef = useRef(visorPx);
   const initialPose = useRef(displayPose);
   const callbacks = useRef({ onLoadError });
   useEffect(() => {
-    live.current = { state, emotion, amplitude, reduced, poseChoice };
+    live.current = { state, emotion, amplitude, reduced, poseChoice, gaze };
     geoRef.current = geo;
+    visorRef.current = visorPx;
     callbacks.current = { onLoadError };
   });
 
@@ -175,6 +199,11 @@ export function ImageCosmo({
     let switching: MascotPoseId | null = null;
     let blinkStart = Number.NEGATIVE_INFINITY;
     let nextBlinkAt = start + nextBlinkDelay();
+    // where Cosmo looks (camera face following), eased per frame: the source updates ~12 times a second
+    let look: Gaze = { ...GAZE_CENTRE };
+    /** the visor-fit factor actually applied (eased, see easeGazeScale) */
+    let gazeScaleNow = 1;
+    let lean: Lean = NO_LEAN;
 
     const frame = (now: number) => {
       raf = requestAnimationFrame(frame);
@@ -200,7 +229,21 @@ export function ImageCosmo({
       }
       w.put("fade", fadeRef.current, "opacity", r2(fade).toString());
 
-      // ---- body: float, breath (idle), attentive tilt (listening); all still with reduced motion
+      // ---- gaze: follow the face (the eyes do so also with reduced motion), or glide back to the centre
+      const seen = cur.gaze?.current ?? null;
+      look = lerpGaze(look, seen ?? GAZE_CENTRE, smoothingFactor(dt, seen ? 90 : 380));
+      // back at the centre with no face: exactly the centre, so the visor test below stops running
+      if (!seen) look = settleGaze(look);
+      // lean toward the person: a few degrees / px, none with reduced motion
+      const leanTarget = gazeLean(seen ? look : null, cur.reduced);
+      const kLean = cur.reduced ? 1 : smoothingFactor(dt, 260);
+      lean = {
+        rotateDeg: lean.rotateDeg + (leanTarget.rotateDeg - lean.rotateDeg) * kLean,
+        dx: lean.dx + (leanTarget.dx - lean.dx) * kLean,
+        dy: lean.dy + (leanTarget.dy - lean.dy) * kLean,
+      };
+
+      // ---- body: float, breath (idle), attentive tilt (listening), lean; all still with reduced motion
       const tiltTarget = tiltTargetFor(cur.state);
       tilt = cur.reduced ? tiltTarget : smoothAmplitude(tilt, tiltTarget, dt, { attackMs: 220, releaseMs: 220 });
       const dy = floatOffset(t, cur.reduced);
@@ -209,7 +252,7 @@ export function ImageCosmo({
         "body",
         bodyRef.current,
         "transform",
-        `translate(0 ${r2(dy)}) rotate(${r2(tilt)} ${IMG_W / 2} ${PIVOT_Y}) ` +
+        `translate(${r2(lean.dx)} ${r2(dy + lean.dy)}) rotate(${r2(tilt + lean.rotateDeg)} ${IMG_W / 2} ${PIVOT_Y}) ` +
           `translate(${IMG_W / 2} ${PIVOT_Y}) scale(1 ${r2(breath)}) translate(${-IMG_W / 2} ${-PIVOT_Y})`,
       );
       const lift = Math.min(1, Math.max(0, -dy / 4));
@@ -227,12 +270,32 @@ export function ImageCosmo({
           }
           closure = blinkClosure(now - blinkStart);
         }
+        // the gaze shift in eye units, scaled down where it would push an eye out of the visor
+        const shiftU = gazeEyeShiftU(look);
+        let safeScale = 1;
+        if (shiftU.dx !== 0 || shiftU.dy !== 0) {
+          const ext = eyeExtentU(eyeP);
+          safeScale = safeGazeScale(
+            g.eyes.map((e) => ({
+              cx: e.cx + eyeP.dx * e.u,
+              cy: e.cy + eyeP.dy * e.u,
+              halfW: ext.halfW * e.u,
+              halfH: ext.halfH * e.u,
+            })),
+            g.eyes.map((e) => ({ dx: shiftU.dx * e.u, dy: shiftU.dy * e.u })),
+            visorRef.current,
+          );
+        }
+        // drops at once (the eyes stay on the glass), rises back gently (no flicker near the edge)
+        gazeScaleNow = cur.reduced ? safeScale : easeGazeScale(gazeScaleNow, safeScale, dt);
+        const gazeScale = gazeScaleNow;
+        const lookP ={ ...eyeP, dx: eyeP.dx + shiftU.dx * gazeScale, dy: eyeP.dy + shiftU.dy * gazeScale };
         for (const i of [0, 1] as const) {
           const e = g.eyes[i];
           const side = i === 0 ? -1 : 1;
           const d = eyePath(eyeP, e.u);
           const sw = r2(eyeP.strokeW * e.u).toString();
-          w.put(`eg${i}`, eyeGroupRefs.current[i], "transform", eyeTransform(e.cx, e.cy, e.u, eyeP, side, closure));
+          w.put(`eg${i}`, eyeGroupRefs.current[i], "transform", eyeTransform(e.cx, e.cy, e.u, lookP, side, closure));
           w.put(`ed${i}`, eyeCoreRefs.current[i], "d", d);
           w.put(`es${i}`, eyeCoreRefs.current[i], "stroke-width", sw);
           w.put(`gd${i}`, eyeGlowRefs.current[i], "d", d);
@@ -241,7 +304,7 @@ export function ImageCosmo({
             `bt${i}`,
             browGroupRefs.current[i],
             "transform",
-            eyeTransform(e.cx, e.cy, e.u, { ...eyeP, scaleY: 1 }, side, 0),
+            eyeTransform(e.cx, e.cy, e.u, { ...lookP, scaleY: 1 }, side, 0),
           );
           w.put(`bo${i}`, browGroupRefs.current[i], "opacity", r2(eyeP.browOpacity).toString());
         }
@@ -252,7 +315,10 @@ export function ImageCosmo({
         const mouthTarget = cur.state === "talking" || mouthOpen > 0.02 ? 1 : 0;
         mouthVis = smoothAmplitude(mouthVis, mouthTarget, dt, { attackMs: 90, releaseMs: 160 });
         w.put("mo", mouthGroupRef.current, "opacity", r2(mouthVis).toString());
-        w.put("mt", mouthGroupRef.current, "transform", `translate(${r2(g.mouth.cx)} ${r2(g.mouth.cy)})`);
+        // the mouth follows the eyes a little, a hint of the head turning
+        const mx = g.mouth.cx + shiftU.dx * gazeScale * g.mouth.u * 0.45;
+        const my = g.mouth.cy + shiftU.dy * gazeScale * g.mouth.u * 0.3;
+        w.put("mt", mouthGroupRef.current, "transform", `translate(${r2(mx)} ${r2(my)})`);
         w.put("md", mouthPathRef.current, "d", glowMouthPath(mouthLook, mouthOpen, g.mouth.u));
         w.put("mf", mouthPathRef.current, "fill-opacity", r2(Math.min(0.3, mouthOpen * 0.6)).toString());
 

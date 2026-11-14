@@ -185,6 +185,20 @@ export function lerpEye(a: EyeParams, b: EyeParams, t: number): EyeParams {
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
+/**
+ * Half extents of the drawn eye in eye units (stroke, scale and vertical stretch included, tilt ignored):
+ * what has to stay inside the visor when the eyes follow a face.
+ */
+export function eyeExtentU(
+  p: Pick<EyeParams, "halfW" | "endY" | "ctrlY" | "strokeW" | "scale" | "scaleY">,
+): { halfW: number; halfH: number } {
+  const apex = (p.endY + p.ctrlY) / 2;
+  return {
+    halfW: (p.halfW + p.strokeW / 2) * p.scale,
+    halfH: (Math.max(Math.abs(apex), Math.abs(p.endY)) + p.strokeW / 2) * p.scale * p.scaleY,
+  };
+}
+
 /** SVG path of an eye in pixels, centred on (0, 0); `u` = eye width in px */
 export function eyePath(shape: Pick<EyeShape, "halfW" | "endY" | "ctrlY">, u: number): string {
   const hw = shape.halfW * u;

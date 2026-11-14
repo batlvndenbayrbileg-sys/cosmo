@@ -3,8 +3,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { KpiKey, Lang, SummaryFindings, TurnRow } from "@/lib/types";
 import { KPI_DEFS, getQuestion } from "@/lib/kpi/registry";
 import { getEnv } from "@/server/env";
-import { LlmUnavailable, type Agent, type AgentArgs, type AgentDecision } from "./agent";
-import { buildDirective } from "./directive";
+import { LlmUnavailable, type Agent, type AgentArgs, type AgentDecision, type CompanionReplyArgs } from "./agent";
+import { buildCompanionDirective, buildDirective } from "./directive";
 import { interpretYesNo, type InterpretedRecord } from "./interpret";
 import { SYSTEM_PROMPT } from "./prompt";
 import { detectSkip, startAnswerFor } from "./scriptedAgent";
@@ -366,7 +366,28 @@ export class ClaudeAgent implements Agent {
     }
   }
 
-  async phraseSummary(args: { findings: SummaryFindings; lang: Lang; crew: { name: string } }): Promise<string | null> {
+  /**
+   * Friend mode: the conversation so far plus the companion directive (same frozen system prompt and tool list, so the
+   * cached prefix is reused). Tool calls are ignored; only the text is returned, and the pipeline checks it.
+   */
+  async companionReply(args: CompanionReplyArgs): Promise<string | null> {
+    const directive = buildCompanionDirective({
+      state: args.ctx.state,
+      lang: args.lang,
+      crewName: args.crew.name,
+      turn: args.turn,
+      crisisRaised: args.ctx.companionCrisis,
+    });
+    try {
+      const message = await this.call(this.withDirective(buildMessages(args.history, args.text), directive));
+      const out = textOf(message).trim();
+      return out.length > 0 ? out : null;
+    } catch {
+      return null;
+    }
+  }
+
+  async phraseSummary(args:{ findings: SummaryFindings; lang: Lang; crew: { name: string } }): Promise<string | null> {
     const { findings, lang } = args;
     const facts = {
       overall: findings.overall,

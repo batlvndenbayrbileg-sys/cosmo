@@ -2,6 +2,7 @@
  * Cosmo mascot contract (docs/BRIEF.md section 6, docs/PLAN.md section 6).
  * Identical for the placeholder SVG character and for the Rive implementation.
  */
+import type { GazeSource } from "./gaze";
 
 export const COSMO_STATES = ["idle", "listening", "thinking", "talking"] as const;
 export type CosmoState = (typeof COSMO_STATES)[number];
@@ -24,4 +25,10 @@ export interface CosmoProps {
    * component has no language of its own). Defaults to an English description.
    */
   label?: string;
+  /**
+   * Additive, optional: where Cosmo looks ("Cosmo looks at you", camera face following). Read every
+   * animation frame, never during render, so updating it does not re-render anything; `current` null or
+   * no source = the usual idle look. Implementations without eyes to move ignore it.
+   */
+  gaze?: GazeSource;
 }

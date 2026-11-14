@@ -11,6 +11,8 @@ describe("detectAskedQuestion: Mongolian", () => {
     ["Дахиад хэлээч", "repeat"],
     ["юу гэсэн бэ", "repeat"],
     ["Сансарт өнөөдөр цаг агаар ямар вэ?", "other"],
+    ["Сайн уу", "greeting"],
+    ["Сайн байна уу, Cosmo?", "greeting"],
   ] as const)("%s -> %s", (text, kind) => {
     expect(detectAskedQuestion(text, "mn")).toBe(kind);
   });

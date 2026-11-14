@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { CosmoAvatar } from "@/components/cosmo/CosmoAvatar";
+import type { GazeSource } from "@/components/cosmo/gaze";
 import type { CosmoEmotion, CosmoState } from "@/components/cosmo/types";
 import { COSMO_LAYOUT_ID } from "@/lib/motion";
 
@@ -14,6 +15,9 @@ export interface SharedCosmoProps {
   /** 0..1, drives the mouth */
   amplitude: number;
   label: string;
+  /** "Cosmo looks at you": read by the mascot's own animation loop (the lean happens inside the avatar, so this
+   *  layoutId element's transform stays framer-motion's alone) */
+  gaze?: GazeSource;
 }
 
 /**
@@ -22,7 +26,7 @@ export interface SharedCosmoProps {
  * handed to the dashboard as `dockSlot`, so framer-motion shrinks it from the stage into the
  * dashboard's Cosmo card inside one React tree.
  */
-export function SharedCosmo({ variant, state, emotion, amplitude, label }: SharedCosmoProps) {
+export function SharedCosmo({ variant, state, emotion, amplitude, label, gaze }: SharedCosmoProps) {
   return (
     <motion.div
       layoutId={COSMO_LAYOUT_ID}
@@ -30,7 +34,7 @@ export function SharedCosmo({ variant, state, emotion, amplitude, label }: Share
       className="size-full"
       data-slot="shared-cosmo"
     >
-      <CosmoAvatar variant={variant} state={state} emotion={emotion} amplitude={amplitude} label={label} />
+      <CosmoAvatar variant={variant} state={state} emotion={emotion} amplitude={amplitude} label={label} gaze={gaze} />
     </motion.div>
   );
 }

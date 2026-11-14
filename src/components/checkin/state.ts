@@ -65,6 +65,8 @@ export interface CheckInState {
   language: Lang | null;
   conversation: ConversationState | null;
   expectedQuestion: QuestionId | null;
+  /** friend mode is on: a conversation on the side, with a way back to the check-in */
+  companion: boolean;
   transcript: TranscriptLine[];
   pendingCrew: PendingCrewLine | null;
   /** newest first */
@@ -118,6 +120,7 @@ export function initialCheckInState(): CheckInState {
     language: null,
     conversation: null,
     expectedQuestion: null,
+    companion: false,
     transcript: [],
     pendingCrew: null,
     cards: [],
@@ -191,7 +194,7 @@ function applyEvent(state: CheckInState, event: TurnEvent): CheckInState {
       });
     }
     case "state":
-      return { ...state, conversation: event.state, expectedQuestion: event.expectedQuestion };
+      return { ...state, conversation: event.state, expectedQuestion: event.expectedQuestion, companion: event.companion === true };
     case "measurement": {
       const clarification = state.clarification?.key === event.key ? null : state.clarification;
       return { ...state, cards: upsertCard(state.cards, event), clarification };

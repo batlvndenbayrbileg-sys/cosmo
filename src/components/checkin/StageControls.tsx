@@ -3,11 +3,12 @@
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowLeft, ArrowUp, CircleHelp, Info, Keyboard, Play, Square, TriangleAlert, X } from "lucide-react";
+import { ArrowLeft, ArrowUp, CircleHelp, Info, Keyboard, Play, ScanFace, Square, TriangleAlert, X } from "lucide-react";
 import { useI18n } from "@/i18n/I18nProvider";
 import { getKpi } from "@/lib/kpi/registry";
 import { cn } from "@/lib/utils";
 import type { KpiKey, Lang } from "@/lib/types";
+import type { FaceTrackStatus } from "./face-tracker";
 
 /** Frosted glass surface shared by every small control on the stage. */
 export const GLASS =
@@ -82,6 +83,56 @@ export function LanguageCaptionControls({
         CC
       </button>
     </div>
+  );
+}
+
+/**
+ * "Cosmo looks at you": turns camera face following on and off (off by default, the choice is remembered).
+ * The tooltip and the accessible description say that the video never leaves the browser. While the camera
+ * is actually running a small green dot sits on the button (and "Camera on" is announced).
+ */
+export function FaceFollowControl({
+  on,
+  status,
+  onToggle,
+}: {
+  on: boolean;
+  status: FaceTrackStatus;
+  onToggle: (on: boolean) => void;
+}) {
+  const { t } = useI18n();
+  const descId = useId();
+  const label = t("checkin.faceFollow.toggle");
+  const privacy = t("checkin.faceFollow.privacy");
+  const live = on && status === "on";
+  return (
+    <span className="relative inline-flex" data-slot="stage-face-follow" data-camera={live ? "on" : "off"}>
+      <button
+        type="button"
+        aria-pressed={on}
+        aria-label={label}
+        aria-describedby={descId}
+        title={`${label}. ${privacy}`}
+        onClick={() => onToggle(!on)}
+        className={cn(GHOST, "w-10", on && "bg-[var(--aegis-ink)] text-white")}
+      >
+        <ScanFace className="size-[18px]" aria-hidden="true" />
+      </button>
+      <span id={descId} className="sr-only">
+        {privacy}
+      </span>
+      <span role="status" className="sr-only">
+        {live ? t("checkin.faceFollow.on") : ""}
+      </span>
+      {live ? (
+        <span
+          aria-hidden="true"
+          title={t("checkin.faceFollow.on")}
+          data-slot="camera-on"
+          className="pointer-events-none absolute -top-0.5 -right-0.5 size-3 rounded-full bg-emerald-500 ring-2 ring-white"
+        />
+      ) : null}
+    </span>
   );
 }
 
