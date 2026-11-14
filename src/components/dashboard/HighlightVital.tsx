@@ -13,7 +13,8 @@ import { AXIS_ICON, BigStat, IconChip } from "./parts";
 import { HeartPulse } from "lucide-react";
 
 const BARS = 10;
-const CHART_H = 150;
+/** room above the tallest bar for today's value pill */
+const TIP_ROOM = 26;
 
 function digitsFor(stat: KpiStat): number {
   const type = KPI_DEFS[stat.key].type;
@@ -42,7 +43,7 @@ export function HighlightVital({ payload }: { payload: DashboardPayload }) {
   const todayBar = bars.find((b) => b.today) ?? null;
 
   return (
-    <section data-slot="highlight-vital" aria-labelledby="highlight-title" className="glass-card flex flex-col gap-5 p-5">
+    <section data-slot="highlight-vital" aria-labelledby="highlight-title" className="glass-card flex flex-col gap-4 p-5 lg:min-h-0 lg:flex-[1.25] lg:gap-[clamp(8px,1.5vh,18px)] lg:p-[clamp(12px,1.8vh,20px)] lg:[&_.num-xl]:text-[clamp(24px,3.6vh,38px)]">
       <header className="flex items-center gap-3">
         <IconChip icon={Icon} />
         <h2 id="highlight-title" className="min-w-0 flex-1 truncate text-[18px] font-normal text-[var(--aegis-ink)]">
@@ -77,19 +78,19 @@ export function HighlightVital({ payload }: { payload: DashboardPayload }) {
       {bars.length === 0 ? (
         <p className="text-[13px] text-[var(--aegis-label)]">{t("dashboard.highlight.noHistory")}</p>
       ) : (
-        <figure className="flex flex-col gap-2">
+        <figure className="flex flex-col gap-2 lg:min-h-0 lg:flex-1">
           <div
             role="img"
             aria-label={t("dashboard.highlight.chartAria", { label, n: bars.length })}
-            className="relative flex items-end gap-[6px]"
-            style={{ height: CHART_H + 30 }}
+            className="relative flex h-[180px] items-end gap-[6px] lg:h-auto lg:min-h-[56px] lg:flex-1"
           >
             {bars.map((b, i) => {
-              const h = Math.max((b.value / max) * CHART_H, 8);
+              // bar height as a share of the chart area (which scales with the screen height), at least 8px
+              const h = `max(8px, calc((100% - ${TIP_ROOM}px) * ${(b.value / max).toFixed(4)}))`;
               return (
                 <div key={b.date ?? "today"} className="relative flex h-full min-w-0 flex-1 flex-col items-center justify-end">
                   {b.today ? (
-                    <span className="tnum absolute z-10 rounded-full bg-[var(--aegis-ink)] px-2 py-0.5 text-[11px] font-medium whitespace-nowrap text-white shadow-md" style={{ bottom: h + 8 }}>
+                    <span className="tnum absolute z-10 rounded-full bg-[var(--aegis-ink)] px-2 py-0.5 text-[11px] font-medium whitespace-nowrap text-white shadow-md" style={{ bottom: `calc(${h} + 6px)` }}>
                       {formatNumber(b.value, digits)}
                       {unit && !unit.startsWith("/") ? ` ${unit}` : ""}
                     </span>

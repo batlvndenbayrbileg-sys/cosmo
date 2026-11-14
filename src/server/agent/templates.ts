@@ -49,6 +49,18 @@ const EN_SPOKEN_UNITS: Readonly<Record<string, readonly [string, string]>> = {
   "mg/dL": ["milligram per decilitre", "milligrams per decilitre"],
 };
 
+/**
+ * Mongolian spoken forms of the displayed units (the speech engine reads "удаа/мин", "°C" and "mg/dL" badly).
+ * Keyed by the unit suffix that formatValue prints in Mongolian.
+ */
+const MN_SPOKEN_UNITS: Readonly<Record<string, (base: string) => string>> = {
+  "удаа/мин": (b) => `минутад ${b} удаа`,
+  "°C": (b) => `${b} хэм`,
+  "mg/dL": (b) => b,
+  "мл": (b) => `${b} миллилитр`,
+  "мин": (b) => `${b} минут`,
+};
+
 function spokenValue(key: KpiKey, value: MeasurementValue, lang: Lang): string {
   const def = KPI_DEFS[key];
   const n = asNumber(value);
@@ -58,6 +70,12 @@ function spokenValue(key: KpiKey, value: MeasurementValue, lang: Lang): string {
     return lang === "mn" ? `${max}-аас ${formatNumber(n, 1)}` : `${formatNumber(n, 1)} out of ${max}`;
   }
   const formatted = formatValue(key, value, lang);
+  if (lang === "mn") {
+    if (def.type === "category" || def.type === "boolean") return formatted.charAt(0).toLowerCase() + formatted.slice(1);
+    for (const [suffix, speak] of Object.entries(MN_SPOKEN_UNITS)) {
+      if (formatted.endsWith(` ${suffix}`)) return speak(formatted.slice(0, formatted.length - suffix.length - 1));
+    }
+  }
   if (lang === "en" && def.unit && n !== null) {
     const words = EN_SPOKEN_UNITS[def.unit];
     if (words && formatted.endsWith(` ${def.unit}`)) {

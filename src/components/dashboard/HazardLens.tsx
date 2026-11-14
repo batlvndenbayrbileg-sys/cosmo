@@ -36,14 +36,14 @@ export function HazardLens({
   const info = selectedStat ? NASA_HAZARDS[selectedStat.hazard] : null;
 
   return (
-    <Card data-slot="hazard-lens" aria-labelledby="hazard-lens-title" className="h-full gap-3">
+    <Card data-slot="hazard-lens" aria-labelledby="hazard-lens-title" className="h-full gap-3 lg:h-auto lg:shrink-0 lg:gap-2">
       <CardHeader>
         <CardTitle id="hazard-lens-title" className="text-lg">
           {t("dashboard.hazards.title")}
         </CardTitle>
-        <p className="text-sm text-muted-foreground">{t("dashboard.hazards.subtitle")}</p>
+        <p className="text-sm text-muted-foreground lg:text-[13px] lg:leading-snug">{t("dashboard.hazards.subtitle")}</p>
       </CardHeader>
-      <CardContent className="flex flex-col gap-3">
+      <CardContent className="flex flex-col gap-3 lg:gap-2.5">
         <ul className="flex flex-wrap gap-2">
           {hazards.map((h) => {
             const name = pick(NASA_HAZARDS[h.hazard].name);
@@ -62,7 +62,7 @@ export function HazardLens({
                   onClick={() => onSelect(isSelected ? null : h.hazard)}
                   style={monitored === null ? HATCH : undefined}
                   className={cn(
-                    "inline-flex min-h-11 items-center gap-2 rounded-full border px-3.5 py-1.5 text-base font-medium outline-none transition-shadow focus-visible:ring-3 focus-visible:ring-ring/50",
+                    "inline-flex min-h-11 items-center gap-2 rounded-full border px-3.5 py-1.5 text-base font-medium outline-none transition-shadow focus-visible:ring-3 focus-visible:ring-ring/50 lg:min-h-[clamp(32px,4.4vh,44px)] lg:px-3 lg:py-1 lg:text-[clamp(13px,1.7vh,16px)]",
                     monitored === null
                       ? "border-dashed border-status-nodata/60 bg-card text-muted-foreground"
                       : statusClasses(monitored).pill,
@@ -88,7 +88,7 @@ export function HazardLens({
           <div
             data-slot="hazard-detail"
             aria-live="polite"
-            className="flex flex-col gap-2 rounded-xl bg-secondary/70 p-4 ring-1 ring-foreground/10"
+            className="flex flex-col gap-2 rounded-xl bg-secondary/70 p-4 ring-1 ring-foreground/10 lg:gap-1.5 lg:p-3"
           >
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div className="flex flex-wrap items-center gap-2">
@@ -104,7 +104,7 @@ export function HazardLens({
                 {t("dashboard.hazards.clear")}
               </Button>
             </div>
-            <p className="text-base text-foreground">{pick(info.summary)}</p>
+            <p className="text-base text-foreground lg:text-[14px] lg:leading-snug">{pick(info.summary)}</p>
             <p className="text-sm text-muted-foreground">
               {selectedStat.keys.length === 0
                 ? t("dashboard.hazards.noLinked")

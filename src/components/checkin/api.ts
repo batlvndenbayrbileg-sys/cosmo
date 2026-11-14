@@ -131,13 +131,33 @@ export async function fetchCrew(fetchImpl?: FetchLike): Promise<CrewPublic[]> {
   return list.filter(isCrewPublic);
 }
 
-export async function createCheckIn(language: Lang, fetchImpl?: FetchLike): Promise<CheckInCreated> {
+/** `language` undefined: the server uses the crew member's own preferred language (what the check-in screen does). */
+export async function createCheckIn(language: Lang | undefined, fetchImpl?: FetchLike): Promise<CheckInCreated> {
   const res = await send(fetchImpl, "/api/checkins", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ language }),
   });
   return readJson<CheckInCreated>(res);
+}
+
+export type TourFocus = "overall" | "alerts" | "body" | "vital" | "radar" | "plan" | "timeline" | "ask";
+export interface TourStep {
+  focus: TourFocus;
+  turnId: string;
+  text: string;
+}
+
+/** POST /api/checkins/:id/tour - Cosmo's spoken walkthrough of today's dashboard (stored as Cosmo turns). */
+export async function postTour(
+  checkInId: string,
+  language: Lang,
+  fetchImpl?: FetchLike,
+): Promise<{ language: Lang; steps: TourStep[] }> {
+  const res = await send(fetchImpl, `/api/checkins/${encodeURIComponent(checkInId)}/tour?lang=${language}`, {
+    method: "POST",
+  });
+  return readJson<{ language: Lang; steps: TourStep[] }>(res);
 }
 
 export async function fetchSnapshot(checkInId: string, fetchImpl?: FetchLike): Promise<CheckInSnapshot> {

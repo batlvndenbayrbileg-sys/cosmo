@@ -41,8 +41,11 @@ export interface AssistantTurn {
 }
 
 export interface UseCheckInOptions {
-  /** language requested for a new check-in (the UI language when the screen opened) */
-  language: Lang;
+  /**
+   * language requested for a new check-in; undefined = the crew member's own preferred language (the check-in screen
+   * leaves it undefined so a Mongolian crew member's check-in is always Mongolian)
+   */
+  language?: Lang;
   /**
    * Cosmo has something to say (greeting or a reply). The summary turn is not reported here: its
    * text arrives with the `summary` event and is spoken from `onSummary` after the dashboard shows.

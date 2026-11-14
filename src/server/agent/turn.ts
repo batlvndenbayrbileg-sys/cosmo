@@ -15,7 +15,6 @@ import type {
 import { computeBaselines, evaluateDay, evaluateIndicator } from "@/lib/health";
 import { formatNumber } from "@/lib/health/format";
 import { KPI_DEFS, QUESTIONS, asNumber, getQuestion, questionFilled } from "@/lib/kpi/registry";
-import { detectLanguage, normalizeLanguageCode } from "@/lib/language";
 import { now } from "@/server/clock";
 import { getEnv } from "@/server/env";
 import { HttpError } from "@/server/http";
@@ -191,15 +190,6 @@ export function isSaneSummaryText(text: string, findings: SummaryFindings): bool
 
 /* ───────────── small helpers ───────────── */
 
-function letterCount(text: string): number {
-  return text.match(/\p{L}/gu)?.length ?? 0;
-}
-
-/** short answers ("yes", "ok") carry no language of their own: the conversation's language continues */
-function replyLanguage(text: string, hint: Lang): Lang {
-  if (letterCount(text) < 4) return hint;
-  return detectLanguage(text, hint).lang;
-}
 
 function clarificationReason(res: Extract<ToolResult, { ok: false }>): string {
   if (res.code === "invalid_value") return res.reason === "range" ? "out_of_range" : "not_a_number";
@@ -366,9 +356,10 @@ async function* runTurnInner(args: RunTurnArgs, started: number): AsyncGenerator
   const ctx0 = loadMachineCtx(checkIn);
 
   const history: TurnRow[] = listTurns(crewId, checkInId, { limit: HISTORY_TURNS });
-  const lastLanguage = history.length > 0 ? history[history.length - 1].language : checkIn.language;
-  const hint: Lang = normalizeLanguageCode(input.languageHint) ?? lastLanguage;
-  const lang = replyLanguage(text, hint);
+  // Team decision (2026-11-14): Cosmo keeps ONE language for the whole check-in - the check-in's language (the crew
+  // member's preferred language or the one chosen at the start). A Mongolian check-in stays Mongolian from start to
+  // finish even when the recogniser returns digits or Latin-looking text for an utterance.
+  const lang: Lang = checkIn.language;
 
   const crewTurn = appendTurn(crewId, checkInId, { speaker: "crew", text, language: lang, createdAt: now() });
   yield { type: "transcript", turnId: crewTurn.id, text, language: lang };

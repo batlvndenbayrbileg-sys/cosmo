@@ -274,6 +274,17 @@ export function StageToasts({ toasts, onAction }: { toasts: StageToast[]; onActi
 
 /* ───────────── question bubble ───────────── */
 
+/**
+ * The server sends a machine reason code with each clarification ("unclear", "out_of_range", "not_a_number",
+ * "not_verified"); it is shown as a sentence in the screen's language, never as the raw code.
+ */
+const CLARIFY_REASON_KEYS: Record<string, string> = {
+  unclear: "checkin.clarify.reason.unclear",
+  out_of_range: "checkin.clarify.reason.outOfRange",
+  not_a_number: "checkin.clarify.reason.notANumber",
+  not_verified: "checkin.clarify.reason.notVerified",
+};
+
 /** Soft question bubble beside Cosmo's head while she needs one more detail; it leaves once answered. */
 export function QuestionBubble({
   clarification,
@@ -307,8 +318,10 @@ export function QuestionBubble({
               <p className="text-[14.5px] font-medium leading-snug text-[var(--aegis-ink)]">
                 {t("checkin.clarify.title", { label: getKpi(clarification.key).labels[lang] })}
               </p>
-              {clarification.reason.trim() !== "" ? (
-                <p className="mt-0.5 text-[13px] leading-snug text-[var(--aegis-label)]">{clarification.reason.trim()}</p>
+              {CLARIFY_REASON_KEYS[clarification.reason.trim()] ? (
+                <p className="mt-0.5 text-[13px] leading-snug text-[var(--aegis-label)]">
+                  {t(CLARIFY_REASON_KEYS[clarification.reason.trim()])}
+                </p>
               ) : null}
             </div>
           </div>

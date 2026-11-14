@@ -201,6 +201,14 @@ export const dashboardStrings: AreaDicts = {
     "dashboard.timeline.dayAxis": "{date}: {status}, {axis}",
 
     "dashboard.details.title": "All readings",
+
+    "dashboard.trends.titleLight": "14-day",
+    "dashboard.trends.titleStrong": "trends",
+    "dashboard.trends.subtitle": "Your main numbers over the last 14 days. Shaded band: your usual range. Dot: today.",
+    "dashboard.trends.avg": "14-day average {value}",
+    "dashboard.alerts.chip": "{n} open alerts",
+    "dashboard.alerts.chipOne": "1 open alert",
+    "dashboard.alerts.chipAria": "Open alerts: {n}. Opens the Earth link view",
   },
   mn: {
     "dashboard.title": "Өдрийн эрүүл мэндийн самбар",
@@ -399,5 +407,13 @@ export const dashboardStrings: AreaDicts = {
     "dashboard.timeline.dayAxis": "{date}: {status}, {axis}",
 
     "dashboard.details.title": "Бүх үзүүлэлт",
+
+    "dashboard.trends.titleLight": "14 хоногийн",
+    "dashboard.trends.titleStrong": "явц",
+    "dashboard.trends.subtitle": "Сүүлийн 14 хоногийн гол үзүүлэлтүүд. Сүүдэртэй зурвас: таны ердийн хүрээ. Цэг: өнөөдөр.",
+    "dashboard.trends.avg": "14 хоногийн дундаж {value}",
+    "dashboard.alerts.chip": "{n} нээлттэй сэрэмжлүүлэг",
+    "dashboard.alerts.chipOne": "1 нээлттэй сэрэмжлүүлэг",
+    "dashboard.alerts.chipAria": "{n} нээлттэй сэрэмжлүүлэг. Дэлхийтэй холбооны хэсгийг нээх",
   },
 };

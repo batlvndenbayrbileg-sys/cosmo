@@ -78,7 +78,10 @@ export function BodyHero({ payload }: { payload: DashboardPayload }) {
     return {
       spot,
       style: {
-        "--tip-left": `calc(50% + ${kx.toFixed(4)} * var(--fig-w) + ${right ? 26 : -26}px)`,
+        // beside the hotspot, but kept inside the stage so it never spills over the side columns
+        "--tip-left": right
+          ? `min(calc(100% - var(--tip-w)), calc(50% + ${kx.toFixed(4)} * var(--fig-w) + 26px))`
+          : `max(var(--tip-w), calc(50% + ${kx.toFixed(4)} * var(--fig-w) - 26px))`,
         "--tip-top": `calc(${ky.toFixed(4)} * var(--stage-h))`,
         "--tip-tx": right ? "0%" : "-100%",
         "--tip-ty": ty,
@@ -93,14 +96,15 @@ export function BodyHero({ payload }: { payload: DashboardPayload }) {
       id="dashboard-body"
       data-slot="body-hero"
       aria-labelledby="body-title"
-      className="relative flex flex-col items-center"
+      className="relative flex flex-col items-center max-md:overflow-x-clip lg:h-full lg:[container-type:size]"
     >
       <h2 id="body-title" className="sr-only">
         {t("dashboard.body.title")}
       </h2>
 
+      {/* phones: a viewport-based height; desktop: the cell's height (minus the hint line), never wider than the cell */}
       <div
-        className="relative w-full [--stage-h:clamp(400px,62vh,640px)] xl:[--stage-h:clamp(520px,72vh,680px)]"
+        className="relative w-full [--stage-h:clamp(380px,62vh,620px)] [--tip-w:268px] lg:[--stage-h:min(calc(100cqh-1.75rem),calc(100cqw*1.5))] lg:[--tip-w:clamp(184px,15vw,268px)]"
         style={{ height: "var(--stage-h)", ["--fig-w" as string]: `calc(var(--stage-h) * ${FIG_RATIO.toFixed(4)})` }}
       >
         {/* glow + floor ring */}
@@ -205,7 +209,7 @@ export function BodyHero({ payload }: { payload: DashboardPayload }) {
             aria-labelledby="body-tip-desktop"
             data-slot="body-tooltip"
             style={tip.style}
-            className="z-30 hidden w-[268px] md:absolute md:block md:[top:var(--tip-top)] md:[left:var(--tip-left)] md:[transform:translate(var(--tip-tx),var(--tip-ty))] md:transition-[left,top] md:duration-300"
+            className="z-30 hidden w-[var(--tip-w)] md:absolute md:block md:[top:var(--tip-top)] md:[left:var(--tip-left)] md:[transform:translate(var(--tip-tx),var(--tip-ty))] md:transition-[left,top] md:duration-300"
           >
             {tooltipCard(shownAxis.axis, 'body-tip-desktop', () => {
               setActive(null);
@@ -264,7 +268,7 @@ export function BodyHero({ payload }: { payload: DashboardPayload }) {
           {tooltipCard(shownAxis.axis, 'body-tip-phone', () => setActive(null))}
         </div>
       ) : (
-        <p className="mt-2 text-center text-[12px] text-[var(--aegis-label)]">{t("dashboard.body.hint")}</p>
+        <p className="mt-2 text-center text-[12px] leading-[1.1rem] text-[var(--aegis-label)]">{t("dashboard.body.hint")}</p>
       )}
     </section>
   );
@@ -276,7 +280,7 @@ export function BodyHero({ payload }: { payload: DashboardPayload }) {
     const info = hazard ? NASA_HAZARDS[hazard] : null;
     const readings = axisIndicators(axis, payload.kpis, 3);
     return (
-      <div className="flex flex-col gap-3 rounded-[22px] border border-white/90 bg-white/80 p-4 shadow-[0_24px_50px_-20px_rgba(40,80,160,0.45)] backdrop-blur-xl">
+      <div className="flex flex-col gap-3 rounded-[22px] border border-white/90 bg-white/80 p-4 lg:gap-2.5 lg:p-[clamp(12px,1.6vh,16px)] shadow-[0_24px_50px_-20px_rgba(40,80,160,0.45)] backdrop-blur-xl">
         <div className="flex items-center gap-2.5">
           <IconChip icon={AXIS_ICON[axis]} size={32} />
           <h3 id={idBase} className="min-w-0 flex-1 text-[16px] leading-tight font-medium text-[var(--aegis-ink)]">
@@ -297,7 +301,7 @@ export function BodyHero({ payload }: { payload: DashboardPayload }) {
           ) : (
             <span className="flex flex-col">
               <span className="flex items-baseline gap-1">
-                <span className="tnum text-[32px] leading-none font-normal text-[var(--aegis-ink)]">
+                <span className="tnum text-[32px] leading-none font-normal text-[var(--aegis-ink)] lg:text-[clamp(24px,3.4vh,32px)]">
                   {Math.round(a.score)}
                 </span>
                 <span className="text-[11px] text-[var(--aegis-label)]">/100</span>

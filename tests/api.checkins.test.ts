@@ -245,12 +245,14 @@ describe("POST /api/checkins/[id]/turn", () => {
     expect(res2.status).toBe(400);
   });
 
-  it("answers in the language the astronaut used, not the one the check-in started in", async () => {
+  // team decision 2026-11-14: one language for the whole check-in (a Mongolian check-in stays Mongolian)
+  it("keeps the check-in's language even when the astronaut answers in the other language", async () => {
     await signIn("bat");
-    const { checkInId } = await createCheckIn("en");
-    const events = await sendTurn(checkInId, "Сайн байна, баярлалаа");
-    const assistant = events.find((e) => e.type === "assistant");
-    expect(assistant).toMatchObject({ language: "mn" });
+    const mn = await createCheckIn("mn");
+    const fromEnglish = await sendTurn(mn.checkInId, "I'm fine, thank you, a bit tired today");
+    expect(fromEnglish.find((e) => e.type === "assistant")).toMatchObject({ language: "mn" });
+    const fromDigits = await sendTurn(mn.checkInId, "98");
+    expect(fromDigits.find((e) => e.type === "assistant")).toMatchObject({ language: "mn" });
   });
 });
 

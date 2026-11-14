@@ -17,13 +17,13 @@ export function DayArc({ dayArc }: { dayArc: DayArcSlot[] }) {
   const next = nextSlot(dayArc);
 
   return (
-    <Card data-slot="day-arc" aria-labelledby="day-arc-title" className="h-full gap-3">
+    <Card data-slot="day-arc" aria-labelledby="day-arc-title" className="h-full gap-3 lg:h-auto lg:shrink-0">
       <CardHeader>
         <CardTitle id="day-arc-title" className="text-lg">
           {t("dashboard.dayArc.title")}
         </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="lg:pb-1">
         <ol className="relative grid grid-cols-1 gap-3 sm:grid-cols-5 sm:gap-2">
           <span
             aria-hidden="true"
@@ -57,10 +57,10 @@ export function DayArc({ dayArc }: { dayArc: DayArcSlot[] }) {
                   ) : null}
                 </span>
                 <span className="flex flex-col sm:items-center">
-                  <span className="text-base font-medium text-foreground">
+                  <span className="text-base font-medium text-foreground lg:text-[clamp(13px,1.9vh,16px)] lg:leading-snug">
                     {t(`dashboard.dayArc.${slot.slot}`)}
                   </span>
-                  <span className="text-sm text-muted-foreground">
+                  <span className="text-sm text-muted-foreground lg:text-[clamp(12px,1.6vh,14px)] lg:leading-snug">
                     {t(`dashboard.dayArc.${slot.state}`)}
                   </span>
                   <span className="tnum text-xs text-muted-foreground">
@@ -98,8 +98,8 @@ export function DayArc({ dayArc }: { dayArc: DayArcSlot[] }) {
               <Moon className="size-4" />
             </span>
             <span className="flex flex-col sm:items-center">
-              <span className="text-base font-medium text-foreground">{t("dashboard.dayArc.bedtime")}</span>
-              <span className="text-sm text-muted-foreground">{t("dashboard.dayArc.bedtimeHint")}</span>
+              <span className="text-base font-medium text-foreground lg:text-[clamp(13px,1.9vh,16px)] lg:leading-snug">{t("dashboard.dayArc.bedtime")}</span>
+              <span className="text-sm text-muted-foreground lg:text-[clamp(12px,1.6vh,14px)] lg:leading-snug">{t("dashboard.dayArc.bedtimeHint")}</span>
             </span>
             {next === "bedtime" ? (
               <span className="rounded-full bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground sm:mt-0.5">

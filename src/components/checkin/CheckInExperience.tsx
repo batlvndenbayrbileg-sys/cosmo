@@ -31,7 +31,11 @@ import {
   StageToasts,
   type StageToast,
 } from "./StageControls";
-import { ApiClientError, fetchDashboard, fetchHealth } from "./api";
+import { ApiClientError, fetchDashboard, fetchHealth, postTour, type TourFocus } from "./api";
+import { DashboardTalk, type TalkStatus } from "./DashboardTalk";
+import { EmergencyOverlay } from "@/components/emergency/EmergencyOverlay";
+import { BUILTIN_CALL_FOR_HELP, matchEmergency, type EmergencyScenario } from "@/lib/emergency";
+import { ShieldAlert } from "lucide-react";
 import { bubbleItems, computeStageLayout } from "./bubbles";
 import type { CheckInError } from "./state";
 import { useDemoRunner } from "./useDemoRunner";
@@ -54,6 +58,18 @@ const MIN_AUDIO_BYTES = 1200;
 const PREPARE_MIN_MS = 1200;
 
 type Phase = "conversation" | "preparing" | "dashboard";
+
+/** the dashboard section Cosmo talks about during the spoken tour (data-slot markers in src/components/dashboard) */
+const TOUR_SELECTOR: Record<TourFocus, string> = {
+  overall: '[data-slot="profile-card"]',
+  alerts: '[data-slot="alerts-strip"], [data-slot="profile-card"]',
+  body: '[data-slot="body-hero"]',
+  vital: '[data-slot="highlight-vital"]',
+  radar: '[data-slot="radar-card"]',
+  plan: '[data-slot="today-plan"]',
+  timeline: '[data-slot="timeline"]',
+  ask: '[data-slot="cosmo-dock"]',
+};
 
 const subscribeNever = () => () => {};
 function subscribeResize(onChange: () => void) {
@@ -103,7 +119,6 @@ export function CheckInExperience() {
   const rawCrew = useSyncExternalStore(subscribeNever, readSelectedCrewRaw, () => null);
   const crew = useMemo(() => parseStoredCrew(rawCrew), [rawCrew]);
 
-  const [initialLang] = useState(lang);
   const [phase, setPhase] = useState<Phase>("conversation");
   const [dashboard, setDashboard] = useState<DashboardPayload | null>(null);
   /** the dashboard load failed: what "Show dashboard" retries */
@@ -117,6 +132,15 @@ export function CheckInExperience() {
   const [captions, setCaptions] = useState(false);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const [tapped, setTapped] = useState(false);
+  /** after the check-in: Cosmo's spoken dashboard tour, then free conversation about the results */
+  const [touring, setTouring] = useState(false);
+  const [tourFocus, setTourFocus] = useState<TourFocus | null>(null);
+  const [afterTalk, setAfterTalk] = useState(false);
+  /** index into the transcript where the after-check-in conversation starts */
+  const [talkFrom, setTalkFrom] = useState(0);
+  const tourCancelled = useRef(false);
+  /** mirror of the transcript length, read when the after-check-in conversation opens */
+  const transcriptLengthRef = useRef(0);
   const alive = useRef(true);
 
   useEffect(() => {
@@ -157,16 +181,43 @@ export function CheckInExperience() {
       if (!alive.current) return;
       setDashboard(payload);
       setPhase("dashboard");
+      // the conversation bar shows only what is said on the dashboard, not the check-in's last lines
+      setTalkFrom(transcriptLengthRef.current);
       if (summary) {
         await sleep(SUMMARY_SPEECH_DELAY_MS);
         if (!alive.current) return;
-        void speakRef.current?.({
+        await speakRef.current?.({
           checkInId,
           turnId: summary.audioTurnId,
           text: summary.spoken.text,
           language: summary.spoken.language,
         });
+        // then Cosmo walks the astronaut through the dashboard, section by section
+        if (alive.current && !tourCancelled.current) {
+          try {
+            const tour = await postTour(checkInId, summary.spoken.language);
+            setTouring(true);
+            for (const step of tour.steps) {
+              if (!alive.current || tourCancelled.current) break;
+              setTourFocus(step.focus);
+              await speakRef.current?.({ checkInId, turnId: step.turnId, text: step.text, language: tour.language });
+            }
+          } catch {
+            // the tour is a nice-to-have: the dashboard and the conversation work without it
+          } finally {
+            if (alive.current) {
+              setTourFocus(null);
+              setTouring(false);
+            }
+          }
+        }
       }
+      if (!alive.current) return;
+      // and then the astronaut can keep talking with Cosmo about the results (the Q&A panel shows only what is
+      // said from here on)
+      setTalkFrom(transcriptLengthRef.current);
+      setAfterTalk(true);
+      setConversationMode(true);
     },
     [router],
   );
@@ -174,7 +225,9 @@ export function CheckInExperience() {
   /* ───────────── check-in, speech, microphone ───────────── */
 
   const checkIn = useCheckIn({
-    language: initialLang,
+    // no language: the server uses the crew member's own language (Bat and Saraa Mongolian, Alex and Mira English).
+    // Sending the UI language was a bug: on the first render it is the default "en", before the stored choice loads.
+    language: undefined,
     onAssistant: (turn) => {
       const speakTurn: SpeakTurn = {
         checkInId: turn.checkInId,
@@ -197,6 +250,9 @@ export function CheckInExperience() {
     onNoSession: () => router.replace("/"),
   });
   const { state } = checkIn;
+  useEffect(() => {
+    transcriptLengthRef.current = state.transcript.length;
+  }, [state.transcript.length]);
   const { setSpeech, setRecording, sendAudio, sendText, setTyping, createCheckIn } = checkIn;
 
   const player = useSpeechPlayer({ onStatusChange: setSpeech });
@@ -243,6 +299,8 @@ export function CheckInExperience() {
     recorder.supported && recorder.permission !== "unsupported" && !micBlocked && voiceIssue === null && !sttDown;
   const scripted = health?.mode === "scripted";
   const talking = phase === "conversation";
+  /** the microphone may be used: during the check-in, and on the dashboard once the spoken tour is over */
+  const canTalk = talking || (phase === "dashboard" && afterTalk && !touring);
 
   /* ───────────── demo ───────────── */
 
@@ -271,11 +329,11 @@ export function CheckInExperience() {
 
   const startListening = useCallback(
     (vad: boolean) => {
-      if (!ready || state.busy || demo.running || !talking) return;
+      if (!ready || state.busy || demo.running || !canTalk) return;
       stopSpeech();
       void startRecorder({ vad });
     },
-    [ready, state.busy, demo.running, talking, stopSpeech, startRecorder],
+    [ready, state.busy, demo.running, canTalk, stopSpeech, startRecorder],
   );
 
   const tapToStart = useCallback(() => {
@@ -309,7 +367,7 @@ export function CheckInExperience() {
   // Space = push-to-talk (hold to talk, release to send)
   const pushToTalk = useRef(false);
   useEffect(() => {
-    if (!talking || !micUsable) return;
+    if (!canTalk || !micUsable) return;
     const down = (e: KeyboardEvent) => {
       if (e.code !== "Space" || spaceBelongsToControl(e.target)) return;
       e.preventDefault();
@@ -329,7 +387,7 @@ export function CheckInExperience() {
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", up);
     };
-  }, [talking, micUsable, startListening, stopRecorder]);
+  }, [canTalk, micUsable, startListening, stopRecorder]);
 
   // hands-free: after Cosmo has finished, listen again (half-duplex: never while she speaks)
   useEffect(() => {
@@ -337,10 +395,11 @@ export function CheckInExperience() {
       !conversationMode ||
       !micUsable ||
       !ready ||
-      !talking ||
+      !canTalk ||
       keyboardOpen ||
       player.blocked ||
-      state.conversation === "DONE" ||
+      // during the check-in a finished conversation stops listening; on the dashboard it is the Q&A
+      (talking && state.conversation === "DONE") ||
       state.busy ||
       state.speech !== "idle" ||
       recorder.recording ||
@@ -356,6 +415,7 @@ export function CheckInExperience() {
     conversationMode,
     micUsable,
     ready,
+    canTalk,
     talking,
     keyboardOpen,
     player.blocked,
@@ -379,6 +439,141 @@ export function CheckInExperience() {
   const retryDashboard = useCallback(() => {
     if (dashboardFailed) void openDashboard(dashboardFailed.checkInId, dashboardFailed.summary);
   }, [dashboardFailed, openDashboard]);
+
+  /* ───────────── after the check-in: tour + conversation ───────────── */
+
+  // the section Cosmo is talking about glows and scrolls into view
+  useEffect(() => {
+    if (!tourFocus) return;
+    const el = document.querySelector<HTMLElement>(TOUR_SELECTOR[tourFocus]);
+    if (!el) return;
+    el.classList.add("tour-focus");
+    const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+    el.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "center" });
+    return () => el.classList.remove("tour-focus");
+  }, [tourFocus]);
+
+  /* ───────────── emergency guidance (team-prepared content, opened by SOS or by what is said) ───────────── */
+
+  const [emergencyLib, setEmergencyLib] = useState<EmergencyScenario[]>([BUILTIN_CALL_FOR_HELP]);
+  const [emergency, setEmergency] = useState<{ open: boolean; id: string | null; alerted: boolean }>({
+    open: false,
+    id: null,
+    alerted: false,
+  });
+  const checkInIdNow = state.checkInId;
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetch("/api/emergency", { credentials: "same-origin" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((body: { scenarios?: EmergencyScenario[] } | null) => {
+        if (!cancelled && body?.scenarios?.length) setEmergencyLib(body.scenarios);
+      })
+      .catch(() => {
+        // the built-in "get help" card stays available
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const openEmergency = useCallback(
+    (id: string | null) => {
+      cancelRecorder();
+      stopSpeech();
+      tourCancelled.current = true;
+      setConversationMode(false);
+      setEmergency((prev) => ({ open: true, id, alerted: prev.alerted }));
+      if (id && checkInIdNow) {
+        void fetch("/api/emergency/alert", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ scenarioId: id, checkInId: checkInIdNow }),
+        })
+          .then((r) => {
+            if (r.ok) setEmergency((prev) => ({ ...prev, alerted: true }));
+          })
+          .catch(() => {});
+      }
+    },
+    [cancelRecorder, stopSpeech, checkInIdNow],
+  );
+
+  // what the astronaut says can open the matching guidance by itself (each crew line is checked once)
+  const checkedLines = useRef(0);
+  useEffect(() => {
+    const lines = state.transcript;
+    for (let i = checkedLines.current; i < lines.length; i++) {
+      const line = lines[i];
+      if (line.speaker !== "crew") continue;
+      const hit = matchEmergency(line.text, emergencyLib);
+      if (hit && !emergency.open) {
+        openEmergency(hit.scenarioId);
+        break;
+      }
+    }
+    checkedLines.current = lines.length;
+  }, [state.transcript, emergencyLib, emergency.open, openEmergency]);
+
+  const emergencyUi = (where: "conversation" | "dashboard") => (
+    <>
+      <button
+        type="button"
+        onClick={() => openEmergency(null)}
+        aria-label={t("checkin.emergency.openLabel")}
+        className={cn(
+          "fixed z-[60] flex h-10 items-center gap-1.5 rounded-full border border-[#C53030]/25 bg-white/80 px-4 text-[14px] font-semibold tracking-wide text-[#C53030] shadow-sm backdrop-blur transition-opacity hover:opacity-100 focus-visible:opacity-100",
+          where === "conversation" ? "top-4 left-[4.5rem] opacity-60" : "bottom-12 left-5 opacity-80",
+        )}
+      >
+        <ShieldAlert className="size-4" aria-hidden />
+        {t("checkin.emergency.open")}
+      </button>
+      <AnimatePresence>
+        {emergency.open ? (
+          <EmergencyOverlay
+            scenarios={emergencyLib}
+            activeId={emergency.id}
+            lang={state.language ?? lang}
+            alerted={emergency.alerted}
+            onSelect={(id) => openEmergency(id)}
+            onClose={() => setEmergency((prev) => ({ ...prev, open: false }))}
+          />
+        ) : null}
+      </AnimatePresence>
+    </>
+  );
+
+  const skipTour = useCallback(() => {
+    tourCancelled.current = true;
+    stopSpeech();
+  }, [stopSpeech]);
+
+  const handleDashboardMic = useCallback(() => {
+    if (recorder.recording) {
+      stopRecorder();
+      return;
+    }
+    setConversationMode(true);
+    startListening(true);
+  }, [recorder.recording, stopRecorder, startListening]);
+
+  const talkLines = state.transcript.slice(talkFrom);
+  const lastQuestionIndex = talkLines.map((l) => l.speaker).lastIndexOf("crew");
+  const lastQuestion = lastQuestionIndex >= 0 ? talkLines[lastQuestionIndex].text : null;
+  const lastAnswer =
+    lastQuestionIndex >= 0 ? (talkLines.slice(lastQuestionIndex + 1).find((l) => l.speaker === "cosmo")?.text ?? null) : null;
+  const talkStatus: TalkStatus = touring
+    ? "touring"
+    : recorder.recording
+      ? "listening"
+      : state.busy
+        ? "thinking"
+        : state.speech !== "idle"
+          ? "speaking"
+          : "idle";
 
   /* ───────────── toasts ───────────── */
 
@@ -444,7 +639,23 @@ export function CheckInExperience() {
     return (
       <MotionConfig reducedMotion="user">
         <LayoutGroup>
-          <DashboardView payload={dashboard} viewer="crew" dockSlot={cosmo} />
+          <DashboardView
+            payload={dashboard}
+            viewer="crew"
+            dockSlot={cosmo}
+            dockOpen={touring || afterTalk ? false : undefined}
+          />
+          {touring || afterTalk ? (
+            <DashboardTalk
+              status={talkStatus}
+              question={lastQuestion}
+              answer={lastAnswer}
+              micUsable={micUsable}
+              onMic={handleDashboardMic}
+              onSkipTour={skipTour}
+              onSendText={handleSendText}
+            />
+          ) : null}
           {veil ? (
             <motion.div
               aria-hidden="true"
@@ -455,6 +666,7 @@ export function CheckInExperience() {
               onAnimationComplete={() => setVeil(false)}
             />
           ) : null}
+          {emergencyUi("dashboard")}
         </LayoutGroup>
       </MotionConfig>
     );
@@ -706,6 +918,7 @@ export function CheckInExperience() {
             {t("shell.ribbon.text")}
           </p>
         </div>
+        {emergencyUi("conversation")}
       </LayoutGroup>
     </MotionConfig>
   );

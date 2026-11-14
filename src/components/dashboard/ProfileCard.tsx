@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { Languages } from "lucide-react";
 import type { DashboardPayload } from "@/lib/types";
 import { StatusGlyph } from "@/components/status";
@@ -11,16 +12,25 @@ import { formatClockLabel, type Viewer } from "./logic";
 import { MascotPicture } from "./parts";
 
 /** crew name in two lines (name / role) with the mission-day label on the right, plus the check-in meta line */
-export function CrewHeading({ payload, viewer }: { payload: DashboardPayload; viewer: Viewer }) {
+export function CrewHeading({
+  payload,
+  viewer,
+  extra,
+}: {
+  payload: DashboardPayload;
+  viewer: Viewer;
+  /** optional pill at the end of the meta line (the open-alerts chip on the overview) */
+  extra?: ReactNode;
+}) {
   const { t, lang } = useI18n();
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-2 lg:gap-[clamp(4px,0.8vh,8px)]">
       <div className="flex items-start justify-between gap-3">
-        <h1 className="flex flex-col leading-[1.05] text-[var(--aegis-ink)]">
-          <span className="text-[34px] font-normal tracking-tight">{payload.crew.name}</span>
-          <span className="text-[26px] font-light tracking-tight text-[var(--aegis-label)]">{payload.crew.role}</span>
+        <h1 className="flex flex-col leading-[1.05] text-[var(--aegis-ink)] dash-tight:flex-row dash-tight:flex-wrap dash-tight:items-baseline dash-tight:gap-x-2">
+          <span className="text-[34px] font-normal tracking-tight lg:text-[clamp(24px,3.5vh,34px)] dash-tight:text-[24px]">{payload.crew.name}</span>
+          <span className="text-[26px] font-light tracking-tight text-[var(--aegis-label)] lg:text-[clamp(18px,2.7vh,26px)] dash-tight:text-[17px]">{payload.crew.role}</span>
         </h1>
-        <span className="tnum mt-2 shrink-0 rounded-full bg-white/70 px-3 py-1 text-[12px] font-medium text-[var(--aegis-label)] ring-1 ring-[var(--aegis-hairline)]">
+        <span className="tnum mt-1 shrink-0 rounded-full bg-white/70 px-3 py-1 text-[12px] font-medium text-[var(--aegis-label)] ring-1 ring-[var(--aegis-hairline)]">
           {t("dashboard.profile.missionDay", { day: payload.missionDay })}
         </span>
       </div>
@@ -38,6 +48,7 @@ export function CrewHeading({ payload, viewer }: { payload: DashboardPayload; vi
             {t("dashboard.viewer.ground")}
           </span>
         ) : null}
+        {extra}
       </p>
     </div>
   );
@@ -49,21 +60,21 @@ export function StatPills({ payload, className }: { payload: DashboardPayload; c
   const readinessAvailable = isReadinessAvailable(payload.axes);
   return (
     <ul className={cn("flex flex-wrap items-center gap-1.5", className)}>
-      <li className="pill min-h-[32px]! gap-1! px-2.5! text-[14px]!" data-status={payload.overall}>
+      <li className="pill min-h-[32px]! gap-1! px-2.5! text-[14px]! dash-tight:min-h-[28px]! dash-tight:px-2! dash-tight:text-[13px]!" data-status={payload.overall}>
         <StatusGlyph status={payload.overall} size={15} labelled={false} />
         <span className="text-[13px]">{t(statusWordKey(payload.overall))}</span>
       </li>
-      <li className="pill min-h-[32px]! gap-1! px-2.5! text-[14px]! tnum" aria-label={readinessAvailable ? t("dashboard.readiness.aria", { value: payload.readiness }) : t("dashboard.readiness.unavailable")}>
+      <li className="pill min-h-[32px]! gap-1! px-2.5! text-[14px]! dash-tight:min-h-[28px]! dash-tight:px-2! dash-tight:text-[13px]! tnum" aria-label={readinessAvailable ? t("dashboard.readiness.aria", { value: payload.readiness }) : t("dashboard.readiness.unavailable")}>
         <span aria-hidden="true">{readinessAvailable ? payload.readiness : "–"}</span>
         <span aria-hidden="true" className="text-[11px] font-normal text-[var(--aegis-label)]">
           {t("dashboard.profile.readiness")}
         </span>
       </li>
-      <li className="pill min-h-[32px]! gap-1! px-2.5! text-[14px]! tnum">
+      <li className="pill min-h-[32px]! gap-1! px-2.5! text-[14px]! dash-tight:min-h-[28px]! dash-tight:px-2! dash-tight:text-[13px]! tnum">
         <span>{payload.missionDay}</span>
         <span className="text-[11px] font-normal text-[var(--aegis-label)]">{t("dashboard.profile.day")}</span>
       </li>
-      <li className="pill min-h-[32px]! gap-1! px-2.5! text-[14px]!">
+      <li className="pill min-h-[32px]! gap-1! px-2.5! text-[14px]! dash-tight:min-h-[28px]! dash-tight:px-2! dash-tight:text-[13px]!">
         <Languages aria-hidden="true" className="size-3.5 text-[var(--aegis-label)]" strokeWidth={1.8} />
         <span className="sr-only">{t("dashboard.profile.lang")}: </span>
         <span>{payload.crew.preferredLanguage === "mn" ? "МН" : "EN"}</span>
@@ -76,8 +87,8 @@ export function StatPills({ payload, className }: { payload: DashboardPayload; c
 export function ProfileCard({ payload }: { payload: DashboardPayload }) {
   const { t } = useI18n();
   return (
-    <div data-slot="profile-card" className="flex flex-col">
-      <div className="glass-card relative h-[250px] overflow-hidden">
+    <div data-slot="profile-card" className="flex flex-col lg:min-h-0 lg:flex-1">
+      <div className="glass-card relative h-[250px] overflow-hidden lg:h-auto lg:min-h-[84px] lg:flex-1 dash-tight:hidden">
         <div
           aria-hidden="true"
           className="absolute inset-0"
@@ -97,8 +108,10 @@ export function ProfileCard({ payload }: { payload: DashboardPayload }) {
           style={{ background: "linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.96) 75%)" }}
         />
       </div>
-      <StatPills payload={payload} className="relative z-10 -mt-6 justify-center px-1" />
-      <p className="mt-2 text-center text-[11px] text-[var(--aegis-label)]">{t("dashboard.profile.readinessNote")}</p>
+      <StatPills payload={payload} className="relative z-10 -mt-6 justify-center px-1 dash-tight:mt-0 dash-tight:justify-start dash-tight:px-0" />
+      <p className="mt-2 text-center text-[11px] leading-snug text-[var(--aegis-label)] lg:mt-1.5 lg:line-clamp-1 dash-tight:text-left">
+        {t("dashboard.profile.readinessNote")}
+      </p>
     </div>
   );
 }

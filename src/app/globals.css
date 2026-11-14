@@ -323,3 +323,68 @@
 .aegis-noscrollbar::-webkit-scrollbar {
   display: none;
 }
+
+/* Cosmo's spoken dashboard tour: the section Cosmo is talking about glows */
+.tour-focus {
+  position: relative;
+  border-radius: 28px;
+  outline: 3px solid rgba(79, 134, 247, 0.6);
+  outline-offset: 6px;
+  box-shadow: 0 0 0 12px rgba(79, 134, 247, 0.12), 0 24px 60px -24px rgba(47, 91, 211, 0.45);
+  transition: outline-color 300ms ease, box-shadow 300ms ease;
+  animation: tour-glow 1.8s ease-in-out infinite;
+  z-index: 5;
+}
+@keyframes tour-glow {
+  0%, 100% { box-shadow: 0 0 0 10px rgba(79, 134, 247, 0.10), 0 24px 60px -24px rgba(47, 91, 211, 0.45); }
+  50% { box-shadow: 0 0 0 18px rgba(79, 134, 247, 0.18), 0 24px 60px -24px rgba(47, 91, 211, 0.55); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tour-focus { animation: none; }
+}
+
+/* ───────────── single-screen dashboard (desktop >= 1024 px) ─────────────
+   DashboardView is exactly one viewport high and switches views with tabs, so the page itself never scrolls.
+   The guard below keeps html/body from scrolling while a dashboard is on screen (panels that need it scroll inside). */
+@media (min-width: 1024px) {
+  html:has([data-slot="dashboard"][data-fit="screen"]),
+  html:has([data-slot="dashboard"][data-fit="screen"]) body {
+    height: 100dvh;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  /* Earth console (/earth/[crewId]): the ground bar sits above the dashboard, so the page column becomes one
+     viewport high and the dashboard takes the rest of it instead of its own 100dvh */
+  [data-slot="earth-crew"]:has(> [data-slot="dashboard"]) {
+    height: 100dvh;
+    padding-top: clamp(10px, 1.6vh, 20px);
+    padding-bottom: clamp(10px, 1.6vh, 20px);
+    gap: clamp(6px, 1vh, 12px);
+  }
+  [data-slot="earth-crew"] > [data-slot="dashboard"] {
+    height: auto;
+    flex: 1 1 0;
+    min-height: 0;
+    padding: 0;
+  }
+}
+
+/* desktop screens up to 1199 px high (1920x1080, 1440x900, 1280x720, ...): the overview puts the small cards beside
+   the radar (instead of under the plan) and tightens the strips so everything fits one screen with a large radar */
+@custom-variant dash-short {
+  @media (min-width: 1024px) and (max-height: 1199px) {
+    @slot;
+  }
+}
+
+/* a mistyped arbitrary variant briefly existed during the single-screen rework; the running dev server keeps
+   every class it has seen, so exclude it explicitly (safe to delete after a dev-server restart). */
+@source not inline("lg:[&_.tnum.text-[32px]]:text-[28px]");
+
+/* very short desktop screens (1280x720, 1366x768, ...): drop decorative pieces (the profile picture) and tighten more */
+@custom-variant dash-tight {
+  @media (min-width: 1024px) and (max-height: 799px) {
+    @slot;
+  }
+}

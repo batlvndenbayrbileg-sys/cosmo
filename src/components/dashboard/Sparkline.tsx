@@ -4,7 +4,7 @@ import type { Status } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { sparklineGeometry, statusColorVar } from "./logic";
 
-const WIDTH = 240;
+const DEFAULT_WIDTH = 240;
 
 /**
  * 14-day sparkline with the personal baseline band (mean plus or minus 2 sd, shaded) and today's point.
@@ -18,6 +18,7 @@ export function Sparkline({
   status,
   label,
   height = 48,
+  viewWidth = DEFAULT_WIDTH,
   className,
 }: {
   history: readonly number[];
@@ -29,8 +30,11 @@ export function Sparkline({
   /** accessible name */
   label: string;
   height?: number;
+  /** width of the drawing in viewBox units; a wider box suits wide, flat cards */
+  viewWidth?: number;
   className?: string;
 }) {
+  const WIDTH = viewWidth;
   const g = sparklineGeometry({ history, today, mean, sd, width: WIDTH, height, pad: 6 });
   if (g.points.length === 0 && g.today === null) return null;
 

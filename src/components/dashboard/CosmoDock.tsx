@@ -9,9 +9,12 @@ import { CosmoAvatar } from "@/components/cosmo/CosmoAvatar";
 import type { CosmoEmotion } from "@/components/cosmo/types";
 import { useI18n } from "@/i18n/I18nProvider";
 import { COSMO_LAYOUT_ID } from "@/lib/motion";
+import { cn } from "@/lib/utils";
 import { useSummaryAudio } from "./useSummaryAudio";
 
 const AVATAR_PX = 64;
+/** the collapsed dock is a compact pill so it never covers the dashboard cards */
+const PILL_AVATAR_PX = 42;
 
 function emotionFor(overall: DashboardPayload["overall"]): CosmoEmotion {
   if (overall === "red") return "concerned";
@@ -36,13 +39,20 @@ function fallbackSpeech(summary: DashboardPayload["summary"]): string {
 export function CosmoDock({
   payload,
   dockSlot,
+  dockOpen,
 }: {
   payload: DashboardPayload;
   dockSlot?: ReactNode;
+  /** when given, the parent decides whether the summary is expanded (for example collapsed during the tour) */
+  dockOpen?: boolean;
 }) {
   const { t, pick } = useI18n();
-  // open right after the check-in hand-off (dockSlot given); collapsed on reloads so it does not cover the cards
-  const [open, setOpen] = useState(dockSlot !== undefined);
+  // collapsed to a compact pill by default so it never covers the cards; the person expands it on demand.
+  // the parent's dockOpen wins until the person toggles; a new dockOpen value resets that toggle (no effect needed)
+  const [toggled, setToggled] = useState<{ forProp: boolean | undefined; open: boolean } | null>(null);
+  const defaultOpen = dockOpen ?? false;
+  const open = toggled !== null && toggled.forProp === dockOpen ? toggled.open : defaultOpen;
+  const setOpen = (next: (o: boolean) => boolean) => setToggled({ forProp: dockOpen, open: next(open) });
   const { summary } = payload;
   const audio = useSummaryAudio({
     checkInId: payload.checkIn.id,
@@ -53,24 +63,31 @@ export function CosmoDock({
 
   const findings = summary.findings.slice(0, 2);
   const recommendations = summary.recommendations.slice(0, 2);
+  const avatarPx = open ? AVATAR_PX : PILL_AVATAR_PX;
 
   return (
     <aside
       data-slot="cosmo-dock"
+      data-open={open ? "true" : "false"}
       role="region"
       aria-label={t("dashboard.dock.region")}
-      className="z-40 flex w-full flex-col overflow-hidden rounded-[24px] border border-white/80 bg-white/75 shadow-[0_30px_70px_-30px_rgba(40,80,160,0.55)] backdrop-blur-xl md:fixed md:right-5 md:bottom-12 md:w-[min(21.5rem,calc(100vw-2rem))]"
+      className={cn(
+        "z-40 flex flex-col overflow-hidden border border-white/80 bg-white/80 shadow-[0_30px_70px_-30px_rgba(40,80,160,0.55)] backdrop-blur-xl md:fixed md:right-[max(1.25rem,calc((100vw-1800px)/2+1.5rem))] md:bottom-12",
+        open
+          ? "w-full rounded-[24px] md:w-[min(21.5rem,calc(100vw-2rem))]"
+          : "w-full rounded-[28px] md:w-auto md:max-w-[min(17.5rem,calc(100vw-2rem))] md:rounded-full",
+      )}
     >
-      <div className="flex items-center gap-3 p-3">
-        <div className="shrink-0" style={{ width: AVATAR_PX, height: AVATAR_PX }}>
+      <div className={cn("flex items-center", open ? "gap-3 p-3" : "gap-2.5 py-1.5 pr-2 pl-2")}>
+        <div className="shrink-0 transition-[width,height] duration-300" style={{ width: avatarPx, height: avatarPx }}>
           {dockSlot ?? (
-            <motion.div layoutId={COSMO_LAYOUT_ID} style={{ width: AVATAR_PX, height: AVATAR_PX }}>
+            <motion.div layoutId={COSMO_LAYOUT_ID} style={{ width: avatarPx, height: avatarPx }}>
               <CosmoAvatar
                 variant={payload.crew.mascotVariant}
                 state={audio.playing ? "talking" : "idle"}
                 emotion={emotionFor(payload.overall)}
                 amplitude={audio.amplitude}
-                size={AVATAR_PX}
+                size={avatarPx}
                 label={t("dashboard.dock.avatar")}
               />
             </motion.div>
@@ -78,14 +95,21 @@ export function CosmoDock({
         </div>
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <p className="unit-label">{t("dashboard.dock.title")}</p>
-          <p data-slot="dock-headline" className="line-clamp-2 text-[15px] leading-snug font-medium text-[var(--aegis-ink)]">
+          <p
+            data-slot="dock-headline"
+            className={cn(
+              "leading-snug font-medium text-[var(--aegis-ink)]",
+              open ? "line-clamp-2 text-[15px]" : "truncate text-[13px]",
+            )}
+          >
             {pick(summary.headline)}
           </p>
         </div>
         <Button
           type="button"
-          size="icon-lg"
+          size={open ? "icon-lg" : "icon"}
           variant="ghost"
+          className={cn(!open && "rounded-full bg-white/80 ring-1 ring-[var(--aegis-hairline)]")}
           aria-expanded={open}
           aria-label={open ? t("dashboard.dock.hide") : t("dashboard.dock.show")}
           onClick={() => setOpen((o) => !o)}
@@ -95,7 +119,7 @@ export function CosmoDock({
       </div>
 
       {open ? (
-        <div className="flex max-h-[min(24rem,52vh)] flex-col gap-3 overflow-y-auto border-t border-[var(--aegis-hairline)] px-4 py-3">
+        <div className="flex max-h-[min(24rem,calc(100dvh-12rem))] flex-col gap-3 overflow-y-auto border-t border-[var(--aegis-hairline)] px-4 py-3">
           <section aria-label={t("dashboard.dock.findings")} className="flex flex-col gap-1.5">
             <h3 className="unit-label">{t("dashboard.dock.findings")}</h3>
             {findings.length === 0 ? (

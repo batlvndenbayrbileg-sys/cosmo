@@ -33,6 +33,7 @@ export const BASELINE_DAYS = 14;
  * Starts today's check-in, or resumes today's unconfirmed one. The greeting comes from the templates (no LLM latency)
  * in `languageHint` when it is a supported language, otherwise in the crew member's preferred language, and is stored
  * as the first Cosmo turn. A resumed check-in returns its original greeting.
+ * (The check-in screen sends no hint, so a crew member's check-in is in their own language; see CheckInExperience.)
  */
 export function createOrResumeCheckIn(crewId: string, languageHint?: string | null): CheckInCreated {
   const crew = getCrewPublic(crewId); // NotFoundError for an unknown crew member

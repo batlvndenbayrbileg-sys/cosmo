@@ -35,10 +35,10 @@ export function HeartCard({ stat }: { stat: KpiStat | undefined }) {
   const baseY = g.band ? g.band.top : null;
 
   return (
-    <section aria-labelledby="heart-card-title" className="glass-card flex min-w-0 flex-col gap-3 p-4">
+    <section aria-labelledby="heart-card-title" className="glass-card flex min-w-0 flex-col gap-3 p-4 lg:min-h-0 lg:gap-[clamp(4px,1vh,12px)] lg:p-[clamp(10px,1.5vh,16px)] lg:[&_.num-xl]:text-[clamp(22px,3.3vh,36px)]">
       <header className="flex items-center gap-2.5">
-        <IconChip icon={HeartPulse} size={30} />
-        <h3 id="heart-card-title" className="min-w-0 truncate text-[14px] text-[var(--aegis-ink)]">
+        <IconChip icon={HeartPulse} size={30} className="dash-short:size-[26px]!" />
+        <h3 id="heart-card-title" className="min-w-0 truncate text-[14px] leading-tight text-[var(--aegis-ink)]">
           {t("dashboard.heart.title")}
         </h3>
       </header>
@@ -48,7 +48,7 @@ export function HeartCard({ stat }: { stat: KpiStat | undefined }) {
         {stat ? <StatusGlyph status={stat.status} size={13} className="ml-auto self-center" /> : null}
       </p>
       {pts.length > 1 ? (
-        <svg viewBox={`0 0 ${W} ${H}`} className="h-14 w-full overflow-visible" aria-hidden="true" focusable="false" preserveAspectRatio="none">
+        <svg viewBox={`0 0 ${W} ${H}`} className="h-14 w-full overflow-visible lg:h-[clamp(24px,4.6vh,56px)] dash-short:h-auto dash-short:min-h-[14px] dash-short:flex-1" aria-hidden="true" focusable="false" preserveAspectRatio="none">
           <defs>
             <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="var(--aegis-accent)" stopOpacity="0.42" />
@@ -79,9 +79,9 @@ export function HeartCard({ stat }: { stat: KpiStat | undefined }) {
           ) : null}
         </svg>
       ) : (
-        <div className="h-14" />
+        <div className="h-14 lg:h-[clamp(24px,4.6vh,56px)] dash-short:h-auto dash-short:flex-1" />
       )}
-      <p className="flex items-center gap-1.5 text-[11px] text-[var(--aegis-label)]">
+      <p className="flex items-center gap-1.5 text-[11px] leading-tight text-[var(--aegis-label)] dash-tight:sr-only">
         <span aria-hidden="true" className="inline-block h-0 w-4 border-t-[1.5px] border-dashed border-status-ok" />
         {t("dashboard.heart.usual")}
         {mean !== null ? <span className="tnum">{formatNumber(mean, 0)}</span> : null}
@@ -126,8 +126,8 @@ function Donut({ spec, stat }: { spec: DonutSpec; stat: KpiStat | undefined }) {
   const Icon = spec.icon;
   return (
     <li className="flex flex-col items-center gap-1" role="img" aria-label={aria}>
-      <span className="relative size-11">
-        <svg viewBox="0 0 44 44" className="size-11 -rotate-90" aria-hidden="true" focusable="false">
+      <span className="relative size-11 lg:size-[clamp(30px,4.4vh,44px)] dash-tight:size-[28px]">
+        <svg viewBox="0 0 44 44" className="size-full -rotate-90" aria-hidden="true" focusable="false">
           <circle
             cx="22"
             cy="22"
@@ -155,7 +155,7 @@ function Donut({ spec, stat }: { spec: DonutSpec; stat: KpiStat | undefined }) {
         </svg>
         <Icon aria-hidden="true" className="absolute inset-0 m-auto size-3.5 text-[var(--aegis-ink)]" strokeWidth={2} />
       </span>
-      <span className="text-[10px] text-[var(--aegis-label)]">{label}</span>
+      <span className="text-[10px] leading-tight text-[var(--aegis-label)] dash-tight:sr-only">{label}</span>
     </li>
   );
 }
@@ -165,10 +165,10 @@ export function HydrationCard({ byKey }: { byKey: ReadonlyMap<KpiKey, KpiStat> }
   const { t, lang } = useI18n();
   const water = numeric(byKey.get("water_ml"));
   return (
-    <section aria-labelledby="hydration-card-title" className="glass-card flex min-w-0 flex-col gap-3 p-4">
+    <section aria-labelledby="hydration-card-title" className="glass-card flex min-w-0 flex-col gap-3 p-4 lg:min-h-0 lg:gap-[clamp(4px,1vh,12px)] lg:p-[clamp(10px,1.5vh,16px)] lg:[&_.num-xl]:text-[clamp(22px,3.3vh,36px)]">
       <header className="flex items-center gap-2.5">
-        <IconChip icon={GlassWater} size={30} />
-        <h3 id="hydration-card-title" className="min-w-0 truncate text-[14px] text-[var(--aegis-ink)]">
+        <IconChip icon={GlassWater} size={30} className="dash-short:size-[26px]!" />
+        <h3 id="hydration-card-title" className="min-w-0 truncate text-[14px] leading-tight text-[var(--aegis-ink)]">
           {t("dashboard.hydration.title")}
         </h3>
       </header>
@@ -176,12 +176,12 @@ export function HydrationCard({ byKey }: { byKey: ReadonlyMap<KpiKey, KpiStat> }
         <span className="num-xl">{water === null ? "–" : formatNumber(water, 0)}</span>
         <span className="unit-label">{unitLabel("ml", lang)}</span>
       </p>
-      <ul className="flex items-start justify-between gap-1">
+      <ul className="flex items-start justify-between gap-1" title={t("dashboard.hydration.note")}>
         {DONUTS.map((d) => (
           <Donut key={d.key} spec={d} stat={byKey.get(d.key)} />
         ))}
       </ul>
-      <p className="text-[11px] text-[var(--aegis-label)]">{t("dashboard.hydration.note")}</p>
+      <p className="text-[11px] leading-tight text-[var(--aegis-label)] lg:line-clamp-1 dash-tight:sr-only">{t("dashboard.hydration.note")}</p>
     </section>
   );
 }
