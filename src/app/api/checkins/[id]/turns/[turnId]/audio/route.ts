@@ -30,7 +30,7 @@ export function GET(
   return handle(async () => {
     const { crewId } = await requireCrewSession();
     const { id, turnId } = await context.params;
-    const turn = listTurns(crewId, id).find((t) => t.id === turnId && t.speaker === "cosmo");
+    const turn = (await listTurns(crewId, id)).find((t) => t.id === turnId && t.speaker === "cosmo");
     if (!turn) throw new NotFoundError("Turn not found");
 
     if (getEnv().demoMode === "scripted") {

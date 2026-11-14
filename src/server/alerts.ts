@@ -27,7 +27,11 @@ export const ALERT_SPOKEN_NOTICE: Bilingual = {
 };
 
 /** returns every alert of this check-in that belongs to the red rules (existing and newly created) */
-export function createAlertsForCheckIn(crewId: string, checkInId: string, summary: SummaryFindings): AlertRow[] {
+export async function createAlertsForCheckIn(
+  crewId: string,
+  checkInId: string,
+  summary: SummaryFindings,
+): Promise<AlertRow[]> {
   if (summary.overall !== "red") return [];
 
   const wanted: Array<{ rule: RedFlagRule | "OVERALL"; text: Bilingual }> =
@@ -36,14 +40,14 @@ export function createAlertsForCheckIn(crewId: string, checkInId: string, summar
       : [{ rule: "OVERALL", text: OVERALL_TEXT }];
 
   // listAlerts is crew-scoped, so another member's alerts can never be matched here
-  const existing = listAlerts(crewId).filter((a) => a.checkInId === checkInId);
+  const existing = (await listAlerts(crewId)).filter((a) => a.checkInId === checkInId);
   const have = new Set<string>(existing.map((a) => a.rule));
 
   const created: AlertRow[] = [];
   for (const { rule, text } of wanted) {
     if (have.has(rule)) continue;
     have.add(rule);
-    created.push(insertAlert(crewId, { checkInId, level: "red", rule, text }));
+    created.push(await insertAlert(crewId, { checkInId, level: "red", rule, text }));
   }
   const rules = new Set<string>(wanted.map((w) => w.rule));
   return [...existing.filter((a) => rules.has(a.rule)), ...created];

@@ -37,7 +37,7 @@ export function POST(request: Request): Promise<Response> {
     }
     const body = parsed.data;
     if ("crewId" in body) {
-      getCrewPublic(body.crewId); // throws NotFoundError for an unknown crew member
+      await getCrewPublic(body.crewId); // throws NotFoundError for an unknown crew member
       await setSessionCookie({ role: "crew", crewId: body.crewId });
     } else {
       await setGroundCookie();

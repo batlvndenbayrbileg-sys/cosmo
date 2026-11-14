@@ -26,7 +26,8 @@ export function defaultAudioContextCtor(): AudioContextCtor | null {
 function closeQuietly(context: AudioContext | null) {
   if (!context) return;
   try {
-    const closed = context.close();
+    // older (webkit) implementations and test doubles may return nothing instead of a Promise
+    const closed = context.close() as Promise<void> | undefined;
     if (closed && typeof closed.catch === "function") closed.catch(() => {});
   } catch {
     // already closed or not closable: nothing more to release

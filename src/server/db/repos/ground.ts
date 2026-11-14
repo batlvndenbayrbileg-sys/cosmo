@@ -63,28 +63,27 @@ function toGround(rec: CheckInRecord): GroundCheckIn {
 }
 
 /** Roster only. Not time dependent, hence no asOf. */
-export function groundListCrew(): CrewPublic[] {
-  const rows = getDb()
-    .prepare(`SELECT ${CREW_COLUMNS} FROM crew_member ORDER BY rowid ASC`)
-    .all() as CrewDbRow[];
+export async function groundListCrew(): Promise<CrewPublic[]> {
+  const db = await getDb();
+  const rows = await db.all<CrewDbRow>(`SELECT ${CREW_COLUMNS} FROM crew_member ORDER BY rowid ASC`);
   return rows.map(mapCrew);
 }
 
-export function groundGetCrew(crewId: string): CrewPublic | null {
-  const row = getDb()
-    .prepare(`SELECT ${CREW_COLUMNS} FROM crew_member WHERE id = ?`)
-    .get(crewId) as CrewDbRow | undefined;
+export async function groundGetCrew(crewId: string): Promise<CrewPublic | null> {
+  const db = await getDb();
+  const row = await db.get<CrewDbRow>(`SELECT ${CREW_COLUMNS} FROM crew_member WHERE id = ?`, crewId);
   return row ? mapCrew(row) : null;
 }
 
-export function groundLatestConfirmedCheckIn(crewId: string, asOf: string): GroundCheckIn | null {
-  const row = getDb()
-    .prepare(
-      `SELECT ${CHECK_IN_COLUMNS} FROM check_in
-        WHERE crew_id = ? AND confirmed_at IS NOT NULL AND confirmed_at <= ?
-        ORDER BY confirmed_at DESC, rowid DESC LIMIT 1`,
-    )
-    .get(crewId, toIso(asOf, "asOf")) as CheckInDbRow | undefined;
+export async function groundLatestConfirmedCheckIn(crewId: string, asOf: string): Promise<GroundCheckIn | null> {
+  const db = await getDb();
+  const row = await db.get<CheckInDbRow>(
+    `SELECT ${CHECK_IN_COLUMNS} FROM check_in
+      WHERE crew_id = ? AND confirmed_at IS NOT NULL AND confirmed_at <= ?
+      ORDER BY confirmed_at DESC, rowid DESC LIMIT 1`,
+    crewId,
+    toIso(asOf, "asOf"),
+  );
   return row ? toGround(mapCheckIn(row)) : null;
 }
 
@@ -93,32 +92,34 @@ export function groundLatestConfirmedCheckIn(crewId: string, asOf: string): Grou
  * transcript snippet) is ALWAYS null here, for every key: ground never sees conversation content.
  * An invisible, unknown or foreign check-in yields [] (it simply has not "arrived").
  */
-export function groundListMeasurements(
+export async function groundListMeasurements(
   crewId: string,
   checkInId: string,
   asOf: string,
-): MeasurementRow[] {
-  const rows = getDb()
-    .prepare(
-      `SELECT ${MEASUREMENT_COLUMNS.split(", ")
-        .map((c) => `m.${c}`)
-        .join(", ")}
-         FROM measurement m
-         JOIN check_in c ON c.id = m.check_in_id AND c.crew_id = m.crew_id
-        WHERE m.crew_id = ? AND m.check_in_id = ?
-          AND c.confirmed_at IS NOT NULL AND c.confirmed_at <= ?
-        ORDER BY m.created_at ASC, m.rowid ASC`,
-    )
-    .all(crewId, checkInId, toIso(asOf, "asOf")) as MeasurementDbRow[];
+): Promise<MeasurementRow[]> {
+  const db = await getDb();
+  const rows = await db.all<MeasurementDbRow>(
+    `SELECT ${MEASUREMENT_COLUMNS.split(", ")
+      .map((c) => `m.${c}`)
+      .join(", ")}
+       FROM measurement m
+       JOIN check_in c ON c.id = m.check_in_id AND c.crew_id = m.crew_id
+      WHERE m.crew_id = ? AND m.check_in_id = ?
+        AND c.confirmed_at IS NOT NULL AND c.confirmed_at <= ?
+      ORDER BY m.created_at ASC, m.rowid ASC`,
+    crewId,
+    checkInId,
+    toIso(asOf, "asOf"),
+  );
   return rows.map((r) => mapMeasurement(r, { redactText: true }));
 }
 
 /** As listHistoryDays, restricted to visible check-ins; free-text keys are omitted entirely. */
-export function groundListHistoryDays(
+export async function groundListHistoryDays(
   crewId: string,
   opts: { before: string; days: number; asOf: string },
-): HistoryDayRow[] {
-  return queryHistoryDays(getDb(), crewId, {
+): Promise<HistoryDayRow[]> {
+  return queryHistoryDays(await getDb(), crewId, {
     before: opts.before,
     days: opts.days,
     asOf: opts.asOf,
@@ -127,17 +128,17 @@ export function groundListHistoryDays(
 }
 
 /** All crew members' alerts whose check-in is visible at asOf, newest first. */
-export function groundListAlerts(asOf: string): AlertRow[] {
-  const rows = getDb()
-    .prepare(
-      `SELECT ${ALERT_COLUMNS.split(", ")
-        .map((c) => `a.${c}`)
-        .join(", ")}
-         FROM alert a
-         JOIN check_in c ON c.id = a.check_in_id AND c.crew_id = a.crew_id
-        WHERE c.confirmed_at IS NOT NULL AND c.confirmed_at <= ?
-        ORDER BY a.created_at DESC, a.rowid DESC`,
-    )
-    .all(toIso(asOf, "asOf")) as AlertDbRow[];
+export async function groundListAlerts(asOf: string): Promise<AlertRow[]> {
+  const db = await getDb();
+  const rows = await db.all<AlertDbRow>(
+    `SELECT ${ALERT_COLUMNS.split(", ")
+      .map((c) => `a.${c}`)
+      .join(", ")}
+       FROM alert a
+       JOIN check_in c ON c.id = a.check_in_id AND c.crew_id = a.crew_id
+      WHERE c.confirmed_at IS NOT NULL AND c.confirmed_at <= ?
+      ORDER BY a.created_at DESC, a.rowid DESC`,
+    toIso(asOf, "asOf"),
+  );
   return rows.map(mapAlert);
 }

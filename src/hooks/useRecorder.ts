@@ -20,6 +20,7 @@ import {
   createVadState,
   rmsFromSamples,
   stepVad,
+  voicingFromSpectrum,
   type VadConfig,
   type VadState,
 } from "@/components/checkin/vad";
@@ -268,7 +269,9 @@ export function useRecorder(options: UseRecorderOptions): RecorderApi {
             context = new Ctor();
             void context.resume().catch(() => {});
             analyser = context.createAnalyser();
-            analyser.fftSize = 1024;
+            // 2048 points: ~23 Hz bins at 48 kHz, fine enough to see the harmonics of a voice (voicingFromSpectrum)
+            analyser.fftSize = 2048;
+            analyser.smoothingTimeConstant = 0.5;
             context.createMediaStreamSource(stream).connect(analyser);
           }
         } catch {
@@ -295,6 +298,8 @@ export function useRecorder(options: UseRecorderOptions): RecorderApi {
         session.current = s;
 
         const buffer = analyser ? new Uint8Array(analyser.fftSize) : null;
+        const spectrum = analyser ? new Float32Array(analyser.frequencyBinCount) : null;
+        const sampleRate = context?.sampleRate ?? 48_000;
         let last = performance.now();
         s.timer = setInterval(() => {
           const now = performance.now();
@@ -310,7 +315,13 @@ export function useRecorder(options: UseRecorderOptions): RecorderApi {
           const rms = rmsFromSamples(buffer);
           level.set(Math.min(1, rms * 4));
           if (!s.vad || s.ended) return;
-          const step = stepVad(s.vad, { rms, dtMs }, config);
+          // does this frame sound like a voice, or like the fan / traffic / keyboard? (noise never opens the mic)
+          let voiced: boolean | undefined;
+          if (spectrum) {
+            analyser.getFloatFrequencyData(spectrum);
+            voiced = voicingFromSpectrum(spectrum, sampleRate, analyser.fftSize).voiced;
+          }
+          const step = stepVad(s.vad, { rms, dtMs, voiced }, config);
           s.vad = step.state;
           switch (step.signal) {
             case "utterance_end":

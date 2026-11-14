@@ -77,7 +77,7 @@ export function POST(request: Request, context: { params: Promise<{ id: string }
     const { crewId } = await requireCrewSession();
     const { id } = await context.params;
     // 404 for another crew member's check-in, before anything is read or transcribed
-    const checkIn = getCheckIn(crewId, id);
+    const checkIn = await getCheckIn(crewId, id);
     const input = await readInput(request, normalizeLanguageCode(checkIn.language));
 
     const iterator = runTurn({ crewId, checkInId: id, input })[Symbol.asyncIterator]();

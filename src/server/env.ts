@@ -18,6 +18,8 @@ const schema = z.object({
   ELEVENLABS_TTS_MODEL_MN: optional,
   ELEVENLABS_TTS_MODEL_EN: optional,
   AEGIS_DB_PATH: optional,
+  DATABASE_URL: optional,
+  POSTGRES_URL: optional,
   SESSION_SECRET: optional,
   MISSION_START_DATE: optional,
 });
@@ -33,6 +35,12 @@ export interface Env {
   ttsModelMn: string;
   ttsModelEn?: string;
   dbPath: string;
+  /**
+   * Postgres connection string (Supabase "Transaction pooler" URI). When set, the app uses Postgres instead of the
+   * local SQLite file, so every serverless instance shares one database. DATABASE_URL, else POSTGRES_URL (the name the
+   * Supabase Vercel integration sets).
+   */
+  databaseUrl?: string;
   sessionSecret?: string;
   missionStartDate: string;
 }
@@ -46,12 +54,14 @@ export function parseEnv(source: Record<string, string | undefined>): Env {
     elevenlabsApiKey: e.ELEVENLABS_API_KEY,
     voiceIdMn: e.ELEVENLABS_VOICE_ID_MN,
     voiceIdEn: e.ELEVENLABS_VOICE_ID_EN,
-    sttModel: e.ELEVENLABS_STT_MODEL ?? "scribe_v2",
+    // scribe_v3 + numbers_format=digits heard Mongolian numbers correctly where scribe_v2 did not (see stt.ts)
+    sttModel: e.ELEVENLABS_STT_MODEL ?? "scribe_v3",
     // Live GET /v1/models (2026-11-14): only eleven_v4 and eleven_v4_turbo list Mongolian on this
     // account; eleven_v3 does not. v4_turbo is the low-latency one.
     ttsModelMn: e.ELEVENLABS_TTS_MODEL_MN ?? "eleven_v4_turbo",
     ttsModelEn: e.ELEVENLABS_TTS_MODEL_EN,
     dbPath: e.AEGIS_DB_PATH ?? "data/aegis.db",
+    databaseUrl: e.DATABASE_URL ?? e.POSTGRES_URL,
     sessionSecret: e.SESSION_SECRET,
     missionStartDate: e.MISSION_START_DATE ?? "2026-10-01",
   };

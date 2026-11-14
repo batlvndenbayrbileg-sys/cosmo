@@ -157,10 +157,11 @@ interface Loaded {
 }
 
 /** Crew viewer: everything through the crewId-scoped repos. */
-function loadForCrew(opts: BuildDashboardOptions): Loaded | null {
+async function loadForCrew(opts: BuildDashboardOptions): Promise<Loaded | null> {
   const { crewId } = opts;
-  const crew = getCrewPublic(crewId);
-  const rec = opts.checkInId !== undefined ? getCheckIn(crewId, opts.checkInId) : latestConfirmedCheckIn(crewId);
+  const crew = await getCrewPublic(crewId);
+  const rec =
+    opts.checkInId !== undefined ? await getCheckIn(crewId, opts.checkInId) : await latestConfirmedCheckIn(crewId);
   if (!rec || rec.confirmedAt === null) return null;
   return {
     crew,
@@ -171,19 +172,19 @@ function loadForCrew(opts: BuildDashboardOptions): Loaded | null {
       localDate: rec.localDate,
       summaryJson: rec.summaryJson,
     },
-    measurements: listMeasurements(crewId, rec.id),
-    history: listHistoryDays(crewId, { before: rec.localDate, days: HISTORY_DAYS }),
-    alerts: listAlerts(crewId).filter((a) => a.checkInId === rec.id),
+    measurements: await listMeasurements(crewId, rec.id),
+    history: await listHistoryDays(crewId, { before: rec.localDate, days: HISTORY_DAYS }),
+    alerts: (await listAlerts(crewId)).filter((a) => a.checkInId === rec.id),
     asOf: undefined,
   };
 }
 
 /** Ground viewer: ground* repos only (confirmed and visible at asOf, free text already removed). */
-function loadForGround(opts: BuildDashboardOptions, asOf: string): Loaded | null {
+async function loadForGround(opts: BuildDashboardOptions, asOf: string): Promise<Loaded | null> {
   const { crewId } = opts;
-  const crew = groundGetCrew(crewId);
+  const crew = await groundGetCrew(crewId);
   if (!crew) return null;
-  const rec = groundLatestConfirmedCheckIn(crewId, asOf);
+  const rec = await groundLatestConfirmedCheckIn(crewId, asOf);
   if (!rec || rec.confirmedAt === null) return null;
   return {
     crew,
@@ -195,9 +196,9 @@ function loadForGround(opts: BuildDashboardOptions, asOf: string): Loaded | null
       // already redacted by the ground repo (spoken text and free-text findings blanked)
       summaryJson: rec.summaryJson,
     },
-    measurements: groundListMeasurements(crewId, rec.id, asOf),
-    history: groundListHistoryDays(crewId, { before: rec.localDate, days: HISTORY_DAYS, asOf }),
-    alerts: groundListAlerts(asOf).filter((a) => a.crewId === crewId && a.checkInId === rec.id),
+    measurements: await groundListMeasurements(crewId, rec.id, asOf),
+    history: await groundListHistoryDays(crewId, { before: rec.localDate, days: HISTORY_DAYS, asOf }),
+    alerts: (await groundListAlerts(asOf)).filter((a) => a.crewId === crewId && a.checkInId === rec.id),
     asOf,
   };
 }
@@ -214,12 +215,12 @@ function loadForGround(opts: BuildDashboardOptions, asOf: string): Loaded | null
  * code-made findings (never Claude's phrasing, which may echo notes), and no sourceText exists
  * anywhere in the payload.
  */
-export function buildDashboardPayload(opts: BuildDashboardOptions): DashboardPayload | null {
+export async function buildDashboardPayload(opts: BuildDashboardOptions): Promise<DashboardPayload | null> {
   const ground = opts.viewer === "ground";
   const clockNow = now();
   const asOf = ground ? toIso(opts.asOf ?? clockNow, "asOf") : undefined;
 
-  const loaded = ground ? loadForGround(opts, asOf as string) : loadForCrew(opts);
+  const loaded = ground ? await loadForGround(opts, asOf as string) : await loadForCrew(opts);
   if (!loaded) return null;
   const { crew, checkIn, measurements, history, alerts } = loaded;
 
@@ -256,7 +257,7 @@ export function buildDashboardPayload(opts: BuildDashboardOptions): DashboardPay
   const oldestHistory = history.length > 0 ? history[0].date : null;
   const simulatedHistory =
     oldestHistory !== null &&
-    historyHasSimulated(crew.id, { fromDate: oldestHistory, beforeDate: checkIn.localDate, asOf: loaded.asOf });
+    (await historyHasSimulated(crew.id, { fromDate: oldestHistory, beforeDate: checkIn.localDate, asOf: loaded.asOf }));
 
   const delayMs = ground ? Math.max(0, opts.delayMs ?? clockNow.getTime() - new Date(asOf as string).getTime()) : 0;
 

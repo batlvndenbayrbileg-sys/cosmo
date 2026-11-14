@@ -10,6 +10,6 @@ export function GET(request: Request): Promise<Response> {
   return handle(async () => {
     await requireGround();
     const delayMs = parseDelayMs(new URL(request.url).searchParams);
-    return ok(buildCrewStatusCards(groundAsOf(delayMs), delayMs));
+    return ok(await buildCrewStatusCards(groundAsOf(delayMs), delayMs));
   });
 }

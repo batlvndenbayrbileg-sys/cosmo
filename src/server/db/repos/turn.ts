@@ -25,7 +25,7 @@ function mapTurn(r: TurnDbRow): TurnRow {
 }
 
 /** Turns may be appended after confirmation (Cosmo speaks the summary after the check-in is confirmed). */
-export function appendTurn(
+export async function appendTurn(
   crewId: string,
   checkInId: string,
   input: {
@@ -35,17 +35,24 @@ export function appendTurn(
     createdAt?: string | Date;
     id?: string;
   },
-): TurnRow {
+): Promise<TurnRow> {
   if (!SPEAKERS.includes(input.speaker)) throw new HttpError(400, "BAD_INPUT", "Invalid speaker");
   if (!isLang(input.language)) throw new HttpError(400, "BAD_INPUT", "Invalid language");
-  const db = getDb();
-  assertCheckInOwned(db, crewId, checkInId);
+  const db = await getDb();
+  await assertCheckInOwned(db, crewId, checkInId);
   const id = input.id ?? newId();
   const createdAt = toIso(input.createdAt ?? new Date(), "createdAt");
-  db.prepare(
+  await db.run(
     `INSERT INTO turn (id, check_in_id, crew_id, speaker, text, language, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
-  ).run(id, checkInId, crewId, input.speaker, input.text, input.language, createdAt);
+    id,
+    checkInId,
+    crewId,
+    input.speaker,
+    input.text,
+    input.language,
+    createdAt,
+  );
   return { id, speaker: input.speaker, text: input.text, language: input.language, createdAt };
 }
 
@@ -53,28 +60,33 @@ export function appendTurn(
  * Chronological order. With `limit`, returns the MOST RECENT `limit` turns (still oldest first),
  * which is what the model context needs. Throws NotFoundError for another crew member's check-in.
  */
-export function listTurns(crewId: string, checkInId: string, opts?: { limit?: number }): TurnRow[] {
-  const db = getDb();
-  assertCheckInOwned(db, crewId, checkInId);
+export async function listTurns(
+  crewId: string,
+  checkInId: string,
+  opts?: { limit?: number },
+): Promise<TurnRow[]> {
+  const db = await getDb();
+  await assertCheckInOwned(db, crewId, checkInId);
   const limit = opts?.limit;
   if (limit !== undefined && (!Number.isInteger(limit) || limit < 1)) {
     throw new HttpError(400, "BAD_INPUT", "limit must be a positive integer");
   }
   const rows =
     limit === undefined
-      ? (db
-          .prepare(
-            `SELECT id, speaker, text, language, created_at FROM turn
-              WHERE crew_id = ? AND check_in_id = ? ORDER BY created_at ASC, rowid ASC`,
-          )
-          .all(crewId, checkInId) as TurnDbRow[])
+      ? await db.all<TurnDbRow>(
+          `SELECT id, speaker, text, language, created_at FROM turn
+            WHERE crew_id = ? AND check_in_id = ? ORDER BY created_at ASC, rowid ASC`,
+          crewId,
+          checkInId,
+        )
       : (
-          db
-            .prepare(
-              `SELECT id, speaker, text, language, created_at FROM turn
-                WHERE crew_id = ? AND check_in_id = ? ORDER BY created_at DESC, rowid DESC LIMIT ?`,
-            )
-            .all(crewId, checkInId, limit) as TurnDbRow[]
+          await db.all<TurnDbRow>(
+            `SELECT id, speaker, text, language, created_at FROM turn
+              WHERE crew_id = ? AND check_in_id = ? ORDER BY created_at DESC, rowid DESC LIMIT ?`,
+            crewId,
+            checkInId,
+            limit,
+          )
         ).reverse();
   return rows.map(mapTurn);
 }

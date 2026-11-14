@@ -10,6 +10,6 @@ export function GET(_request: Request, context: { params: Promise<{ id: string }
   return handle(async () => {
     const { crewId } = await requireCrewSession();
     const { id } = await context.params;
-    return ok(getSnapshot(crewId, id));
+    return ok(await getSnapshot(crewId, id));
   });
 }

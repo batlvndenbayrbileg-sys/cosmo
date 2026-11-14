@@ -30,11 +30,11 @@ export interface AddCheckInOptions {
  * Creates, fills and confirms a check-in through the repos, as the turn pipeline would, with a
  * stored SummaryPayload computed from the crew member's real history. Returns its id.
  */
-export function addConfirmedCheckIn(opts: AddCheckInOptions): string {
+export async function addConfirmedCheckIn(opts: AddCheckInOptions): Promise<string> {
   const startedAt = new Date(opts.confirmedAt.getTime() - 6 * 60_000);
-  const ci = createCheckIn(opts.crewId, { language: opts.language, startedAt, id: opts.id });
+  const ci = await createCheckIn(opts.crewId, { language: opts.language, startedAt, id: opts.id });
   for (const [key, value] of Object.entries(opts.values) as Array<[KpiKey, MeasurementValue]>) {
-    upsertMeasurement(opts.crewId, ci.id, {
+    await upsertMeasurement(opts.crewId, ci.id, {
       key,
       value,
       unit: KPI_DEFS[key].unit,
@@ -46,18 +46,18 @@ export function addConfirmedCheckIn(opts: AddCheckInOptions): string {
   }
   let summaryJson: string | null = null;
   if (!opts.noSummary) {
-    const history: HistoryDay[] = listHistoryDays(opts.crewId, { before: localDateISO(startedAt), days: 14 });
+    const history: HistoryDay[] = await listHistoryDays(opts.crewId, { before: localDateISO(startedAt), days: 14 });
     const evaluation = evaluateDay(opts.values, history);
     const summary = composeTemplateSummary(evaluation.summary, opts.language);
     if (opts.spokenText !== undefined) summary.spoken.text = opts.spokenText;
     summaryJson = JSON.stringify({ ...summary, ...opts.summaryExtras });
   }
-  confirmCheckIn(opts.crewId, ci.id, { confirmedAt: opts.confirmedAt, summaryJson });
+  await confirmCheckIn(opts.crewId, ci.id, { confirmedAt: opts.confirmedAt, summaryJson });
   return ci.id;
 }
 
 /** Adds a red alert row (as the turn pipeline does on SUMMARY) for a check-in. */
-export function addAlert(
+export async function addAlert(
   crewId: string,
   checkInId: string,
   createdAt: Date,

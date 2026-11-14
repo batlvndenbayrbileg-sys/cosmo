@@ -9,6 +9,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:pg": "node scripts/test-pg.mjs",
     "test:watch": "vitest",
     "db:seed": "tsx scripts/seed.ts",
     "probe:elevenlabs": "tsx scripts/probe-elevenlabs.ts",
@@ -24,6 +25,7 @@
     "framer-motion": "14.13.0",
     "lucide-react": "^1.72.0",
     "next": "16.4.6",
+    "pg": "^8.23.1",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "recharts": "3.8.0",
@@ -33,9 +35,11 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.16",
     "@tailwindcss/turbopack": "4.3.3",
     "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^24.19.2",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",

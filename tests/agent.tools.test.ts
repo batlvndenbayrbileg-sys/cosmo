@@ -21,16 +21,17 @@ import { TEST_TODAY, freshSeededDb } from "./helpers/db";
 
 let checkInId: string;
 
-beforeEach(() => {
+beforeEach(async () => {
   setClockForTests(TEST_TODAY);
-  freshSeededDb();
-  checkInId = startCheckIn("bat", "en");
+  await freshSeededDb();
+  checkInId = await startCheckIn("bat", "en");
 });
 afterEach(() => setClockForTests(null));
 
-const stored = (crewId = "bat", id = checkInId) => new Map(listMeasurements(crewId, id).map((m) => [m.key, m]));
+const stored = async (crewId = "bat", id = checkInId) =>
+  new Map((await listMeasurements(crewId, id)).map((m) => [m.key, m]));
 
-function record(utterance: string, input: Record<string, unknown>, over: Parameters<typeof toolContext>[4] = {}, state: Parameters<typeof toolContext>[2] = "KPI_CAPTURE") {
+async function record(utterance: string, input: Record<string, unknown>, over: Parameters<typeof toolContext>[4] = {}, state: Parameters<typeof toolContext>[2] = "KPI_CAPTURE") {
   return executeTool(toolContext("bat", checkInId, state, utterance, over), "record_measurement", {
     unit: null,
     confidence: 0.9,
@@ -71,9 +72,9 @@ describe("tool definitions", () => {
     expect(record.properties.key.enum).toEqual([...KPI_KEYS]);
   });
 
-  it("are a constant: frozen and byte-identical on every read", () => {
+  it("are a constant: frozen and byte-identical on every read", async () => {
     const first = JSON.stringify(TOOL_DEFINITIONS);
-    executeTool(toolContext("bat", checkInId, "KPI_CAPTURE", "x"), "get_baseline", {});
+    await executeTool(toolContext("bat", checkInId, "KPI_CAPTURE", "x"), "get_baseline", {});
     expect(JSON.stringify(TOOL_DEFINITIONS)).toBe(first);
     expect(Object.isFrozen(TOOL_DEFINITIONS)).toBe(true);
     expect(Object.isFrozen(TOOL_DEFINITIONS[0])).toBe(true);
@@ -81,77 +82,77 @@ describe("tool definitions", () => {
 });
 
 describe("record_measurement: validation", () => {
-  it("stores a valid value with the registry unit, the given confidence and the context source", () => {
-    const res = record("I slept 7 hours", { key: "sleep_hours", value: 7, unit: "wrong unit", source_text: "7 hours" }, { source: "voice" });
+  it("stores a valid value with the registry unit, the given confidence and the context source", async () => {
+    const res = await record("I slept 7 hours", { key: "sleep_hours", value: 7, unit: "wrong unit", source_text: "7 hours" }, { source: "voice" });
     expect(res.ok).toBe(true);
-    const row = stored().get("sleep_hours");
+    const row = (await stored()).get("sleep_hours");
     expect(row).toMatchObject({ value: 7, unit: "h", sourceText: "7 hours", confidence: 0.9, source: "voice" });
   });
 
-  it("rejects a value outside the hard range and writes nothing (reason: range)", () => {
-    const res = record("I slept 20 hours", { key: "sleep_hours", value: 20, source_text: "20 hours" });
+  it("rejects a value outside the hard range and writes nothing (reason: range)", async () => {
+    const res = await record("I slept 20 hours", { key: "sleep_hours", value: 20, source_text: "20 hours" });
     expectError(res, "invalid_value");
     if (!res.ok) expect(res.reason).toBe("range");
-    expect(stored().size).toBe(0);
+    expect((await stored()).size).toBe(0);
   });
 
-  it("rejects a value of the wrong type (reason: type)", () => {
-    const res = record("lots", { key: "heart_rate", value: "lots", source_text: "lots" });
+  it("rejects a value of the wrong type (reason: type)", async () => {
+    const res = await record("lots", { key: "heart_rate", value: "lots", source_text: "lots" });
     expectError(res, "invalid_value");
     if (!res.ok) expect(res.reason).toBe("type");
-    const fraction = record("68.5 bpm", { key: "heart_rate", value: 68.5, source_text: "68.5" });
+    const fraction = await record("68.5 bpm", { key: "heart_rate", value: 68.5, source_text: "68.5" });
     expectError(fraction, "invalid_value");
   });
 
-  it("rejects an unknown key, a missing field and unknown fields (including a crew id)", () => {
-    expectError(record("x", { key: "spo2", value: 98, source_text: "98" }), "bad_input");
-    expectError(executeTool(toolContext("bat", checkInId, "KPI_CAPTURE", "98"), "record_measurement", { key: "mood", value: 4 }), "bad_input");
-    expectError(record("4", { key: "mood", value: 4, source_text: "4", crewId: "saraa" }), "bad_input");
-    expectError(executeTool(toolContext("bat", checkInId, "KPI_CAPTURE", "x"), "launch_rocket", {}), "unknown_tool");
-    expect(stored().size).toBe(0);
+  it("rejects an unknown key, a missing field and unknown fields (including a crew id)", async () => {
+    expectError(await record("x", { key: "spo2", value: 98, source_text: "98" }), "bad_input");
+    expectError(await executeTool(toolContext("bat", checkInId, "KPI_CAPTURE", "98"), "record_measurement", { key: "mood", value: 4 }), "bad_input");
+    expectError(await record("4", { key: "mood", value: 4, source_text: "4", crewId: "saraa" }), "bad_input");
+    expectError(await executeTool(toolContext("bat", checkInId, "KPI_CAPTURE", "x"), "launch_rocket", {}), "unknown_tool");
+    expect((await stored()).size).toBe(0);
   });
 
-  it("normalises yes/no words for the symptom keys", () => {
-    const res = record("yes a headache", { key: "symptom_headache", value: "yes", source_text: "yes" });
+  it("normalises yes/no words for the symptom keys", async () => {
+    const res = await record("yes a headache", { key: "symptom_headache", value: "yes", source_text: "yes" });
     expect(res.ok).toBe(true);
-    expect(stored().get("symptom_headache")?.value).toBe(1);
+    expect((await stored()).get("symptom_headache")?.value).toBe(1);
   });
 });
 
 describe("record_measurement: cross-check against the speaker's words (PLAN 4.5)", () => {
-  it("rejects a source_text that is not a quote of the latest utterance", () => {
-    const res = record("I slept 6 hours", { key: "sleep_hours", value: 7, source_text: "7 hours" });
+  it("rejects a source_text that is not a quote of the latest utterance", async () => {
+    const res = await record("I slept 6 hours", { key: "sleep_hours", value: 7, source_text: "7 hours" });
     expectError(res, "source_mismatch");
-    expect(stored().size).toBe(0);
+    expect((await stored()).size).toBe(0);
   });
 
-  it("rejects an empty source_text", () => {
-    expectError(record("I slept 6 hours", { key: "sleep_hours", value: 6, source_text: "  " }), "source_mismatch");
+  it("rejects an empty source_text", async () => {
+    expectError(await record("I slept 6 hours", { key: "sleep_hours", value: 6, source_text: "  " }), "source_mismatch");
   });
 
-  it("rejects a number that does not appear in the words (the model heard something else)", () => {
-    const res = record("I slept 6 hours last night", { key: "sleep_hours", value: 7, source_text: "6 hours" });
+  it("rejects a number that does not appear in the words (the model heard something else)", async () => {
+    const res = await record("I slept 6 hours last night", { key: "sleep_hours", value: 7, source_text: "6 hours" });
     expectError(res, "number_mismatch");
     if (!res.ok) expect(res.reason).toBe("unclear");
-    expect(stored().size).toBe(0);
+    expect((await stored()).size).toBe(0);
   });
 
-  it("accepts a value that matches a number in the words and keeps the confidence", () => {
-    const res = record("my pulse is sixty eight", { key: "heart_rate", value: 68, source_text: "sixty eight", confidence: 0.95 });
+  it("accepts a value that matches a number in the words and keeps the confidence", async () => {
+    const res = await record("my pulse is sixty eight", { key: "heart_rate", value: 68, source_text: "sixty eight", confidence: 0.95 });
     expect(res.ok).toBe(true);
-    expect(stored().get("heart_rate")?.confidence).toBe(0.95);
+    expect((await stored()).get("heart_rate")?.confidence).toBe(0.95);
   });
 
-  it("reads Mongolian number words", () => {
-    const res = record("Пульс жаран найм", { key: "heart_rate", value: 68, source_text: "жаран найм" });
+  it("reads Mongolian number words", async () => {
+    const res = await record("Пульс жаран найм", { key: "heart_rate", value: 68, source_text: "жаран найм" });
     expect(res.ok).toBe(true);
-    expect(record("Пульс жаран найм", { key: "bp_systolic", value: 110, source_text: "жаран найм" }).ok).toBe(false);
+    expect((await record("Пульс жаран найм", { key: "bp_systolic", value: 110, source_text: "жаран найм" })).ok).toBe(false);
   });
 
-  it("accepts a value with no number to check but caps the confidence at 0.6", () => {
-    const res = record("I slept really well", { key: "sleep_hours", value: 8, source_text: "slept really well", confidence: 0.95 });
+  it("accepts a value with no number to check but caps the confidence at 0.6", async () => {
+    const res = await record("I slept really well", { key: "sleep_hours", value: 8, source_text: "slept really well", confidence: 0.95 });
     expect(res.ok).toBe(true);
-    expect(stored().get("sleep_hours")?.confidence).toBe(0.6);
+    expect((await stored()).get("sleep_hours")?.confidence).toBe(0.6);
   });
 
   it("allows unit conversions and compounds that the words really say", () => {
@@ -179,7 +180,7 @@ describe("record_measurement: cross-check against the speaker's words (PLAN 4.5)
     expect(isSubstringOfUtterance("fine", "mostly good")).toBe(false);
   });
 
-  it("everything the rule-based interpreter returns passes the same check (same path for scripted and live)", () => {
+  it("everything the rule-based interpreter returns passes the same check (same path for scripted and live)", async () => {
     const phrases: Array<[string, string]> = [
       ["sleep", "I slept 6 hours 30 minutes"],
       ["sleep", "about an hour and a half"],
@@ -201,7 +202,7 @@ describe("record_measurement: cross-check against the speaker's words (PLAN 4.5)
     for (const [id, say] of phrases) {
       const result = interpretAnswer(getQuestion(id as never), say, "en");
       for (const r of result.records) {
-        const res = executeTool(toolContext("bat", checkInId, "KPI_CAPTURE", say, { dryRun: true }), "record_measurement", {
+        const res = await executeTool(toolContext("bat", checkInId, "KPI_CAPTURE", say, { dryRun: true }), "record_measurement", {
           key: r.key,
           value: r.value,
           unit: r.unit,
@@ -217,44 +218,44 @@ describe("record_measurement: cross-check against the speaker's words (PLAN 4.5)
 });
 
 describe("free-text keys", () => {
-  it("stores a note that is the astronaut's own words and refuses an invented one", () => {
-    const ok = executeTool(
+  it("stores a note that is the astronaut's own words and refuses an invented one", async () => {
+    const ok = await executeTool(
       toolContext("bat", checkInId, "KPI_CAPTURE", "Nothing special, just a long shift"),
       "record_measurement",
       { key: "day_note", value: "just a long shift", unit: "", source_text: "just a long shift", confidence: 0.9 },
     );
     expect(ok.ok).toBe(true);
-    expect(stored().get("day_note")?.value).toBe("just a long shift");
+    expect((await stored()).get("day_note")?.value).toBe("just a long shift");
 
-    const invented = executeTool(
+    const invented = await executeTool(
       toolContext("bat", checkInId, "KPI_CAPTURE", "Nothing special"),
       "record_measurement",
       { key: "symptom_note", value: "felt a sharp pain in my chest", unit: "", source_text: "Nothing special", confidence: 0.9 },
     );
     expectError(invented, "source_mismatch");
-    expect(stored().has("symptom_note")).toBe(false);
+    expect((await stored()).has("symptom_note")).toBe(false);
   });
 });
 
 describe("state legality", () => {
-  it("record_measurement is legal in GREETING, SMALL_TALK and KPI_CAPTURE only", () => {
+  it("record_measurement is legal in GREETING, SMALL_TALK and KPI_CAPTURE only", async () => {
     const base = { key: "mood", value: 4, source_text: "4" };
     for (const state of ["GREETING", "SMALL_TALK", "KPI_CAPTURE"] as const) {
-      expect(record("4", base, { dryRun: true }, state).ok, state).toBe(true);
+      expect((await record("4", base, { dryRun: true }, state)).ok, state).toBe(true);
     }
     for (const state of ["CONFIRM", "SUMMARY", "DONE"] as const) {
-      expectError(record("4", base, { dryRun: true }, state), "illegal_state");
+      expectError(await record("4", base, { dryRun: true }, state), "illegal_state");
     }
-    expect(stored().size).toBe(0);
+    expect((await stored()).size).toBe(0);
   });
 
-  it("DONE refuses every writing tool and nothing reaches the database", () => {
+  it("DONE refuses every writing tool and nothing reaches the database", async () => {
     const tc = toolContext("bat", checkInId, "DONE", "I slept 6 hours");
-    expectError(executeTool(tc, "record_measurement", { key: "sleep_hours", value: 6, unit: "h", source_text: "6 hours", confidence: 1 }), "illegal_state");
-    expectError(executeTool(tc, "correct_measurement", { key: "sleep_hours", value: 6 }), "illegal_state");
-    expectError(executeTool(tc, "request_clarification", { key: "sleep_hours", reason: "x" }), "illegal_state");
-    expectError(executeTool(tc, "finish_confirmation", { confirmed: true }), "illegal_state");
-    expect(stored().size).toBe(0);
+    expectError(await executeTool(tc, "record_measurement", { key: "sleep_hours", value: 6, unit: "h", source_text: "6 hours", confidence: 1 }), "illegal_state");
+    expectError(await executeTool(tc, "correct_measurement", { key: "sleep_hours", value: 6 }), "illegal_state");
+    expectError(await executeTool(tc, "request_clarification", { key: "sleep_hours", reason: "x" }), "illegal_state");
+    expectError(await executeTool(tc, "finish_confirmation", { confirmed: true }), "illegal_state");
+    expect((await stored()).size).toBe(0);
   });
 
   it("the legality table matches the plan", () => {
@@ -271,61 +272,61 @@ describe("state legality", () => {
     expect(isLegalIn("get_baseline", "KPI_CAPTURE")).toBe(true);
   });
 
-  it("refuses to overwrite a value that is already recorded outside the read-back", () => {
-    const res = record("I slept 8 hours", { key: "sleep_hours", value: 8, source_text: "8 hours" }, { filled: new Set<KpiKey>(["sleep_hours"]) });
+  it("refuses to overwrite a value that is already recorded outside the read-back", async () => {
+    const res = await record("I slept 8 hours", { key: "sleep_hours", value: 8, source_text: "8 hours" }, { filled: new Set<KpiKey>(["sleep_hours"]) });
     expectError(res, "already_recorded");
-    expect(stored().size).toBe(0);
+    expect((await stored()).size).toBe(0);
   });
 });
 
 describe("correct_measurement, request_clarification, finish_confirmation", () => {
-  it("corrects an existing value at the read-back (change: corrected) and cross-checks the number against the words", () => {
-    record("I slept 5.5 hours", { key: "sleep_hours", value: 5.5, source_text: "5.5 hours" });
+  it("corrects an existing value at the read-back (change: corrected) and cross-checks the number against the words", async () => {
+    await record("I slept 5.5 hours", { key: "sleep_hours", value: 5.5, source_text: "5.5 hours" });
     const tc = toolContext("bat", checkInId, "CONFIRM", "No, I slept 7 hours", { filled: new Set<KpiKey>(["sleep_hours"]) });
-    const res = executeTool(tc, "correct_measurement", { key: "sleep_hours", value: 7 });
+    const res = await executeTool(tc, "correct_measurement", { key: "sleep_hours", value: 7 });
     expect(res.ok).toBe(true);
     if (res.ok) expect(res.effect).toMatchObject({ type: "measurement", key: "sleep_hours", value: 7, change: "corrected" });
-    expect(stored().get("sleep_hours")?.value).toBe(7);
+    expect((await stored()).get("sleep_hours")?.value).toBe(7);
 
-    expectError(executeTool(tc, "correct_measurement", { key: "sleep_hours", value: 9 }), "number_mismatch");
-    expectError(executeTool(tc, "correct_measurement", { key: "sleep_hours", value: 99 }), "invalid_value");
-    expect(stored().get("sleep_hours")?.value).toBe(7);
+    expectError(await executeTool(tc, "correct_measurement", { key: "sleep_hours", value: 9 }), "number_mismatch");
+    expectError(await executeTool(tc, "correct_measurement", { key: "sleep_hours", value: 99 }), "invalid_value");
+    expect((await stored()).get("sleep_hours")?.value).toBe(7);
   });
 
-  it("request_clarification returns a clarification effect without writing", () => {
-    const res = executeTool(toolContext("bat", checkInId, "KPI_CAPTURE", "hm"), "request_clarification", { key: "mood", reason: "no number heard" });
+  it("request_clarification returns a clarification effect without writing", async () => {
+    const res = await executeTool(toolContext("bat", checkInId, "KPI_CAPTURE", "hm"), "request_clarification", { key: "mood", reason: "no number heard" });
     expect(res.ok).toBe(true);
     if (res.ok) expect(res.effect).toEqual({ type: "clarification", key: "mood", reason: "no number heard" });
-    expect(stored().size).toBe(0);
+    expect((await stored()).size).toBe(0);
   });
 
-  it("finish_confirmation(true) carries the code-computed summary; false does not", () => {
+  it("finish_confirmation(true) carries the code-computed summary; false does not", async () => {
     for (const [key, value, said] of [["sleep_hours", 6, "6 hours"], ["water_ml", 1800, "1800 ml"]] as const) {
-      record(said, { key, value, source_text: said });
+      await record(said, { key, value, source_text: said });
     }
     const tc = toolContext("bat", checkInId, "CONFIRM", "yes");
-    const yes = executeTool(tc, "finish_confirmation", { confirmed: true });
+    const yes = await executeTool(tc, "finish_confirmation", { confirmed: true });
     expect(yes.ok).toBe(true);
     if (yes.ok) {
       expect(yes.effect).toEqual({ type: "confirmation", confirmed: true });
       expect((yes.data as { summary: { overall: string } }).summary.overall).toBeDefined();
     }
-    const no = executeTool(tc, "finish_confirmation", { confirmed: false });
+    const no = await executeTool(tc, "finish_confirmation", { confirmed: false });
     expect(no.ok && no.data).toEqual({ confirmed: false });
   });
 
-  it("dryRun validates exactly like a real call but writes nothing", () => {
-    const dry = record("I slept 6 hours", { key: "sleep_hours", value: 6, source_text: "6 hours" }, { dryRun: true });
+  it("dryRun validates exactly like a real call but writes nothing", async () => {
+    const dry = await record("I slept 6 hours", { key: "sleep_hours", value: 6, source_text: "6 hours" }, { dryRun: true });
     expect(dry.ok).toBe(true);
-    expect(stored().size).toBe(0);
-    const bad = record("I slept 6 hours", { key: "sleep_hours", value: 7, source_text: "6 hours" }, { dryRun: true });
+    expect((await stored()).size).toBe(0);
+    const bad = await record("I slept 6 hours", { key: "sleep_hours", value: 7, source_text: "6 hours" }, { dryRun: true });
     expectError(bad, "number_mismatch");
   });
 });
 
 describe("get_baseline and compose_summary return code-computed data", () => {
-  it("get_baseline: Bat's own 14-day mean and sd from the seeded history", () => {
-    const res = executeTool(toolContext("bat", checkInId, "KPI_CAPTURE", "x"), "get_baseline", {});
+  it("get_baseline: Bat's own 14-day mean and sd from the seeded history", async () => {
+    const res = await executeTool(toolContext("bat", checkInId, "KPI_CAPTURE", "x"), "get_baseline", {});
     expect(res.ok).toBe(true);
     const data = (res.ok ? res.data : null) as { baselines: Record<string, { mean: number | null; sd: number | null; n: number }> };
     expect(data.baselines.sleep_hours.n).toBe(14);
@@ -336,42 +337,42 @@ describe("get_baseline and compose_summary return code-computed data", () => {
     expect(toolResultContent(res)).toContain("sleep_hours");
   });
 
-  it("get_baseline takes no crew id from the model", () => {
-    expectError(executeTool(toolContext("bat", checkInId, "KPI_CAPTURE", "x"), "get_baseline", { crewId: "saraa" }), "bad_input");
+  it("get_baseline takes no crew id from the model", async () => {
+    expectError(await executeTool(toolContext("bat", checkInId, "KPI_CAPTURE", "x"), "get_baseline", { crewId: "saraa" }), "bad_input");
   });
 
-  it("compose_summary: legal in DONE, computed from the stored values", () => {
+  it("compose_summary: legal in DONE, computed from the stored values", async () => {
     for (const [key, value, said] of [["sleep_hours", 5, "5 hours"], ["heart_rate", 68, "68"], ["mood", 4, "4"]] as const) {
-      record(said, { key, value, source_text: said });
+      await record(said, { key, value, source_text: said });
     }
-    const res = executeTool(toolContext("bat", checkInId, "DONE", ""), "compose_summary", {});
+    const res = await executeTool(toolContext("bat", checkInId, "DONE", ""), "compose_summary", {});
     expect(res.ok).toBe(true);
     const findings = (res.ok ? res.data : null) as { overall: string; findings: unknown[]; disclaimer: { en: string } };
     expect(findings.disclaimer.en).toBe("Decision support, not a diagnosis.");
     expect(Array.isArray(findings.findings)).toBe(true);
-    expectError(executeTool(toolContext("bat", checkInId, "KPI_CAPTURE", ""), "compose_summary", {}), "illegal_state");
+    expectError(await executeTool(toolContext("bat", checkInId, "KPI_CAPTURE", ""), "compose_summary", {}), "illegal_state");
   });
 });
 
 describe("crew isolation", () => {
-  it("a tool call under another crew member's session can neither write to nor read from this check-in", () => {
-    const before = stored();
+  it("a tool call under another crew member's session can neither write to nor read from this check-in", async () => {
+    const before = await stored();
     const tc = toolContext("saraa", checkInId, "KPI_CAPTURE", "I slept 6 hours");
-    const write = executeTool(tc, "record_measurement", { key: "sleep_hours", value: 6, unit: "h", source_text: "6 hours", confidence: 1 });
+    const write = await executeTool(tc, "record_measurement", { key: "sleep_hours", value: 6, unit: "h", source_text: "6 hours", confidence: 1 });
     expectError(write, "write_refused");
-    expectError(executeTool({ ...tc, state: "DONE" }, "compose_summary", {}), "not_found");
-    expectError(executeTool(tc, "get_baseline", {}), "not_found");
-    expect(stored()).toEqual(before);
-    expect(listMeasurements("bat", checkInId)).toHaveLength(0);
+    expectError(await executeTool({ ...tc, state: "DONE" }, "compose_summary", {}), "not_found");
+    expectError(await executeTool(tc, "get_baseline", {}), "not_found");
+    expect(await stored()).toEqual(before);
+    expect(await listMeasurements("bat", checkInId)).toHaveLength(0);
   });
 
-  it("a write cannot reach a confirmed check-in either", () => {
+  it("a write cannot reach a confirmed check-in either", async () => {
     const tc = toolContext("bat", checkInId, "KPI_CAPTURE", "I slept 6 hours");
-    expect(executeTool(tc, "record_measurement", { key: "sleep_hours", value: 6, unit: "h", source_text: "6 hours", confidence: 1 }).ok).toBe(true);
+    expect((await executeTool(tc, "record_measurement", { key: "sleep_hours", value: 6, unit: "h", source_text: "6 hours", confidence: 1 })).ok).toBe(true);
     // confirm through the repo, then try again
-    const db = getDb();
-    db.prepare("UPDATE check_in SET confirmed_at = ? WHERE id = ?").run(new Date().toISOString(), checkInId);
-    const res = executeTool(toolContext("bat", checkInId, "KPI_CAPTURE", "my pulse is 70"), "record_measurement", { key: "heart_rate", value: 70, unit: "bpm", source_text: "70", confidence: 1 });
+    const db = await getDb();
+    await db.run("UPDATE check_in SET confirmed_at = ? WHERE id = ?", new Date().toISOString(), checkInId);
+    const res = await executeTool(toolContext("bat", checkInId, "KPI_CAPTURE", "my pulse is 70"), "record_measurement", { key: "heart_rate", value: 70, unit: "bpm", source_text: "70", confidence: 1 });
     expectError(res, "write_refused");
   });
 });

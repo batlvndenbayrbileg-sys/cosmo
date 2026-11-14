@@ -6,7 +6,7 @@ import { HttpError } from "@/server/http";
 
 /**
  * Text-to-speech with ElevenLabs (streamed):
- *   POST https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/stream?output_format=mp3_44100_128
+ *   POST https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/stream?output_format=mp3_44100_64
  *   header xi-api-key; JSON { text, model_id }
  * Model: Mongolian uses ELEVENLABS_TTS_MODEL_MN (default eleven_v4_turbo - the live GET /v1/models on this account
  * lists Mongolian only for eleven_v4 / eleven_v4_turbo); English uses ELEVENLABS_TTS_MODEL_EN or eleven_v4_turbo.
@@ -35,7 +35,9 @@ export async function synthesizeSpeech(text: string, lang: Lang): Promise<Respon
 
   let res: Response;
   try {
-    res = await fetch(`${BASE}/${encodeURIComponent(voiceId)}/stream?output_format=mp3_44100_128`, {
+    // 64 kbps: measured 2026-11-15 on a Mongolian line, first audio byte ~260 ms vs ~540 ms at 128 kbps and the whole
+    // clip ~0.75 s vs ~1.1 s, with no audible loss for a speaking voice (scratchpad tts-timing)
+    res = await fetch(`${BASE}/${encodeURIComponent(voiceId)}/stream?output_format=mp3_44100_64`, {
       method: "POST",
       headers: {
         "xi-api-key": env.elevenlabsApiKey,

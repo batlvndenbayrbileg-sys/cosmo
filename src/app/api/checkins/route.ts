@@ -27,6 +27,6 @@ export function POST(request: Request): Promise<Response> {
     }
     const parsed = bodySchema.safeParse(json);
     if (!parsed.success) throw new HttpError(400, "BAD_INPUT", 'Expected { "language"?: string }');
-    return ok(createOrResumeCheckIn(crewId, parsed.data.language));
+    return ok(await createOrResumeCheckIn(crewId, parsed.data.language));
   });
 }

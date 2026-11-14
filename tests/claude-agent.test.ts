@@ -21,11 +21,11 @@ import { TEST_TODAY, freshSeededDb } from "./helpers/db";
 let checkInId: string;
 let crew: CrewPublic;
 
-beforeEach(() => {
+beforeEach(async () => {
   setClockForTests(TEST_TODAY);
-  freshSeededDb();
-  checkInId = startCheckIn("bat", "en");
-  crew = getCrewPublic("bat");
+  await freshSeededDb();
+  checkInId = await startCheckIn("bat", "en");
+  crew = await getCrewPublic("bat");
 });
 afterEach(() => setClockForTests(null));
 
@@ -219,7 +219,7 @@ describe("ClaudeAgent tool use", () => {
     expect(decision.replyText).toBe("Got it, 6 hours. How is your mood, from 1 to 5?");
     expect(decision.llmMs).toBeGreaterThanOrEqual(0);
     // the agent itself never writes
-    expect(listMeasurements("bat", checkInId)).toHaveLength(0);
+    expect(await listMeasurements("bat", checkInId)).toHaveLength(0);
   });
 
   it("a rejected call triggers a second call with ALL tool results in one user message; the first reply is discarded", async () => {
@@ -343,14 +343,14 @@ describe("ClaudeAgent tool use", () => {
     for (const say of ["hello", "I'm fine", "let's start", "6 hours", "4", "no", "120 over 80", "70", "36.6", "95", "2300 ml", "45 minutes", "sharp", "3", "nothing"]) {
       await playTurn("bat", id, say);
     }
-    expect(ctxOf("bat", id).state).toBe("CONFIRM");
+    expect((await ctxOf("bat", id)).state).toBe("CONFIRM");
     const { client } = fakeClient([message("tool_use", [tool("tu_f", "finish_confirmation", { confirmed: true })])]);
     const events = await playTurn("bat", id, "hmm what does my blood pressure usually look like?", { agent: new ClaudeAgent({ client }) });
     expect(eventsOf(events, "summary")).toEqual([]);
-    expect(ctxOf("bat", id).state).toBe("CONFIRM");
-    expect(getCheckIn("bat", id).confirmedAt).toBeNull();
-    expect(getCheckIn("bat", id).summaryJson).toBeNull();
-    expect(listAlerts("bat").filter((a) => a.checkInId === id)).toEqual([]);
+    expect((await ctxOf("bat", id)).state).toBe("CONFIRM");
+    expect((await getCheckIn("bat", id)).confirmedAt).toBeNull();
+    expect((await getCheckIn("bat", id)).summaryJson).toBeNull();
+    expect((await listAlerts("bat")).filter((a) => a.checkInId === id)).toEqual([]);
     expect(assistantText(events)).toMatch(/is everything correct/i);
   });
 
@@ -451,7 +451,7 @@ describe("turn pipeline with a live agent", () => {
     expect(error[0]).toMatchObject({ code: "LLM_FAILED", recoverable: true });
     expect(assistantText(events).length).toBeGreaterThan(0);
     expect(events[events.length - 1].type).toBe("done");
-    expect(ctxOf("bat", checkInId).state).toBe("SMALL_TALK");
+    expect((await ctxOf("bat", checkInId)).state).toBe("SMALL_TALK");
   });
 
   it("uses the model's wording when it is sane, the template otherwise", async () => {
@@ -467,7 +467,7 @@ describe("turn pipeline with a live agent", () => {
       undefined,
     ];
     for (const reply of bad) {
-      const id = startCheckInFresh();
+      const id = await startCheckInFresh();
       const events = await playTurn("bat", id, "I'm fine, thanks", { agent: withReply(reply) });
       expect(assistantText(events), String(reply)).not.toBe(reply);
       expect(assistantText(events).length).toBeGreaterThan(0);
@@ -511,7 +511,7 @@ describe("turn pipeline with a live agent", () => {
     expect(eventsOf(third, "state")[0].expectedQuestion).toBe("mood");
     expect(assistantText(third)).toMatch(/add it when we confirm/i);
     expect(assistantText(third)).not.toContain("No worries");
-    expect(ctxOf("bat", checkInId).skipped).toEqual(["sleep"]);
+    expect((await ctxOf("bat", checkInId)).skipped).toEqual(["sleep"]);
   });
 
   it("a model reply cannot replace the clarification of an unusable answer (it could ask for another value)", async () => {
@@ -547,12 +547,12 @@ describe("turn pipeline with a live agent", () => {
     await playTurn("bat", checkInId, "nice day");
     const events = await playTurn("bat", checkInId, "Yes my pulse is 68", { agent: liar });
     expect(eventsOf(events, "measurement")).toEqual([]);
-    expect(listMeasurements("bat", checkInId).find((m) => m.key === "heart_rate")).toBeUndefined();
+    expect((await listMeasurements("bat", checkInId)).find((m) => m.key === "heart_rate")).toBeUndefined();
   });
 
   it("model-phrased summaries are used only when every numeral is in the findings", async () => {
     const play = async (phrase: string) => {
-      const id = startCheckInFresh();
+      const id = await startCheckInFresh();
       const agent = withReply(undefined, { phraseSummary: async () => phrase });
       for (const say of ["hello", "I'm fine thanks", "let's start"]) await playTurn("bat", id, say);
       for (const say of ["6 hours", "4", "no", "120 over 80", "70", "36.6", "95", "2300 ml", "45 minutes", "sharp", "3", "nothing", "yes"]) {
@@ -572,8 +572,8 @@ describe("turn pipeline with a live agent", () => {
 });
 
 /** a clean database and a new open check-in for Bat (earlier ids of the same test become invalid) */
-function startCheckInFresh(): string {
-  freshSeededDb();
+async function startCheckInFresh(): Promise<string> {
+  await freshSeededDb();
   setClockForTests(TEST_TODAY);
   return startCheckIn("bat", "en");
 }

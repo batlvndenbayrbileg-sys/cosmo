@@ -15,6 +15,6 @@ export function POST(_request: Request, ctx: { params: Promise<{ id: string }> }
     const { crewId } = await requireCrew();
     const parsed = paramsSchema.safeParse(await ctx.params);
     if (!parsed.success) throw new HttpError(400, "BAD_INPUT", "Invalid alert id");
-    return ok(ackAlert(crewId, parsed.data.id, now()));
+    return ok(await ackAlert(crewId, parsed.data.id, now()));
   });
 }

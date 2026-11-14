@@ -25,16 +25,25 @@ export function POST(request: Request, context: { params: Promise<{ id: string }
   return handle(async () => {
     const { crewId } = await requireCrewSession();
     const { id } = await context.params;
-    const checkIn = getCheckIn(crewId, id); // 404 for another crew member's check-in
+    const checkIn = await getCheckIn(crewId, id); // 404 for another crew member's check-in
     if (checkIn.confirmedAt === null) throw new HttpError(409, "WRONG_STATE", "The check-in is not confirmed yet");
 
     const url = new URL(request.url);
     const lang: Lang = normalizeLanguageCode(url.searchParams.get("lang")) ?? checkIn.language;
-    const facts = buildResultsFacts(loadTodayValues(crewId, id).values, loadHistory(crewId, checkIn.localDate), lang);
-    const steps = buildTour(facts, lang).map((step) => {
-      const turn = appendTurn(crewId, id, { speaker: "cosmo", text: step.text, language: lang, createdAt: new Date().toISOString() });
-      return { focus: step.focus, turnId: turn.id, text: step.text };
-    });
+    const today = await loadTodayValues(crewId, id);
+    const history = await loadHistory(crewId, checkIn.localDate);
+    const facts = buildResultsFacts(today.values, history, lang);
+    // sequential so the stored Cosmo turns keep the tour's order
+    const steps: TourResponse["steps"] = [];
+    for (const step of buildTour(facts, lang)) {
+      const turn = await appendTurn(crewId, id, {
+        speaker: "cosmo",
+        text: step.text,
+        language: lang,
+        createdAt: new Date().toISOString(),
+      });
+      steps.push({ focus: step.focus, turnId: turn.id, text: step.text });
+    }
     const body: TourResponse = { language: lang, steps };
     return ok(body);
   });

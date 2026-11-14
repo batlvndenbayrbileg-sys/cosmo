@@ -40,33 +40,36 @@ export function groundAsOf(delayMs: number): string {
  * and readiness likewise, openAlerts counts visible, unacknowledged alerts. Values only: no turns,
  * notes or source text (everything goes through the ground* repos).
  */
-export function buildCrewStatusCards(asOf: string, delayMs: number): CrewStatusCard[] {
-  const visibleAlerts = groundListAlerts(asOf);
-  return groundListCrew().map((crew): CrewStatusCard => {
+export async function buildCrewStatusCards(asOf: string, delayMs: number): Promise<CrewStatusCard[]> {
+  const visibleAlerts = await groundListAlerts(asOf);
+  const cards: CrewStatusCard[] = [];
+  for (const crew of await groundListCrew()) {
     const openAlerts = visibleAlerts.filter((a) => a.crewId === crew.id && a.acknowledgedAt === null).length;
-    const payload = buildDashboardPayload({ crewId: crew.id, viewer: "ground", asOf, delayMs });
+    const payload = await buildDashboardPayload({ crewId: crew.id, viewer: "ground", asOf, delayMs });
     if (!payload) {
-      return {
+      cards.push({
         crew,
         overall: "no_data",
         readiness: null,
         lastCheckInAt: null,
         stars: KPI_KEYS.map((key) => ({ key, status: "no_data" as const })),
         openAlerts,
-      };
+      });
+      continue;
     }
-    return {
+    cards.push({
       crew,
       overall: payload.overall,
       readiness: payload.readiness,
       lastCheckInAt: payload.checkIn.confirmedAt,
       stars: payload.kpis.map((k) => ({ key: k.key, status: k.status })),
       openAlerts,
-    };
-  });
+    });
+  }
+  return cards;
 }
 
 /** Every crew member's alerts that have arrived by `asOf`, newest first. */
-export function listGroundAlerts(asOf: string): AlertRow[] {
+export async function listGroundAlerts(asOf: string): Promise<AlertRow[]> {
   return groundListAlerts(asOf);
 }

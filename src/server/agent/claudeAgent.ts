@@ -217,7 +217,7 @@ export class ClaudeAgent implements Agent {
     const base = buildMessages(args.history, args.text);
 
     const first = await this.call(this.withDirective(base, directive));
-    const firstCalls = this.validateAll(args, toolUsesOf(first));
+    const firstCalls = await this.validateAll(args, toolUsesOf(first));
     let finalText = textOf(first);
     let finalCalls = firstCalls;
     let carried: Called[] = [];
@@ -241,7 +241,7 @@ export class ClaudeAgent implements Agent {
         },
       ];
       const second = await this.call(this.withDirective(withResults, directive));
-      finalCalls = this.validateAll(args, toolUsesOf(second));
+      finalCalls = await this.validateAll(args, toolUsesOf(second));
       // the first reply was never spoken: only the second one counts. Calls that passed in the first message stay.
       carried = firstCalls;
       finalText = textOf(second);
@@ -250,8 +250,11 @@ export class ClaudeAgent implements Agent {
     return this.toDecision(args, carried, finalCalls, finalText, Date.now() - started);
   }
 
-  private validateAll(args: AgentArgs, uses: ToolUse[]): Called[] {
-    return uses.map((use) => ({ use, result: args.validate(use.name, use.input) }));
+  /** one call after the other, in the order the model made them */
+  private async validateAll(args: AgentArgs, uses: ToolUse[]): Promise<Called[]> {
+    const out: Called[] = [];
+    for (const use of uses) out.push({ use, result: await args.validate(use.name, use.input) });
+    return out;
   }
 
   private toDecision(

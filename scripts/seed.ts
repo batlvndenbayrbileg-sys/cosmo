@@ -1,6 +1,7 @@
 /**
  * pnpm db:seed — (re)creates the demo database: 4 crew members, 14 simulated confirmed check-ins
- * each. Writes to AEGIS_DB_PATH (default data/aegis.db) and prints the crew with their last day.
+ * each. Writes to DATABASE_URL (Postgres) when set, else AEGIS_DB_PATH (default data/aegis.db), and prints the
+ * crew with their last day.
  * WARNING: wipes every existing row first.
  */
 import { registerHooks } from "node:module";
@@ -45,10 +46,10 @@ async function main(): Promise<void> {
   const { getEnv } = await import("../src/server/env");
   const { buildDashboardPayload } = await import("../src/server/dashboard/build");
 
-  const db = getDb();
-  const result = seedDatabase(db, { wipe: true });
+  const db = await getDb();
+  const result = await seedDatabase(db, { wipe: true });
   console.log(
-    `Seeded ${getEnv().dbPath}: ${result.crew} crew, ${result.checkIns} check-ins, ` +
+    `Seeded ${getEnv().databaseUrl ? "Postgres (DATABASE_URL)" : getEnv().dbPath}: ${result.crew} crew, ${result.checkIns} check-ins, ` +
       `${result.measurements} measurements, ${result.alerts} alert(s); ` +
       `${result.dates[0]} .. ${result.dates[result.dates.length - 1]} (simulated)\n`,
   );
@@ -75,13 +76,13 @@ async function main(): Promise<void> {
   console.log(columns.map(([name, w]) => cell(name, w)).join(" "));
   console.log(columns.map(([, w]) => "-".repeat(w)).join(" "));
 
-  for (const crew of listCrewPublic()) {
-    const latest = latestConfirmedCheckIn(crew.id);
+  for (const crew of await listCrewPublic()) {
+    const latest = await latestConfirmedCheckIn(crew.id);
     if (!latest) {
       console.log(cell(crew.id, 7), "(no confirmed check-in)");
       continue;
     }
-    const v = Object.fromEntries(listMeasurements(crew.id, latest.id).map((m) => [m.key, m.value]));
+    const v = Object.fromEntries((await listMeasurements(crew.id, latest.id)).map((m) => [m.key, m.value]));
     const row = [
       crew.id,
       crew.role,
@@ -98,13 +99,13 @@ async function main(): Promise<void> {
       `${v.symptom_headache}/${v.symptom_dizziness}/${v.symptom_nausea}`,
       v.vision_check,
       v.workload,
-      listAlerts(crew.id).length,
+      (await listAlerts(crew.id)).length,
       // computed by src/lib/health from the seeded values (and the stored summary, if any)
-      buildDashboardPayload({ crewId: crew.id, viewer: "crew" })?.overall,
+      (await buildDashboardPayload({ crewId: crew.id, viewer: "crew" }))?.overall,
     ];
     console.log(row.map((x, i) => cell(x, columns[i][1])).join(" "));
   }
-  db.close();
+  await db.close();
 }
 
 main().catch((err) => {

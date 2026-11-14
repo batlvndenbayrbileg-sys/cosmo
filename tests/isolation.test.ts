@@ -36,39 +36,39 @@ interface World {
 
 let w: World;
 
-function build(): World {
-  const db = freshEmptyDb();
-  insertCrew(db, A, { language: "mn" });
-  insertCrew(db, B, { language: "en" });
+async function build(): Promise<World> {
+  const db = await freshEmptyDb();
+  await insertCrew(db, A, { language: "mn" });
+  await insertCrew(db, B, { language: "en" });
 
-  const a = checkinRepo.createCheckIn(A, { language: "mn", startedAt: at(10, 8, 24), id: "ci-a" });
-  measurementRepo.upsertMeasurement(A, a.id, {
+  const a = await checkinRepo.createCheckIn(A, { language: "mn", startedAt: at(10, 8, 24), id: "ci-a" });
+  await measurementRepo.upsertMeasurement(A, a.id, {
     key: "sleep_hours", value: 7, unit: "h", sourceText: "seven", confidence: 0.9, source: "voice",
   });
-  measurementRepo.upsertMeasurement(A, a.id, {
+  await measurementRepo.upsertMeasurement(A, a.id, {
     key: "day_note", value: "A-note", unit: null, sourceText: null, confidence: null, source: "typed",
   });
-  turnRepo.appendTurn(A, a.id, { speaker: "crew", text: "A-turn", language: "mn" });
-  const aAlert = alertRepo.insertAlert(A, {
+  await turnRepo.appendTurn(A, a.id, { speaker: "crew", text: "A-turn", language: "mn" });
+  const aAlert = await alertRepo.insertAlert(A, {
     checkInId: a.id, level: "red", rule: "VITAL_RED", text: { en: "A alert", mn: "A сэрэмжлүүлэг" }, createdAt: at(10, 8, 31),
   });
-  checkinRepo.confirmCheckIn(A, a.id, { confirmedAt: at(10), summaryJson: JSON.stringify({ overall: "red" }) });
+  await checkinRepo.confirmCheckIn(A, a.id, { confirmedAt: at(10), summaryJson: JSON.stringify({ overall: "red" }) });
 
-  const b = checkinRepo.createCheckIn(B, { language: "en", startedAt: at(11, 8, 24), id: "ci-b" });
-  measurementRepo.upsertMeasurement(B, b.id, {
+  const b = await checkinRepo.createCheckIn(B, { language: "en", startedAt: at(11, 8, 24), id: "ci-b" });
+  await measurementRepo.upsertMeasurement(B, b.id, {
     key: "sleep_hours", value: 5.5, unit: "h", sourceText: "five and a half", confidence: 0.8, source: "voice",
   });
-  measurementRepo.upsertMeasurement(B, b.id, {
+  await measurementRepo.upsertMeasurement(B, b.id, {
     key: "symptom_headache", value: 1, unit: null, sourceText: "yes", confidence: 1, source: "typed",
   });
-  measurementRepo.upsertMeasurement(B, b.id, {
+  await measurementRepo.upsertMeasurement(B, b.id, {
     key: "symptom_note", value: SECRET_NOTE, unit: null, sourceText: SECRET_NOTE, confidence: null, source: "typed",
   });
-  turnRepo.appendTurn(B, b.id, { speaker: "crew", text: SECRET_TURN, language: "en" });
-  const bAlert = alertRepo.insertAlert(B, {
+  await turnRepo.appendTurn(B, b.id, { speaker: "crew", text: SECRET_TURN, language: "en" });
+  const bAlert = await alertRepo.insertAlert(B, {
     checkInId: b.id, level: "red", rule: "HEADACHE_PLUS_VISION", text: { en: "B alert", mn: "B сэрэмжлүүлэг" }, createdAt: at(11, 8, 31),
   });
-  checkinRepo.confirmCheckIn(B, b.id, {
+  await checkinRepo.confirmCheckIn(B, b.id, {
     confirmedAt: at(11),
     summaryJson: JSON.stringify({
       overall: "red",
@@ -80,20 +80,20 @@ function build(): World {
     }),
   });
 
-  const open = checkinRepo.createCheckIn(B, { language: "en", startedAt: at(12, 8, 0), id: "ci-b-open" });
-  measurementRepo.upsertMeasurement(B, open.id, {
+  const open = await checkinRepo.createCheckIn(B, { language: "en", startedAt: at(12, 8, 0), id: "ci-b-open" });
+  await measurementRepo.upsertMeasurement(B, open.id, {
     key: "mood", value: 2, unit: null, sourceText: null, confidence: null, source: "typed",
   });
-  turnRepo.appendTurn(B, open.id, { speaker: "cosmo", text: "B-open-turn", language: "en" });
+  await turnRepo.appendTurn(B, open.id, { speaker: "cosmo", text: "B-open-turn", language: "en" });
 
   return { db, aCheckIn: a.id, aAlert: aAlert.id, bCheckIn: b.id, bAlert: bAlert.id, bOpen: open.id };
 }
 
-beforeEach(() => {
-  w = build();
+beforeEach(async () => {
+  w = await build();
 });
 
-const notFound = (fn: () => unknown) => expect(fn).toThrow(NotFoundError);
+const notFound = (fn: () => Promise<unknown>) => expect(fn()).rejects.toThrow(NotFoundError);
 
 /* ───────────── registry: every crew-scoped repo function and its isolation case ───────────── */
 
@@ -118,165 +118,165 @@ const MODULES: Record<string, Record<string, unknown>> = {
 /** roster-only functions: no health data, hence no crewId parameter */
 const ROSTER_ONLY = new Set(["crew.listCrewPublic"]);
 
-const cases: Record<string, () => void> = {
+const cases: Record<string, () => Promise<void>> = {
   /* crew */
-  "crew.listCrewPublic": () => {
-    const roster = crewRepo.listCrewPublic();
+  "crew.listCrewPublic": async () => {
+    const roster = await crewRepo.listCrewPublic();
     expect(roster.map((c) => c.id)).toEqual([A, B]);
     // roster fields only
     expect(Object.keys(roster[0]).sort()).toEqual(
       ["avatarSeed", "id", "mascotVariant", "name", "preferredLanguage", "role"],
     );
   },
-  "crew.getCrewPublic": () => {
-    expect(crewRepo.getCrewPublic(A).id).toBe(A);
-    expect(crewRepo.getCrewPublic(B).id).toBe(B);
-    notFound(() => crewRepo.getCrewPublic("nobody"));
+  "crew.getCrewPublic": async () => {
+    expect((await crewRepo.getCrewPublic(A)).id).toBe(A);
+    expect((await crewRepo.getCrewPublic(B)).id).toBe(B);
+    await notFound(() => crewRepo.getCrewPublic("nobody"));
   },
 
   /* checkin */
-  "checkin.createCheckIn": () => {
-    notFound(() => checkinRepo.createCheckIn("nobody", { language: "en" }));
-    const mine = checkinRepo.createCheckIn(A, { language: "en", startedAt: at(13) });
+  "checkin.createCheckIn": async () => {
+    await notFound(() => checkinRepo.createCheckIn("nobody", { language: "en" }));
+    const mine = await checkinRepo.createCheckIn(A, { language: "en", startedAt: at(13) });
     expect(mine.crewId).toBe(A);
     // cannot hijack B's check-in id: the primary key is taken, nothing of B's changes
-    expect(() => checkinRepo.createCheckIn(A, { language: "en", id: w.bCheckIn })).toThrow();
-    expect(checkinRepo.getCheckIn(B, w.bCheckIn).crewId).toBe(B);
+    await expect(checkinRepo.createCheckIn(A, { language: "en", id: w.bCheckIn })).rejects.toThrow();
+    expect((await checkinRepo.getCheckIn(B, w.bCheckIn)).crewId).toBe(B);
   },
-  "checkin.getCheckIn": () => {
-    expect(checkinRepo.getCheckIn(A, w.aCheckIn).id).toBe(w.aCheckIn);
-    notFound(() => checkinRepo.getCheckIn(A, w.bCheckIn));
-    notFound(() => checkinRepo.getCheckIn(B, w.aCheckIn));
-    notFound(() => checkinRepo.getCheckIn(A, "does-not-exist"));
+  "checkin.getCheckIn": async () => {
+    expect((await checkinRepo.getCheckIn(A, w.aCheckIn)).id).toBe(w.aCheckIn);
+    await notFound(() => checkinRepo.getCheckIn(A, w.bCheckIn));
+    await notFound(() => checkinRepo.getCheckIn(B, w.aCheckIn));
+    await notFound(() => checkinRepo.getCheckIn(A, "does-not-exist"));
   },
-  "checkin.getOpenCheckInForDate": () => {
-    expect(checkinRepo.getOpenCheckInForDate(B, dateOf(12))?.id).toBe(w.bOpen);
+  "checkin.getOpenCheckInForDate": async () => {
+    expect((await checkinRepo.getOpenCheckInForDate(B, dateOf(12)))?.id).toBe(w.bOpen);
     // A has no open check-in that day, and must never be handed B's
-    expect(checkinRepo.getOpenCheckInForDate(A, dateOf(12))).toBeNull();
-    expect(checkinRepo.getOpenCheckInForDate(B, dateOf(11))).toBeNull(); // confirmed: not open
+    expect(await checkinRepo.getOpenCheckInForDate(A, dateOf(12))).toBeNull();
+    expect(await checkinRepo.getOpenCheckInForDate(B, dateOf(11))).toBeNull(); // confirmed: not open
   },
-  "checkin.setCheckInState": () => {
-    notFound(() => checkinRepo.setCheckInState(A, w.bCheckIn, "DONE", "{}"));
-    notFound(() => checkinRepo.setCheckInState(A, w.bOpen, "CONFIRM"));
-    expect(checkinRepo.getCheckIn(B, w.bOpen).state).toBe("GREETING");
+  "checkin.setCheckInState": async () => {
+    await notFound(() => checkinRepo.setCheckInState(A, w.bCheckIn, "DONE", "{}"));
+    await notFound(() => checkinRepo.setCheckInState(A, w.bOpen, "CONFIRM"));
+    expect((await checkinRepo.getCheckIn(B, w.bOpen)).state).toBe("GREETING");
     // the owner can
-    expect(checkinRepo.setCheckInState(B, w.bOpen, "KPI_CAPTURE", '{"x":1}')).toMatchObject({
+    expect(await checkinRepo.setCheckInState(B, w.bOpen, "KPI_CAPTURE", '{"x":1}')).toMatchObject({
       state: "KPI_CAPTURE", stateJson: '{"x":1}',
     });
     // state_json is kept when omitted
-    expect(checkinRepo.setCheckInState(B, w.bOpen, "CONFIRM").stateJson).toBe('{"x":1}');
+    expect((await checkinRepo.setCheckInState(B, w.bOpen, "CONFIRM")).stateJson).toBe('{"x":1}');
   },
-  "checkin.confirmCheckIn": () => {
-    notFound(() => checkinRepo.confirmCheckIn(A, w.bOpen, { confirmedAt: at(13), summaryJson: "{}" }));
-    expect(checkinRepo.getCheckIn(B, w.bOpen).confirmedAt).toBeNull();
+  "checkin.confirmCheckIn": async () => {
+    await notFound(() => checkinRepo.confirmCheckIn(A, w.bOpen, { confirmedAt: at(13), summaryJson: "{}" }));
+    expect((await checkinRepo.getCheckIn(B, w.bOpen)).confirmedAt).toBeNull();
     // the owner can, exactly once
-    const done = checkinRepo.confirmCheckIn(B, w.bOpen, { confirmedAt: at(13), summaryJson: null });
+    const done = await checkinRepo.confirmCheckIn(B, w.bOpen, { confirmedAt: at(13), summaryJson: null });
     expect(done.confirmedAt).toBe(at(13));
-    expect(() => checkinRepo.confirmCheckIn(B, w.bOpen, { confirmedAt: at(14), summaryJson: null })).toThrow(
+    await expect(checkinRepo.confirmCheckIn(B, w.bOpen, { confirmedAt: at(14), summaryJson: null })).rejects.toThrow(
       expect.objectContaining({ status: 409, code: "WRONG_STATE" }),
     );
   },
-  "checkin.latestConfirmedCheckIn": () => {
-    expect(checkinRepo.latestConfirmedCheckIn(A)?.id).toBe(w.aCheckIn);
-    expect(checkinRepo.latestConfirmedCheckIn(B)?.id).toBe(w.bCheckIn);
-    insertCrew(w.db, "crew-c");
-    expect(checkinRepo.latestConfirmedCheckIn("crew-c")).toBeNull();
+  "checkin.latestConfirmedCheckIn": async () => {
+    expect((await checkinRepo.latestConfirmedCheckIn(A))?.id).toBe(w.aCheckIn);
+    expect((await checkinRepo.latestConfirmedCheckIn(B))?.id).toBe(w.bCheckIn);
+    await insertCrew(w.db, "crew-c");
+    expect(await checkinRepo.latestConfirmedCheckIn("crew-c")).toBeNull();
   },
-  "checkin.listHistoryDays": () => {
-    const a = checkinRepo.listHistoryDays(A, { before: dateOf(20), days: 14 });
-    const b = checkinRepo.listHistoryDays(B, { before: dateOf(20), days: 14 });
+  "checkin.listHistoryDays": async () => {
+    const a = await checkinRepo.listHistoryDays(A, { before: dateOf(20), days: 14 });
+    const b = await checkinRepo.listHistoryDays(B, { before: dateOf(20), days: 14 });
     expect(a).toEqual([{ date: dateOf(10), values: { sleep_hours: 7, day_note: "A-note" } }]);
     expect(b).toEqual([
       { date: dateOf(11), values: { sleep_hours: 5.5, symptom_headache: 1, symptom_note: SECRET_NOTE } },
     ]);
     expect(JSON.stringify(a)).not.toContain("B-");
     expect(JSON.stringify(b)).not.toContain("A-note");
-    expect(checkinRepo.listHistoryDays("crew-nobody", { before: dateOf(20), days: 14 })).toEqual([]);
+    expect(await checkinRepo.listHistoryDays("crew-nobody", { before: dateOf(20), days: 14 })).toEqual([]);
   },
 
   /* measurement */
-  "measurement.upsertMeasurement": () => {
+  "measurement.upsertMeasurement": async () => {
     const attempt = () =>
       measurementRepo.upsertMeasurement(A, w.bCheckIn, {
         key: "sleep_hours", value: 1, unit: "h", sourceText: "hijack", confidence: 1, source: "typed",
       });
-    notFound(attempt);
-    notFound(() =>
+    await notFound(attempt);
+    await notFound(() =>
       measurementRepo.upsertMeasurement(A, w.bOpen, {
         key: "mood", value: 5, unit: null, sourceText: null, confidence: null, source: "typed",
       }),
     );
     // B's data is untouched
-    expect(measurementRepo.listMeasurements(B, w.bCheckIn).find((m) => m.key === "sleep_hours")?.value).toBe(5.5);
-    expect(measurementRepo.listMeasurements(B, w.bOpen).find((m) => m.key === "mood")?.value).toBe(2);
+    expect((await measurementRepo.listMeasurements(B, w.bCheckIn)).find((m) => m.key === "sleep_hours")?.value).toBe(5.5);
+    expect((await measurementRepo.listMeasurements(B, w.bOpen)).find((m) => m.key === "mood")?.value).toBe(2);
     // owner can correct an open check-in: the row is updated, not duplicated
-    measurementRepo.upsertMeasurement(B, w.bOpen, {
+    await measurementRepo.upsertMeasurement(B, w.bOpen, {
       key: "mood", value: 4, unit: null, sourceText: "four", confidence: 1, source: "typed",
     });
-    expect(measurementRepo.listMeasurements(B, w.bOpen).filter((m) => m.key === "mood")).toHaveLength(1);
-    expect(measurementRepo.listMeasurements(B, w.bOpen).find((m) => m.key === "mood")?.value).toBe(4);
+    expect((await measurementRepo.listMeasurements(B, w.bOpen)).filter((m) => m.key === "mood")).toHaveLength(1);
+    expect((await measurementRepo.listMeasurements(B, w.bOpen)).find((m) => m.key === "mood")?.value).toBe(4);
     // confirmed check-ins are immutable
-    expect(() =>
+    await expect(
       measurementRepo.upsertMeasurement(B, w.bCheckIn, {
         key: "sleep_hours", value: 9, unit: "h", sourceText: null, confidence: null, source: "typed",
       }),
-    ).toThrow(expect.objectContaining({ status: 409, code: "WRONG_STATE" }));
+    ).rejects.toThrow(expect.objectContaining({ status: 409, code: "WRONG_STATE" }));
   },
-  "measurement.listMeasurements": () => {
-    notFound(() => measurementRepo.listMeasurements(A, w.bCheckIn));
-    notFound(() => measurementRepo.listMeasurements(B, w.aCheckIn));
-    const a = measurementRepo.listMeasurements(A, w.aCheckIn);
+  "measurement.listMeasurements": async () => {
+    await notFound(() => measurementRepo.listMeasurements(A, w.bCheckIn));
+    await notFound(() => measurementRepo.listMeasurements(B, w.aCheckIn));
+    const a = await measurementRepo.listMeasurements(A, w.aCheckIn);
     expect(a.map((m) => m.key).sort()).toEqual(["day_note", "sleep_hours"]);
     expect(JSON.stringify(a)).not.toContain("B-");
   },
 
   /* turn */
-  "turn.appendTurn": () => {
-    notFound(() => turnRepo.appendTurn(A, w.bCheckIn, { speaker: "crew", text: "inject", language: "en" }));
-    expect(turnRepo.listTurns(B, w.bCheckIn).map((t) => t.text)).toEqual([SECRET_TURN]);
-    turnRepo.appendTurn(B, w.bCheckIn, { speaker: "cosmo", text: "after confirm", language: "en" });
-    expect(turnRepo.listTurns(B, w.bCheckIn)).toHaveLength(2);
+  "turn.appendTurn": async () => {
+    await notFound(() => turnRepo.appendTurn(A, w.bCheckIn, { speaker: "crew", text: "inject", language: "en" }));
+    expect((await turnRepo.listTurns(B, w.bCheckIn)).map((t) => t.text)).toEqual([SECRET_TURN]);
+    await turnRepo.appendTurn(B, w.bCheckIn, { speaker: "cosmo", text: "after confirm", language: "en" });
+    expect(await turnRepo.listTurns(B, w.bCheckIn)).toHaveLength(2);
   },
-  "turn.listTurns": () => {
-    notFound(() => turnRepo.listTurns(A, w.bCheckIn));
-    notFound(() => turnRepo.listTurns(A, w.bOpen, { limit: 5 }));
-    expect(turnRepo.listTurns(A, w.aCheckIn).map((t) => t.text)).toEqual(["A-turn"]);
+  "turn.listTurns": async () => {
+    await notFound(() => turnRepo.listTurns(A, w.bCheckIn));
+    await notFound(() => turnRepo.listTurns(A, w.bOpen, { limit: 5 }));
+    expect((await turnRepo.listTurns(A, w.aCheckIn)).map((t) => t.text)).toEqual(["A-turn"]);
     // limit returns the most recent turns, oldest first
-    for (const t of ["t1", "t2", "t3"]) turnRepo.appendTurn(B, w.bOpen, { speaker: "crew", text: t, language: "en" });
-    expect(turnRepo.listTurns(B, w.bOpen, { limit: 2 }).map((t) => t.text)).toEqual(["t2", "t3"]);
-    expect(turnRepo.listTurns(B, w.bOpen).map((t) => t.text)).toEqual(["B-open-turn", "t1", "t2", "t3"]);
+    for (const t of ["t1", "t2", "t3"]) await turnRepo.appendTurn(B, w.bOpen, { speaker: "crew", text: t, language: "en" });
+    expect((await turnRepo.listTurns(B, w.bOpen, { limit: 2 })).map((t) => t.text)).toEqual(["t2", "t3"]);
+    expect((await turnRepo.listTurns(B, w.bOpen)).map((t) => t.text)).toEqual(["B-open-turn", "t1", "t2", "t3"]);
   },
 
   /* alert */
-  "alert.insertAlert": () => {
-    notFound(() =>
+  "alert.insertAlert": async () => {
+    await notFound(() =>
       alertRepo.insertAlert(A, { checkInId: w.bCheckIn, level: "red", rule: "OVERALL", text: { en: "x", mn: "x" } }),
     );
-    expect(alertRepo.listAlerts(B)).toHaveLength(1);
-    const mine = alertRepo.insertAlert(A, {
+    expect(await alertRepo.listAlerts(B)).toHaveLength(1);
+    const mine = await alertRepo.insertAlert(A, {
       checkInId: w.aCheckIn, level: "yellow", rule: "OVERALL", text: { en: "mine", mn: "минийх" },
     });
     expect(mine.crewId).toBe(A);
     expect(mine.text).toEqual({ en: "mine", mn: "минийх" });
   },
-  "alert.listAlerts": () => {
-    const a = alertRepo.listAlerts(A);
-    const b = alertRepo.listAlerts(B);
+  "alert.listAlerts": async () => {
+    const a = await alertRepo.listAlerts(A);
+    const b = await alertRepo.listAlerts(B);
     expect(a.map((x) => x.id)).toEqual([w.aAlert]);
     expect(b.map((x) => x.id)).toEqual([w.bAlert]);
     expect(a.every((x) => x.crewId === A)).toBe(true);
     expect(b.every((x) => x.crewId === B)).toBe(true);
   },
-  "alert.ackAlert": () => {
-    notFound(() => alertRepo.ackAlert(A, w.bAlert));
-    notFound(() => alertRepo.ackAlert(B, w.aAlert));
-    expect(alertRepo.listAlerts(B)[0].acknowledgedAt).toBeNull();
-    expect(alertRepo.listAlerts(A)[0].acknowledgedAt).toBeNull();
-    const acked = alertRepo.ackAlert(B, w.bAlert, at(12, 9, 0));
+  "alert.ackAlert": async () => {
+    await notFound(() => alertRepo.ackAlert(A, w.bAlert));
+    await notFound(() => alertRepo.ackAlert(B, w.aAlert));
+    expect((await alertRepo.listAlerts(B))[0].acknowledgedAt).toBeNull();
+    expect((await alertRepo.listAlerts(A))[0].acknowledgedAt).toBeNull();
+    const acked = await alertRepo.ackAlert(B, w.bAlert, at(12, 9, 0));
     expect(acked.acknowledgedAt).toBe(at(12, 9, 0));
     // idempotent: the first acknowledgement time is kept
-    expect(alertRepo.ackAlert(B, w.bAlert, at(13, 9, 0)).acknowledgedAt).toBe(at(12, 9, 0));
-    expect(alertRepo.listAlerts(A)[0].acknowledgedAt).toBeNull();
+    expect((await alertRepo.ackAlert(B, w.bAlert, at(13, 9, 0))).acknowledgedAt).toBe(at(12, 9, 0));
+    expect((await alertRepo.listAlerts(A))[0].acknowledgedAt).toBeNull();
   },
 };
 
@@ -333,54 +333,68 @@ describe("crew isolation: crew A can never read or modify crew B's data", () => 
 });
 
 describe("database-level guarantee (composite foreign keys)", () => {
-  it("refuses a measurement whose crew_id differs from its check-in's crew_id", () => {
-    expect(() =>
-      w.db
-        .prepare(
-          "INSERT INTO measurement (id, check_in_id, crew_id, key, value, source, created_at) VALUES ('x', ?, ?, 'mood', 3, 'typed', ?)",
-        )
-        .run(w.bCheckIn, A, at(12)),
-    ).toThrow(/FOREIGN KEY/i);
+  it("refuses a measurement whose crew_id differs from its check-in's crew_id", async () => {
+    await expect(
+      w.db.run(
+        "INSERT INTO measurement (id, check_in_id, crew_id, key, value, source, created_at) VALUES ('x', ?, ?, 'mood', 3, 'typed', ?)",
+        w.bCheckIn,
+        A,
+        at(12),
+      ),
+    ).rejects.toThrow(/FOREIGN KEY/i);
   });
 
-  it("refuses a turn or an alert that claims another crew member's check-in", () => {
-    expect(() =>
-      w.db
-        .prepare("INSERT INTO turn (id, check_in_id, crew_id, speaker, text, language, created_at) VALUES ('t', ?, ?, 'crew', 'x', 'en', ?)")
-        .run(w.bCheckIn, A, at(12)),
-    ).toThrow(/FOREIGN KEY/i);
-    expect(() =>
-      w.db
-        .prepare("INSERT INTO alert (id, crew_id, check_in_id, created_at, level, rule, text_json) VALUES ('al', ?, ?, ?, 'red', 'OVERALL', '{}')")
-        .run(A, w.bCheckIn, at(12)),
-    ).toThrow(/FOREIGN KEY/i);
+  it("refuses a turn or an alert that claims another crew member's check-in", async () => {
+    await expect(
+      w.db.run(
+        "INSERT INTO turn (id, check_in_id, crew_id, speaker, text, language, created_at) VALUES ('t', ?, ?, 'crew', 'x', 'en', ?)",
+        w.bCheckIn,
+        A,
+        at(12),
+      ),
+    ).rejects.toThrow(/FOREIGN KEY/i);
+    await expect(
+      w.db.run(
+        "INSERT INTO alert (id, crew_id, check_in_id, created_at, level, rule, text_json) VALUES ('al', ?, ?, ?, 'red', 'OVERALL', '{}')",
+        A,
+        w.bCheckIn,
+        at(12),
+      ),
+    ).rejects.toThrow(/FOREIGN KEY/i);
   });
 
-  it("refuses to re-assign a check-in to another crew member while it has measurements", () => {
-    expect(() => w.db.prepare("UPDATE check_in SET crew_id = ? WHERE id = ?").run(A, w.bCheckIn)).toThrow(
+  it("refuses to re-assign a check-in to another crew member while it has measurements", async () => {
+    await expect(w.db.run("UPDATE check_in SET crew_id = ? WHERE id = ?", A, w.bCheckIn)).rejects.toThrow(
       /FOREIGN KEY/i,
     );
   });
 
-  it("enforces UNIQUE(check_in_id, key) and the source CHECK", () => {
-    expect(() =>
-      w.db
-        .prepare("INSERT INTO measurement (id, check_in_id, crew_id, key, value, source, created_at) VALUES ('dup', ?, ?, 'sleep_hours', 1, 'typed', ?)")
-        .run(w.aCheckIn, A, at(12)),
-    ).toThrow(/UNIQUE/i);
-    expect(() =>
-      w.db
-        .prepare("INSERT INTO measurement (id, check_in_id, crew_id, key, value, source, created_at) VALUES ('bad', ?, ?, 'mood', 1, 'guess', ?)")
-        .run(w.aCheckIn, A, at(12)),
-    ).toThrow(/CHECK/i);
+  it("enforces UNIQUE(check_in_id, key) and the source CHECK", async () => {
+    await expect(
+      w.db.run(
+        "INSERT INTO measurement (id, check_in_id, crew_id, key, value, source, created_at) VALUES ('dup', ?, ?, 'sleep_hours', 1, 'typed', ?)",
+        w.aCheckIn,
+        A,
+        at(12),
+      ),
+    ).rejects.toThrow(/UNIQUE/i);
+    await expect(
+      w.db.run(
+        "INSERT INTO measurement (id, check_in_id, crew_id, key, value, source, created_at) VALUES ('bad', ?, ?, 'mood', 1, 'guess', ?)",
+        w.aCheckIn,
+        A,
+        at(12),
+      ),
+    ).rejects.toThrow(/CHECK/i);
   });
 });
 
 describe("repo behaviour", () => {
-  it("stores text keys in value_text, numbers (booleans as 0/1) in value", () => {
-    const rows = w.db
-      .prepare("SELECT key, value, value_text FROM measurement WHERE check_in_id = ? ORDER BY key")
-      .all(w.bCheckIn);
+  it("stores text keys in value_text, numbers (booleans as 0/1) in value", async () => {
+    const rows = await w.db.all(
+      "SELECT key, value, value_text FROM measurement WHERE check_in_id = ? ORDER BY key",
+      w.bCheckIn,
+    );
     expect(rows).toEqual([
       { key: "sleep_hours", value: 5.5, value_text: null },
       { key: "symptom_headache", value: 1, value_text: null },
@@ -388,71 +402,71 @@ describe("repo behaviour", () => {
     ]);
   });
 
-  it("rejects a text value for a numeric key and a number for a text key (BAD_INPUT, nothing stored)", () => {
+  it("rejects a text value for a numeric key and a number for a text key (BAD_INPUT, nothing stored)", async () => {
     const bad = (key: "mood" | "day_note", value: number | string) =>
       measurementRepo.upsertMeasurement(B, w.bOpen, { key, value, unit: null, sourceText: null, confidence: null, source: "typed" });
-    expect(() => bad("mood", "five")).toThrow(expect.objectContaining({ status: 400, code: "BAD_INPUT" }));
-    expect(() => bad("mood", Number.NaN)).toThrow(HttpError);
-    expect(() => bad("day_note", 5)).toThrow(HttpError);
-    expect(measurementRepo.listMeasurements(B, w.bOpen).map((m) => m.key)).toEqual(["mood"]);
+    await expect(bad("mood", "five")).rejects.toThrow(expect.objectContaining({ status: 400, code: "BAD_INPUT" }));
+    await expect(bad("mood", Number.NaN)).rejects.toThrow(HttpError);
+    await expect(bad("day_note", 5)).rejects.toThrow(HttpError);
+    expect((await measurementRepo.listMeasurements(B, w.bOpen)).map((m) => m.key)).toEqual(["mood"]);
   });
 
-  it("listHistoryDays: latest `days` confirmed dates before `before`, one entry per date (latest confirmed), oldest first", () => {
-    const early = checkinRepo.createCheckIn(A, { language: "mn", startedAt: at(10, 7, 0), id: "ci-a-early" });
-    measurementRepo.upsertMeasurement(A, early.id, {
+  it("listHistoryDays: latest `days` confirmed dates before `before`, one entry per date (latest confirmed), oldest first", async () => {
+    const early = await checkinRepo.createCheckIn(A, { language: "mn", startedAt: at(10, 7, 0), id: "ci-a-early" });
+    await measurementRepo.upsertMeasurement(A, early.id, {
       key: "sleep_hours", value: 3, unit: "h", sourceText: null, confidence: null, source: "typed",
     });
-    checkinRepo.confirmCheckIn(A, early.id, { confirmedAt: at(10, 7, 10), summaryJson: null });
+    await checkinRepo.confirmCheckIn(A, early.id, { confirmedAt: at(10, 7, 10), summaryJson: null });
     // two confirmed check-ins on 10 Nov: the later confirmation wins (sleep 7, not 3)
-    expect(checkinRepo.listHistoryDays(A, { before: dateOf(11), days: 14 })).toEqual([
+    expect(await checkinRepo.listHistoryDays(A, { before: dateOf(11), days: 14 })).toEqual([
       { date: dateOf(10), values: { sleep_hours: 7, day_note: "A-note" } },
     ]);
     // `before` is exclusive
-    expect(checkinRepo.listHistoryDays(A, { before: dateOf(10), days: 14 })).toEqual([]);
+    expect(await checkinRepo.listHistoryDays(A, { before: dateOf(10), days: 14 })).toEqual([]);
     // `days` counts confirmed days, not calendar days: a gap does not shrink the window
-    expect(checkinRepo.listHistoryDays(A, { before: dateOf(11), days: 1 })).toHaveLength(1);
-    expect(checkinRepo.listHistoryDays(A, { before: dateOf(28), days: 1 }).map((d) => d.date)).toEqual([dateOf(10)]);
-    expect(() => checkinRepo.listHistoryDays(A, { before: "11/11/2026", days: 14 })).toThrow(HttpError);
-    expect(() => checkinRepo.listHistoryDays(A, { before: dateOf(11), days: 0 })).toThrow(HttpError);
+    expect(await checkinRepo.listHistoryDays(A, { before: dateOf(11), days: 1 })).toHaveLength(1);
+    expect((await checkinRepo.listHistoryDays(A, { before: dateOf(28), days: 1 })).map((d) => d.date)).toEqual([dateOf(10)]);
+    await expect(checkinRepo.listHistoryDays(A, { before: "11/11/2026", days: 14 })).rejects.toThrow(HttpError);
+    await expect(checkinRepo.listHistoryDays(A, { before: dateOf(11), days: 0 })).rejects.toThrow(HttpError);
   });
 
-  it("listHistoryDays returns the last `days` confirmed days even across a long gap (baseline survives old data)", () => {
+  it("listHistoryDays returns the last `days` confirmed days even across a long gap (baseline survives old data)", async () => {
     // 14 consecutive confirmed days, 1..14 Nov, for crew A (10 Nov already exists with sleep 7)
     for (let day = 1; day <= 14; day++) {
       if (day === 10) continue;
-      const c = checkinRepo.createCheckIn(A, { language: "mn", startedAt: at(day, 8, 0), id: `gap-${day}` });
-      measurementRepo.upsertMeasurement(A, c.id, {
+      const c = await checkinRepo.createCheckIn(A, { language: "mn", startedAt: at(day, 8, 0), id: `gap-${day}` });
+      await measurementRepo.upsertMeasurement(A, c.id, {
         key: "sleep_hours", value: day, unit: "h", sourceText: null, confidence: null, source: "simulated",
       });
-      checkinRepo.confirmCheckIn(A, c.id, { confirmedAt: at(day, 8, 30), summaryJson: null });
+      await checkinRepo.confirmCheckIn(A, c.id, { confirmedAt: at(day, 8, 30), summaryJson: null });
     }
     const expectedDates = Array.from({ length: 14 }, (_, i) => dateOf(i + 1));
     for (const day of [15, 20, 23, 24, 25, 28]) {
-      const got = checkinRepo.listHistoryDays(A, { before: dateOf(day), days: 14 });
+      const got = await checkinRepo.listHistoryDays(A, { before: dateOf(day), days: 14 });
       expect(got.map((d) => d.date), `before ${dateOf(day)}`).toEqual(expectedDates);
     }
     // fewer than `days` available: everything there is, oldest first
-    expect(checkinRepo.listHistoryDays(A, { before: dateOf(28), days: 3 }).map((d) => d.date)).toEqual([
+    expect((await checkinRepo.listHistoryDays(A, { before: dateOf(28), days: 3 })).map((d) => d.date)).toEqual([
       dateOf(12), dateOf(13), dateOf(14),
     ]);
     // a hole inside the history is skipped, not padded: the 10th is absent here
-    expect(checkinRepo.listHistoryDays(A, { before: dateOf(12), days: 3 }).map((d) => d.date)).toEqual([
+    expect((await checkinRepo.listHistoryDays(A, { before: dateOf(12), days: 3 })).map((d) => d.date)).toEqual([
       dateOf(9), dateOf(10), dateOf(11),
     ]);
     // ground applies the same rule, and asOf decides which days count
-    const g = groundRepo.groundListHistoryDays(A, { before: dateOf(28), days: 14, asOf: at(28) });
+    const g = await groundRepo.groundListHistoryDays(A, { before: dateOf(28), days: 14, asOf: at(28) });
     expect(g.map((d) => d.date)).toEqual(expectedDates);
-    const early = groundRepo.groundListHistoryDays(A, { before: dateOf(28), days: 14, asOf: at(5, 8, 30) });
+    const early = await groundRepo.groundListHistoryDays(A, { before: dateOf(28), days: 14, asOf: at(5, 8, 30) });
     expect(early.map((d) => d.date)).toEqual([dateOf(1), dateOf(2), dateOf(3), dateOf(4), dateOf(5)]);
   });
 
-  it("unconfirmed check-ins never appear in history or latestConfirmed", () => {
-    expect(checkinRepo.listHistoryDays(B, { before: dateOf(20), days: 14 }).map((d) => d.date)).toEqual([dateOf(11)]);
-    expect(checkinRepo.latestConfirmedCheckIn(B)?.id).toBe(w.bCheckIn);
+  it("unconfirmed check-ins never appear in history or latestConfirmed", async () => {
+    expect((await checkinRepo.listHistoryDays(B, { before: dateOf(20), days: 14 })).map((d) => d.date)).toEqual([dateOf(11)]);
+    expect((await checkinRepo.latestConfirmedCheckIn(B))?.id).toBe(w.bCheckIn);
   });
 
-  it("createCheckIn stores state GREETING and the local date of startedAt", () => {
-    const c = checkinRepo.createCheckIn(A, { language: "en", startedAt: at(15, 23, 30) });
+  it("createCheckIn stores state GREETING and the local date of startedAt", async () => {
+    const c = await checkinRepo.createCheckIn(A, { language: "en", startedAt: at(15, 23, 30) });
     expect(c).toMatchObject({ state: "GREETING", stateJson: "{}", confirmedAt: null, summaryJson: null, language: "en" });
     expect(c.localDate).toBe(dateOf(15));
     expect(c.startedAt).toBe(at(15, 23, 30));
@@ -460,29 +474,29 @@ describe("repo behaviour", () => {
 });
 
 describe("ground reads: asOf, redaction, no turns", () => {
-  it("groundListCrew is roster only", () => {
-    expect(groundRepo.groundListCrew().map((c) => c.id)).toEqual([A, B]);
-    expect(groundRepo.groundGetCrew(B)?.id).toBe(B);
-    expect(groundRepo.groundGetCrew("nobody")).toBeNull();
+  it("groundListCrew is roster only", async () => {
+    expect((await groundRepo.groundListCrew()).map((c) => c.id)).toEqual([A, B]);
+    expect((await groundRepo.groundGetCrew(B))?.id).toBe(B);
+    expect(await groundRepo.groundGetCrew("nobody")).toBeNull();
   });
 
-  it("groundLatestConfirmedCheckIn respects asOf (confirmed_at <= asOf is visible, inclusive)", () => {
-    expect(groundRepo.groundLatestConfirmedCheckIn(B, at(11, 8, 29))).toBeNull();
-    expect(groundRepo.groundLatestConfirmedCheckIn(B, at(11, 8, 30))?.id).toBe(w.bCheckIn);
-    expect(groundRepo.groundLatestConfirmedCheckIn(B, at(20))?.id).toBe(w.bCheckIn);
-    expect(groundRepo.groundLatestConfirmedCheckIn(A, at(10, 8, 29))).toBeNull();
+  it("groundLatestConfirmedCheckIn respects asOf (confirmed_at <= asOf is visible, inclusive)", async () => {
+    expect(await groundRepo.groundLatestConfirmedCheckIn(B, at(11, 8, 29))).toBeNull();
+    expect((await groundRepo.groundLatestConfirmedCheckIn(B, at(11, 8, 30)))?.id).toBe(w.bCheckIn);
+    expect((await groundRepo.groundLatestConfirmedCheckIn(B, at(20)))?.id).toBe(w.bCheckIn);
+    expect(await groundRepo.groundLatestConfirmedCheckIn(A, at(10, 8, 29))).toBeNull();
     // unconfirmed check-ins are never visible, however late asOf is
-    expect(groundRepo.groundLatestConfirmedCheckIn(B, "2099-01-01T00:00:00.000Z")?.id).toBe(w.bCheckIn);
+    expect((await groundRepo.groundLatestConfirmedCheckIn(B, "2099-01-01T00:00:00.000Z"))?.id).toBe(w.bCheckIn);
   });
 
-  it("asOf accepts any ISO instant (offsets are normalised), and rejects garbage", () => {
+  it("asOf accepts any ISO instant (offsets are normalised), and rejects garbage", async () => {
     const sameInstantWithOffset = new Date(at(11, 8, 30)).toISOString().replace("Z", "+00:00");
-    expect(groundRepo.groundLatestConfirmedCheckIn(B, sameInstantWithOffset)?.id).toBe(w.bCheckIn);
-    expect(() => groundRepo.groundLatestConfirmedCheckIn(B, "yesterday")).toThrow(HttpError);
+    expect((await groundRepo.groundLatestConfirmedCheckIn(B, sameInstantWithOffset))?.id).toBe(w.bCheckIn);
+    await expect(groundRepo.groundLatestConfirmedCheckIn(B, "yesterday")).rejects.toThrow(HttpError);
   });
 
-  it("never returns state_json, and redacts free text from the stored summary", () => {
-    const rec = groundRepo.groundLatestConfirmedCheckIn(B, at(20))!;
+  it("never returns state_json, and redacts free text from the stored summary", async () => {
+    const rec = (await groundRepo.groundLatestConfirmedCheckIn(B, at(20)))!;
     expect(rec).not.toHaveProperty("stateJson");
     const summary = JSON.parse(rec.summaryJson!);
     expect(summary.spoken.text).toBe("");
@@ -495,9 +509,9 @@ describe("ground reads: asOf, redaction, no turns", () => {
     expect(groundRepo.redactSummaryJson(null)).toBeNull();
   });
 
-  it("groundListMeasurements: asOf gate, numeric values intact, text keys redacted to ''", () => {
-    expect(groundRepo.groundListMeasurements(B, w.bCheckIn, at(11, 8, 29))).toEqual([]);
-    const rows = groundRepo.groundListMeasurements(B, w.bCheckIn, at(11, 8, 30));
+  it("groundListMeasurements: asOf gate, numeric values intact, text keys redacted to ''", async () => {
+    expect(await groundRepo.groundListMeasurements(B, w.bCheckIn, at(11, 8, 29))).toEqual([]);
+    const rows = await groundRepo.groundListMeasurements(B, w.bCheckIn, at(11, 8, 30));
     expect(rows.map((r) => r.key).sort()).toEqual(["sleep_hours", "symptom_headache", "symptom_note"]);
     expect(rows.find((r) => r.key === "sleep_hours")?.value).toBe(5.5);
     expect(rows.find((r) => r.key === "symptom_headache")?.value).toBe(1);
@@ -507,79 +521,79 @@ describe("ground reads: asOf, redaction, no turns", () => {
     expect(JSON.stringify(rows)).not.toContain(SECRET_NOTE);
   });
 
-  it("groundListMeasurements never leaks the verbatim transcript snippet, on numeric keys either", () => {
+  it("groundListMeasurements never leaks the verbatim transcript snippet, on numeric keys either", async () => {
     const SENTENCE = "I slept 5 hours, my head hurts and I miss my wife";
-    const c = checkinRepo.createCheckIn(B, { language: "en", startedAt: at(13, 8, 0), id: "ci-b-sentence" });
-    measurementRepo.upsertMeasurement(B, c.id, {
+    const c = await checkinRepo.createCheckIn(B, { language: "en", startedAt: at(13, 8, 0), id: "ci-b-sentence" });
+    await measurementRepo.upsertMeasurement(B, c.id, {
       key: "sleep_hours", value: 5, unit: "h", sourceText: SENTENCE, confidence: 0.9, source: "voice",
     });
-    checkinRepo.confirmCheckIn(B, c.id, { confirmedAt: at(13, 8, 30), summaryJson: null });
+    await checkinRepo.confirmCheckIn(B, c.id, { confirmedAt: at(13, 8, 30), summaryJson: null });
     // the crew member's own read still has the snippet (it is shown back for confirmation)
-    expect(measurementRepo.listMeasurements(B, c.id)[0].sourceText).toBe(SENTENCE);
-    const rows = groundRepo.groundListMeasurements(B, c.id, at(13, 8, 30));
+    expect((await measurementRepo.listMeasurements(B, c.id))[0].sourceText).toBe(SENTENCE);
+    const rows = await groundRepo.groundListMeasurements(B, c.id, at(13, 8, 30));
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ key: "sleep_hours", value: 5, sourceText: null });
     expect(JSON.stringify(rows)).not.toContain("head hurts");
     // none of the ground reads of this crew member contains it
     const everything = JSON.stringify([
-      groundRepo.groundLatestConfirmedCheckIn(B, at(20)),
-      groundRepo.groundListHistoryDays(B, { before: dateOf(20), days: 14, asOf: at(20) }),
-      groundRepo.groundListAlerts(at(20)),
+      await groundRepo.groundLatestConfirmedCheckIn(B, at(20)),
+      await groundRepo.groundListHistoryDays(B, { before: dateOf(20), days: 14, asOf: at(20) }),
+      await groundRepo.groundListAlerts(at(20)),
     ]);
     expect(everything).not.toContain("miss my wife");
   });
 
-  it("groundListMeasurements never returns an unconfirmed check-in or one under the wrong crewId", () => {
-    expect(groundRepo.groundListMeasurements(B, w.bOpen, "2099-01-01T00:00:00.000Z")).toEqual([]);
-    expect(groundRepo.groundListMeasurements(A, w.bCheckIn, "2099-01-01T00:00:00.000Z")).toEqual([]);
-    expect(groundRepo.groundListMeasurements(B, w.aCheckIn, "2099-01-01T00:00:00.000Z")).toEqual([]);
+  it("groundListMeasurements never returns an unconfirmed check-in or one under the wrong crewId", async () => {
+    expect(await groundRepo.groundListMeasurements(B, w.bOpen, "2099-01-01T00:00:00.000Z")).toEqual([]);
+    expect(await groundRepo.groundListMeasurements(A, w.bCheckIn, "2099-01-01T00:00:00.000Z")).toEqual([]);
+    expect(await groundRepo.groundListMeasurements(B, w.aCheckIn, "2099-01-01T00:00:00.000Z")).toEqual([]);
   });
 
-  it("groundListHistoryDays respects asOf and omits free-text keys entirely", () => {
+  it("groundListHistoryDays respects asOf and omits free-text keys entirely", async () => {
     const opts = { before: dateOf(20), days: 14 };
-    expect(groundRepo.groundListHistoryDays(B, { ...opts, asOf: at(11, 8, 29) })).toEqual([]);
-    const days = groundRepo.groundListHistoryDays(B, { ...opts, asOf: at(11, 8, 30) });
+    expect(await groundRepo.groundListHistoryDays(B, { ...opts, asOf: at(11, 8, 29) })).toEqual([]);
+    const days = await groundRepo.groundListHistoryDays(B, { ...opts, asOf: at(11, 8, 30) });
     expect(days).toEqual([{ date: dateOf(11), values: { sleep_hours: 5.5, symptom_headache: 1 } }]);
     expect(JSON.stringify(days)).not.toContain(SECRET_NOTE);
-    expect(groundRepo.groundListHistoryDays(A, { ...opts, asOf: at(20) })).toEqual([
+    expect(await groundRepo.groundListHistoryDays(A, { ...opts, asOf: at(20) })).toEqual([
       { date: dateOf(10), values: { sleep_hours: 7 } },
     ]);
   });
 
-  it("groundListHistoryDays is keyed by crewId: A's history never contains B's rows", () => {
-    const a = groundRepo.groundListHistoryDays(A, { before: dateOf(20), days: 14, asOf: at(20) });
+  it("groundListHistoryDays is keyed by crewId: A's history never contains B's rows", async () => {
+    const a = await groundRepo.groundListHistoryDays(A, { before: dateOf(20), days: 14, asOf: at(20) });
     expect(JSON.stringify(a)).not.toContain("5.5");
     expect(a.map((d) => d.date)).toEqual([dateOf(10)]);
   });
 
-  it("groundListAlerts: only alerts whose check-in is visible, newest first, across crew", () => {
-    expect(groundRepo.groundListAlerts(at(10, 8, 29))).toEqual([]);
-    expect(groundRepo.groundListAlerts(at(10, 8, 30)).map((a) => a.id)).toEqual([w.aAlert]);
-    expect(groundRepo.groundListAlerts(at(11, 8, 29)).map((a) => a.id)).toEqual([w.aAlert]);
-    expect(groundRepo.groundListAlerts(at(11, 8, 30)).map((a) => a.id)).toEqual([w.bAlert, w.aAlert]);
-    expect(groundRepo.groundListAlerts(at(11, 8, 30)).map((a) => a.crewId)).toEqual([B, A]);
+  it("groundListAlerts: only alerts whose check-in is visible, newest first, across crew", async () => {
+    expect(await groundRepo.groundListAlerts(at(10, 8, 29))).toEqual([]);
+    expect((await groundRepo.groundListAlerts(at(10, 8, 30))).map((a) => a.id)).toEqual([w.aAlert]);
+    expect((await groundRepo.groundListAlerts(at(11, 8, 29))).map((a) => a.id)).toEqual([w.aAlert]);
+    expect((await groundRepo.groundListAlerts(at(11, 8, 30))).map((a) => a.id)).toEqual([w.bAlert, w.aAlert]);
+    expect((await groundRepo.groundListAlerts(at(11, 8, 30))).map((a) => a.crewId)).toEqual([B, A]);
   });
 
-  it("an alert on a check-in that is not confirmed yet is invisible to ground", () => {
-    alertRepo.insertAlert(B, {
+  it("an alert on a check-in that is not confirmed yet is invisible to ground", async () => {
+    await alertRepo.insertAlert(B, {
       checkInId: w.bOpen, level: "red", rule: "VITAL_RED", text: { en: "open", mn: "нээлттэй" }, createdAt: at(12, 8, 10),
     });
-    expect(groundRepo.groundListAlerts("2099-01-01T00:00:00.000Z").map((a) => a.text.en)).toEqual(["B alert", "A alert"]);
-    checkinRepo.confirmCheckIn(B, w.bOpen, { confirmedAt: at(12, 8, 20), summaryJson: null });
-    expect(groundRepo.groundListAlerts(at(12, 8, 19)).map((a) => a.text.en)).toEqual(["B alert", "A alert"]);
-    expect(groundRepo.groundListAlerts(at(12, 8, 20)).map((a) => a.text.en)).toEqual(["open", "B alert", "A alert"]);
+    expect((await groundRepo.groundListAlerts("2099-01-01T00:00:00.000Z")).map((a) => a.text.en)).toEqual(["B alert", "A alert"]);
+    await checkinRepo.confirmCheckIn(B, w.bOpen, { confirmedAt: at(12, 8, 20), summaryJson: null });
+    expect((await groundRepo.groundListAlerts(at(12, 8, 19))).map((a) => a.text.en)).toEqual(["B alert", "A alert"]);
+    expect((await groundRepo.groundListAlerts(at(12, 8, 20))).map((a) => a.text.en)).toEqual(["open", "B alert", "A alert"]);
   });
 
-  it("nothing a ground read returns contains turn text or free-text notes", () => {
+  it("nothing a ground read returns contains turn text or free-text notes", async () => {
     const everything = JSON.stringify([
-      groundRepo.groundListCrew(),
-      groundRepo.groundLatestConfirmedCheckIn(A, at(20)),
-      groundRepo.groundLatestConfirmedCheckIn(B, at(20)),
-      groundRepo.groundListMeasurements(A, w.aCheckIn, at(20)),
-      groundRepo.groundListMeasurements(B, w.bCheckIn, at(20)),
-      groundRepo.groundListHistoryDays(A, { before: dateOf(20), days: 14, asOf: at(20) }),
-      groundRepo.groundListHistoryDays(B, { before: dateOf(20), days: 14, asOf: at(20) }),
-      groundRepo.groundListAlerts(at(20)),
+      await groundRepo.groundListCrew(),
+      await groundRepo.groundLatestConfirmedCheckIn(A, at(20)),
+      await groundRepo.groundLatestConfirmedCheckIn(B, at(20)),
+      await groundRepo.groundListMeasurements(A, w.aCheckIn, at(20)),
+      await groundRepo.groundListMeasurements(B, w.bCheckIn, at(20)),
+      await groundRepo.groundListHistoryDays(A, { before: dateOf(20), days: 14, asOf: at(20) }),
+      await groundRepo.groundListHistoryDays(B, { before: dateOf(20), days: 14, asOf: at(20) }),
+      await groundRepo.groundListAlerts(at(20)),
     ]);
     for (const secret of [SECRET_NOTE, SECRET_TURN, SPOKEN_QUOTE, "B-open-turn", "A-turn", "A-note"]) {
       expect(everything, secret).not.toContain(secret);

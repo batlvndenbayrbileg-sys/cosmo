@@ -38,8 +38,8 @@ const post = (body: unknown) =>
     }),
   );
 
-beforeEach(() => {
-  freshSeededDb();
+beforeEach(async () => {
+  await freshSeededDb();
   mocks.jar.clear();
   mocks.sets.length = 0;
   mocks.deletes.length = 0;
@@ -246,7 +246,7 @@ describe("GET /api/health", () => {
     const body = JSON.parse(text) as HealthResponse;
     expect(body.mode).toBe("live");
     expect(body.llm).toEqual({ model: "claude-test-model", available: true });
-    expect(body.stt).toEqual({ model: "scribe_v2", available: true });
+    expect(body.stt).toEqual({ model: "scribe_v3", available: true });
     expect(body.tts.mn).toEqual({ model: "eleven_v4_turbo", available: true });
     expect(body.tts.en).toEqual({ model: null, available: false });
     for (const secret of ["SECRET-KEY", "VOICE-MN", "sk-ant", "xi-"]) expect(text).not.toContain(secret);

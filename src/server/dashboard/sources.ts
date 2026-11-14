@@ -14,24 +14,24 @@ import { assertDateISO, toIso } from "@/server/db/shared";
  *
  * Candidate to move into repos/measurement.ts (as a crewId-first function) later.
  */
-export function historyHasSimulated(
+export async function historyHasSimulated(
   crewId: string,
   window: { fromDate: string; beforeDate: string; asOf?: string },
-): boolean {
+): Promise<boolean> {
   const from = assertDateISO(window.fromDate, "fromDate");
   const before = assertDateISO(window.beforeDate, "beforeDate");
   const visibility = window.asOf !== undefined ? "AND c.confirmed_at <= ?" : "";
   const params: string[] = [crewId, from, before];
   if (window.asOf !== undefined) params.push(toIso(window.asOf, "asOf"));
-  const row = getDb()
-    .prepare(
-      `SELECT 1 AS hit
-         FROM measurement m
-         JOIN check_in c ON c.id = m.check_in_id AND c.crew_id = m.crew_id
-        WHERE m.crew_id = ? AND m.source = 'simulated'
-          AND c.confirmed_at IS NOT NULL AND c.local_date >= ? AND c.local_date < ? ${visibility}
-        LIMIT 1`,
-    )
-    .get(...params);
+  const db = await getDb();
+  const row = await db.get<{ hit: number }>(
+    `SELECT 1 AS hit
+       FROM measurement m
+       JOIN check_in c ON c.id = m.check_in_id AND c.crew_id = m.crew_id
+      WHERE m.crew_id = ? AND m.source = 'simulated'
+        AND c.confirmed_at IS NOT NULL AND c.local_date >= ? AND c.local_date < ? ${visibility}
+      LIMIT 1`,
+    ...params,
+  );
   return row !== undefined;
 }

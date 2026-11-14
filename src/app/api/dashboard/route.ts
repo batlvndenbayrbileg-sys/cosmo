@@ -18,7 +18,7 @@ export function GET(request: Request): Promise<Response> {
     const params = new URL(request.url).searchParams;
     const parsed = querySchema.safeParse({ checkInId: params.get("checkInId") ?? undefined });
     if (!parsed.success) throw new HttpError(400, "BAD_INPUT", "Invalid checkInId");
-    const payload = buildDashboardPayload({ crewId, checkInId: parsed.data.checkInId, viewer: "crew" });
+    const payload = await buildDashboardPayload({ crewId, checkInId: parsed.data.checkInId, viewer: "crew" });
     if (!payload) throw new NotFoundError("No confirmed check-in yet");
     return ok(payload);
   });

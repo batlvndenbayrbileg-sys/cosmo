@@ -126,7 +126,7 @@ export function CrewSelect() {
                   crew={crew}
                   busy={selecting === crew.id}
                   disabled={selecting !== null}
-                  onSelect={select}
+                  onSelect={(c) => void select(c)}
                 />
               </motion.li>
             ))}

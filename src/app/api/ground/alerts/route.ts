@@ -10,6 +10,6 @@ export function GET(request: Request): Promise<Response> {
   return handle(async () => {
     await requireGround();
     const delayMs = parseDelayMs(new URL(request.url).searchParams);
-    return ok(listGroundAlerts(groundAsOf(delayMs)));
+    return ok(await listGroundAlerts(groundAsOf(delayMs)));
   });
 }

@@ -48,7 +48,7 @@ export interface AgentArgs {
   /** earlier turns of this check-in, oldest first, WITHOUT the current utterance */
   history: TurnRow[];
   /** validate a tool call exactly as the pipeline will, without writing anything */
-  validate: (name: string, input: unknown) => ToolResult;
+  validate: (name: string, input: unknown) => Promise<ToolResult>;
 }
 
 export interface AgentDecision {

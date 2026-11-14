@@ -39,13 +39,13 @@ export function assistantText(events: TurnEvent[]): string {
   return eventsOf(events, "assistant")[0]?.text ?? "";
 }
 
-export function startCheckIn(crewId: string, language?: string): string {
-  return createOrResumeCheckIn(crewId, language).checkInId;
+export async function startCheckIn(crewId: string, language?: string): Promise<string> {
+  return (await createOrResumeCheckIn(crewId, language)).checkInId;
 }
 
 /** the persisted machine context of a check-in (state column + state_json) */
-export function ctxOf(crewId: string, checkInId: string): MachineCtx {
-  return loadMachineCtx(getCheckIn(crewId, checkInId));
+export async function ctxOf(crewId: string, checkInId: string): Promise<MachineCtx> {
+  return loadMachineCtx(await getCheckIn(crewId, checkInId));
 }
 
 /** a context in the given state, for direct tool tests */

@@ -26,10 +26,23 @@ export function POST(request: Request): Promise<Response> {
       en: `Emergency guidance opened: ${scenario.title.en}. Crew medical officer and ground informed (simulated link).`,
       mn: `Яаралтай тусламжийн заавар нээгдлээ: ${scenario.title.mn}. Багийн эмч болон Дэлхийд мэдэгдлээ (симуляци).`,
     };
-    const existing = listAlerts(crewId).find((a) => a.checkInId === parsed.data.checkInId && a.text.en === text.en);
-    // insertAlert checks that the check-in belongs to this crew member (404 otherwise)
+    // an alert raised before alerts had a deterministic id is matched by its text
+    const existing = (await listAlerts(crewId)).find(
+      (a) => a.checkInId === parsed.data.checkInId && a.text.en === text.en,
+    );
+    // one id per check-in and scenario, inserted only when absent: two requests in flight at once (SOS tapped while
+    // the transcript matcher opens the same scenario, a retry) get the same single alert. insertAlert checks that the
+    // check-in belongs to this crew member (404 otherwise).
     const alert =
-      existing ?? insertAlert(crewId, { checkInId: parsed.data.checkInId, level: "red", rule: "SERIOUS_SYMPTOM_WORD", text });
+      existing ??
+      (await insertAlert(crewId, {
+        id: `al-${parsed.data.checkInId}-emergency-${scenario.id}`,
+        ifAbsent: true,
+        checkInId: parsed.data.checkInId,
+        level: "red",
+        rule: "SERIOUS_SYMPTOM_WORD",
+        text,
+      }));
     return ok({ alert });
   });
 }

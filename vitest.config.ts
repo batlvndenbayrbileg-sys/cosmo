@@ -13,8 +13,13 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["tests/**/*.test.ts"],
-    // every test run uses its own throw-away SQLite file, never data/aegis.db
-    env: { AEGIS_DB_PATH: ":memory:", DEMO_MODE: "scripted" },
+    // every test run uses a throw-away database, never data/aegis.db: in-memory SQLite by default, or the in-process
+    // Postgres (PGlite) when AEGIS_TEST_DB=":pglite:" (`pnpm test:pg`). test.env overrides the shell's AEGIS_DB_PATH, so
+    // the override has its own name.
+    env: { AEGIS_DB_PATH: process.env.AEGIS_TEST_DB || ":memory:", DEMO_MODE: "scripted" },
     testTimeout: 15_000,
+    // the first getDb() of a PGlite test file starts a WebAssembly Postgres, which takes seconds while every worker does
+    // the same at once
+    hookTimeout: process.env.AEGIS_TEST_DB === ":pglite:" ? 60_000 : 10_000,
   },
 });

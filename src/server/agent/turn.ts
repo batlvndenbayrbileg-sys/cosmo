@@ -18,6 +18,7 @@ import { KPI_DEFS, QUESTIONS, asNumber, getQuestion, questionFilled } from "@/li
 import { now } from "@/server/clock";
 import { getEnv } from "@/server/env";
 import { HttpError } from "@/server/http";
+import { getDb } from "@/server/db/client";
 import { confirmCheckIn, getCheckIn } from "@/server/db/repos/checkin";
 import { getCrewPublic } from "@/server/db/repos/crew";
 import { appendTurn, listTurns } from "@/server/db/repos/turn";
@@ -351,23 +352,23 @@ async function* runTurnInner(args: RunTurnArgs, started: number): AsyncGenerator
   if (text.length === 0) throw new HttpError(400, "BAD_INPUT", "Empty message");
   if (text.length > MAX_UTTERANCE_CHARS) throw new HttpError(400, "BAD_INPUT", "Message is too long");
 
-  const checkIn = getCheckIn(crewId, checkInId); // NotFoundError for another crew member's check-in
-  const crew = getCrewPublic(crewId);
-  const ctx0 = loadMachineCtx(checkIn);
+  const checkIn = await getCheckIn(crewId, checkInId); // NotFoundError for another crew member's check-in
+  const crew = await getCrewPublic(crewId);
+  const ctx0 = await loadMachineCtx(checkIn);
 
-  const history: TurnRow[] = listTurns(crewId, checkInId, { limit: HISTORY_TURNS });
+  const history: TurnRow[] = await listTurns(crewId, checkInId, { limit: HISTORY_TURNS });
   // Team decision (2026-11-14): Cosmo keeps ONE language for the whole check-in - the check-in's language (the crew
   // member's preferred language or the one chosen at the start). A Mongolian check-in stays Mongolian from start to
   // finish even when the recogniser returns digits or Latin-looking text for an utterance.
   const lang: Lang = checkIn.language;
 
-  const crewTurn = appendTurn(crewId, checkInId, { speaker: "crew", text, language: lang, createdAt: now() });
+  const crewTurn = await appendTurn(crewId, checkInId, { speaker: "crew", text, language: lang, createdAt: now() });
   yield { type: "transcript", turnId: crewTurn.id, text, language: lang };
 
   const env = getEnv();
   const source: MeasurementSource = input.kind === "voice" ? "voice" : env.demoMode === "scripted" ? "simulated" : "typed";
 
-  const today = loadTodayValues(crewId, checkInId);
+  const today = await loadTodayValues(crewId, checkInId);
   const expected = ctx0.state === "KPI_CAPTURE" ? cursorQuestion(ctx0) : null;
   const toolContext = (dryRun: boolean, state: ConversationState, filled: ReadonlySet<KpiKey>): ToolContext => ({
     crewId,
@@ -409,7 +410,7 @@ async function* runTurnInner(args: RunTurnArgs, started: number): AsyncGenerator
   let llmMs = decision.llmMs ?? Math.round(performance.now() - decideStarted);
 
   /* ── 2. proposals -> executeTool -> events ── */
-  const history14 = loadHistory(crewId, checkIn.localDate);
+  const history14 = await loadHistory(crewId, checkIn.localDate);
   const baselines = computeBaselines(history14);
   const filledNow = new Set<KpiKey>(ctx0.filled);
   const acknowledged: InterpretedRecord[] = [];
@@ -418,7 +419,11 @@ async function* runTurnInner(args: RunTurnArgs, started: number): AsyncGenerator
   const alreadyRecorded: KpiKey[] = [];
   const correctedNow = new Set<KpiKey>();
 
-  const apply = (records: InterpretedRecord[], name: Extract<ToolName, "record_measurement" | "correct_measurement">): KpiKey[] => {
+  /** one record after the other, in order: each write sees the keys the earlier ones filled */
+  const apply = async (
+    records: InterpretedRecord[],
+    name: Extract<ToolName, "record_measurement" | "correct_measurement">,
+  ): Promise<KpiKey[]> => {
     const accepted: KpiKey[] = [];
     const seen = new Set<KpiKey>();
     for (const rec of records) {
@@ -428,7 +433,7 @@ async function* runTurnInner(args: RunTurnArgs, started: number): AsyncGenerator
         name === "record_measurement"
           ? { key: rec.key, value: rec.value, unit: rec.unit, source_text: rec.sourceText, confidence: rec.confidence }
           : { key: rec.key, value: rec.value, source_text: rec.sourceText, confidence: rec.confidence };
-      const res = executeTool(toolContext(false, ctx0.state, filledNow), name, toolInput);
+      const res = await executeTool(toolContext(false, ctx0.state, filledNow), name, toolInput);
       if (res.ok && res.effect?.type === "measurement") {
         const e = res.effect;
         accepted.push(e.key);
@@ -467,13 +472,13 @@ async function* runTurnInner(args: RunTurnArgs, started: number): AsyncGenerator
   switch (ctx0.state) {
     case "GREETING":
     case "SMALL_TALK": {
-      const accepted = apply(decision.records, "record_measurement");
+      const accepted = await apply(decision.records, "record_measurement");
       if (accepted.length > 0) send({ type: "MEASUREMENT_ACCEPTED", keys: accepted });
       send({ type: "USER_TURN", start: decision.startAnswer ?? "unclear" });
       break;
     }
     case "KPI_CAPTURE": {
-      const accepted = apply(decision.records, "record_measurement");
+      const accepted = await apply(decision.records, "record_measurement");
       if (accepted.length > 0) {
         send({ type: "MEASUREMENT_ACCEPTED", keys: accepted });
       } else if (expected !== null) {
@@ -500,7 +505,7 @@ async function* runTurnInner(args: RunTurnArgs, started: number): AsyncGenerator
     }
     case "CONFIRM": {
       const attempted = decision.correction ?? [];
-      const corrected = attempted.length > 0 ? apply(attempted, "correct_measurement") : [];
+      const corrected = attempted.length > 0 ? await apply(attempted, "correct_measurement") : [];
       for (const key of corrected) correctedNow.add(key);
       for (const r of decision.rejected ?? []) {
         if (!failures.some((f) => f.key === r.key)) failures.push({ key: r.key, reason: r.reason, text: clarifyReasonText(r.reason) });
@@ -538,7 +543,7 @@ async function* runTurnInner(args: RunTurnArgs, started: number): AsyncGenerator
   /* ── 3. words ── */
   const summaryRequested = effects.some((e) => e.type === "computeSummary");
   const replyEffect = [...effects].reverse().find((e): e is ReplyEffect => e.type === "reply");
-  const valuesNow = loadTodayValues(crewId, checkInId).values;
+  const valuesNow = (await loadTodayValues(crewId, checkInId)).values;
   let finalState: ConversationState = ctx.state;
   let assistantText = "";
   let emotion: Emotion = decision.emotion;
@@ -563,17 +568,28 @@ async function* runTurnInner(args: RunTurnArgs, started: number): AsyncGenerator
     }
     // an overall red status always raises an alert: the astronaut is told, whoever phrased the summary
     spoken = ensureAlertNotice(spoken, findings, lang);
-    const cosmoTurn = appendTurn(crewId, checkInId, { speaker: "cosmo", text: spoken, language: lang, createdAt: now() });
-    summaryPayload = { ...composeTemplateSummary(findings, lang, cosmoTurn.id), spoken: { language: lang, text: spoken } };
-    confirmCheckIn(crewId, checkInId, { confirmedAt: now(), summaryJson: JSON.stringify(summaryPayload) });
-    createAlertsForCheckIn(crewId, checkInId, findings);
+    // the summary turn, the confirmation, the alerts and the DONE state are written together or not at all: a failure
+    // part-way (a dropped Postgres connection, say) must not leave a confirmed red check-in without its alert, because a
+    // confirmed check-in is DONE and the SUMMARY step would never run again
+    const db = await getDb();
+    const { cosmoTurn, payload } = await db.transaction(async () => {
+      const turn = await appendTurn(crewId, checkInId, { speaker: "cosmo", text: spoken, language: lang, createdAt: now() });
+      const composed: SummaryPayload = {
+        ...composeTemplateSummary(findings, lang, turn.id),
+        spoken: { language: lang, text: spoken },
+      };
+      await confirmCheckIn(crewId, checkInId, { confirmedAt: now(), summaryJson: JSON.stringify(composed) });
+      await createAlertsForCheckIn(crewId, checkInId, findings);
+      send({ type: "SUMMARY_SPOKEN" });
+      await saveMachineCtx(crewId, checkInId, ctx);
+      return { cosmoTurn: turn, payload: composed };
+    });
+    summaryPayload = payload;
     // the state event tells the client to move to the dashboard; the stored state is DONE
     finalState = "SUMMARY";
-    send({ type: "SUMMARY_SPOKEN" });
     assistantText = spoken;
     emotion =
       findings.redFlags.length > 0 || findings.overall === "red" ? "concerned" : findings.overall === "green" ? "happy" : "neutral";
-    saveMachineCtx(crewId, checkInId, ctx);
     out.push({ type: "state", state: finalState, expectedQuestion: null });
     out.push({ type: "assistant", turnId: cosmoTurn.id, text: assistantText, language: lang, emotion });
     out.push({ type: "summary", summary: summaryPayload });
@@ -633,8 +649,8 @@ async function* runTurnInner(args: RunTurnArgs, started: number): AsyncGenerator
         : effect.kind === "smallTalkPropose"
           ? "happy"
           : decision.emotion;
-    const cosmoTurn = appendTurn(crewId, checkInId, { speaker: "cosmo", text: assistantText, language: lang, createdAt: now() });
-    saveMachineCtx(crewId, checkInId, ctx);
+    const cosmoTurn = await appendTurn(crewId, checkInId, { speaker: "cosmo", text: assistantText, language: lang, createdAt: now() });
+    await saveMachineCtx(crewId, checkInId, ctx);
     out.push({
       type: "state",
       state: ctx.state,

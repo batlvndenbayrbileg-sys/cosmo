@@ -27,9 +27,9 @@ import { demoAudioFileName } from "@/server/speech/tts";
 import { parseSse } from "./helpers/agent";
 import { TEST_TODAY, freshSeededDb } from "./helpers/db";
 
-beforeEach(() => {
+beforeEach(async () => {
   setClockForTests(TEST_TODAY);
-  freshSeededDb();
+  await freshSeededDb();
   mocks.jar.clear();
 });
 afterEach(() => setClockForTests(null));
@@ -76,7 +76,7 @@ describe("POST /api/checkins", () => {
     expect(created.greeting.text).toBe("Сайн уу, Бат! Би Cosmo байна. Өнөөдөр ямар байна даа?");
     expect(created.greeting.turnId).toBeTruthy();
     // the greeting is stored as a Cosmo turn
-    expect(listTurns("bat", created.checkInId).map((t) => [t.speaker, t.id])).toEqual([["cosmo", created.greeting.turnId]]);
+    expect((await listTurns("bat", created.checkInId)).map((t) => [t.speaker, t.id])).toEqual([["cosmo", created.greeting.turnId]]);
   });
 
   it("honours an explicit language and accepts an empty body", async () => {
@@ -116,7 +116,7 @@ describe("POST /api/checkins", () => {
     await signIn("saraa");
     const saraa = await createCheckIn();
     expect(saraa.checkInId).not.toBe(bat.checkInId);
-    expect(listTurns("saraa", saraa.checkInId)).toHaveLength(1);
+    expect(await listTurns("saraa", saraa.checkInId)).toHaveLength(1);
   });
 });
 
@@ -203,13 +203,13 @@ describe("POST /api/checkins/[id]/turn", () => {
   it("is a 404 for another crew member's check-in and writes nothing to it", async () => {
     await signIn("bat");
     const { checkInId } = await createCheckIn("en");
-    const before = listTurns("bat", checkInId);
+    const before = await listTurns("bat", checkInId);
     mocks.jar.clear();
     await signIn("saraa");
     const res = await turnRequest(checkInId, "I slept 3 hours");
     expect(res.status).toBe(404);
     expect((await errorOf(res)).code).toBe("NOT_FOUND");
-    expect(listTurns("bat", checkInId)).toEqual(before);
+    expect(await listTurns("bat", checkInId)).toEqual(before);
     expect((await turnRequest("nope", "hello")).status).toBe(404);
   });
 
@@ -226,7 +226,7 @@ describe("POST /api/checkins/[id]/turn", () => {
       expect(res.status, JSON.stringify(body).slice(0, 40)).toBe(400);
       expect((await errorOf(res)).code).toBe("BAD_INPUT");
     }
-    expect(listTurns("bat", checkInId)).toHaveLength(1); // only the greeting
+    expect(await listTurns("bat", checkInId)).toHaveLength(1); // only the greeting
   });
 
   it("a voice turn without a working speech-to-text answers 502 STT_FAILED and stores nothing", async () => {
@@ -237,7 +237,7 @@ describe("POST /api/checkins/[id]/turn", () => {
     const res = await postTurn(new Request(`http://localhost/api/checkins/${checkInId}/turn`, { method: "POST", body: form }), ctx({ id: checkInId }));
     expect(res.status).toBe(502);
     expect((await errorOf(res)).code).toBe("STT_FAILED");
-    expect(listTurns("bat", checkInId)).toHaveLength(1);
+    expect(await listTurns("bat", checkInId)).toHaveLength(1);
 
     const empty = new FormData();
     empty.append("audio", new Blob([], { type: "audio/webm" }), "turn.webm");

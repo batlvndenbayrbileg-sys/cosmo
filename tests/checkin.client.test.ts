@@ -1010,7 +1010,8 @@ describe("recordingCapMs: the recorder's own hard limit", () => {
   });
 
   it("with VAD the cap backstops the VAD limits (waiting for speech + one utterance)", () => {
-    expect(recordingCapMs(DEFAULT_VAD_CONFIG, true)).toBe(50_000);
+    // 30 s waiting for speech (was 20 s) + one 30 s utterance
+    expect(recordingCapMs(DEFAULT_VAD_CONFIG, true)).toBe(60_000);
   });
 
   it("capReached is inclusive of the limit", () => {

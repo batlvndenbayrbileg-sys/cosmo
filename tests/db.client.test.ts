@@ -33,15 +33,15 @@ describe("db client: a fresh file database gets the demo roster", () => {
     fs.rmSync(dir, { recursive: true, force: true });
   });
 
-  it("seeds an empty file database once and leaves a filled one alone", () => {
+  it("seeds an empty file database once and leaves a filled one alone", async () => {
     const file = path.join(dir, "nested", "aegis.db");
     const db = openDb(file);
     expect(fs.existsSync(file)).toBe(true);
-    const first = seedIfEmpty(db);
+    const first = await seedIfEmpty(db);
     expect(first?.crew).toBeGreaterThan(0);
-    expect(seedIfEmpty(db)).toBeNull();
-    const n = (db.prepare("SELECT COUNT(*) AS n FROM crew_member").get() as { n: number }).n;
+    expect(await seedIfEmpty(db)).toBeNull();
+    const n = (await db.get<{ n: number }>("SELECT COUNT(*) AS n FROM crew_member"))!.n;
     expect(n).toBe(first?.crew);
-    db.close();
+    await db.close();
   });
 });

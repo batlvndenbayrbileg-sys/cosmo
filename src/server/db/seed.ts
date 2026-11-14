@@ -2,7 +2,7 @@ import "server-only";
 import { evaluateDay, type HistoryDay } from "@/lib/health";
 import type { Bilingual, CrewPublic, KpiKey, Lang } from "@/lib/types";
 import { composeTemplateSummary } from "@/server/dashboard/template";
-import type { Db } from "./client";
+import type { Db, Queryable } from "./client";
 import { localDateISO } from "./shared";
 
 /**
@@ -368,126 +368,165 @@ function confirmedAtFor(today: Date, daysBefore: number, offsetMin: number): Dat
   );
 }
 
-export function seedDatabase(db: Db, opts: SeedOptions = {}): SeedResult {
+/** most rows per multi-row INSERT (well under SQLite's and Postgres's bound-parameter limits) */
+const BATCH_ROWS = 200;
+
+/**
+ * Inserts `rows` with multi-row VALUES statements, in order (so insertion order, the `rowid`/`seq` tie-breaker, is the
+ * same as one INSERT per row). `values` is one row's VALUES tuple, e.g. "(?, ?, NULL)"; `tail` follows the VALUES list.
+ */
+async function insertRows(
+  tx: Queryable,
+  head: string,
+  values: string,
+  rows: readonly unknown[][],
+  tail = "",
+): Promise<void> {
+  for (let i = 0; i < rows.length; i += BATCH_ROWS) {
+    const chunk = rows.slice(i, i + BATCH_ROWS);
+    await tx.run(`${head} VALUES ${chunk.map(() => values).join(", ")}${tail}`, ...chunk.flat());
+  }
+}
+
+export async function seedDatabase(db: Db, opts: SeedOptions = {}): Promise<SeedResult> {
   const today = opts.today ?? new Date();
   const result: SeedResult = { crew: 0, checkIns: 0, measurements: 0, alerts: 0, dates: [] };
 
-  const run = db.transaction(() => {
+  // everything is computed first (pure and deterministic), then written in one transaction
+  const crewRows: unknown[][] = [];
+  const checkInRows: unknown[][] = [];
+  const measurementRows: unknown[][] = [];
+  const summaryRows: Array<[summaryJson: string, checkInId: string, crewId: string]> = [];
+  const alertRows: unknown[][] = [];
+
+  for (const profile of SEED_CREW) {
+    crewRows.push([
+      profile.id,
+      profile.name,
+      profile.role,
+      profile.preferredLanguage,
+      profile.mascotVariant,
+      profile.avatarSeed,
+    ]);
+    result.crew += 1;
+
+    // separate stream for time jitter so it never perturbs the value draws
+    const timeRng = mulberry32(hashSeed(`${profile.avatarSeed}:time`));
+    const days = generateDays(profile);
+    /** confirmed days before the one being written, for the baseline of the last day's summary */
+    const history: HistoryDay[] = [];
+
+    for (const day of days) {
+      const daysBefore = SEED_DAYS - day.index;
+      const confirmed = confirmedAtFor(today, daysBefore, Math.floor(timeRng() * 21) - 8);
+      const started = new Date(confirmed.getTime() - 6 * 60_000);
+      const localDate = localDateISO(started);
+      const checkInId = `ci-${profile.id}-${localDate}`;
+
+      checkInRows.push([
+        checkInId,
+        profile.id,
+        started.toISOString(),
+        confirmed.toISOString(),
+        localDate,
+        profile.preferredLanguage,
+      ]);
+      result.checkIns += 1;
+      if (!result.dates.includes(localDate)) result.dates.push(localDate);
+
+      let n = 0;
+      const at = () => new Date(started.getTime() + (n++ + 1) * 20_000).toISOString();
+      for (const key of SEED_KEYS) {
+        measurementRows.push([`${checkInId}:${key}`, checkInId, profile.id, key, day.values[key], null, UNITS[key], at()]);
+        result.measurements += 1;
+      }
+      if (day.note !== null) {
+        measurementRows.push([`${checkInId}:day_note`, checkInId, profile.id, "day_note", null, day.note, null, at()]);
+        result.measurements += 1;
+      }
+
+      const values: HistoryDay["values"] = { ...day.values };
+      if (day.note !== null) values.day_note = day.note;
+
+      if (day.index === SEED_DAYS - 1) {
+        // last seeded check-in: stored summary (template wording) so ground has it from the start
+        const evaluation = evaluateDay(values, history);
+        const summary = composeTemplateSummary(evaluation.summary, profile.preferredLanguage);
+        summaryRows.push([JSON.stringify(summary), checkInId, profile.id]);
+
+        if (profile.story === "headache_vision") {
+          const flag = evaluation.redFlags.find((f) => f.rule === "HEADACHE_PLUS_VISION");
+          if (!flag) throw new Error("seed: Mira's last day must raise HEADACHE_PLUS_VISION");
+          const text: Bilingual = flag.text;
+          alertRows.push([
+            `al-${checkInId}-HEADACHE_PLUS_VISION`,
+            profile.id,
+            checkInId,
+            new Date(confirmed.getTime() + 1_000).toISOString(),
+            "red",
+            "HEADACHE_PLUS_VISION",
+            JSON.stringify(text),
+          ]);
+          result.alerts += 1;
+        }
+      }
+      history.push({ date: localDate, values });
+    }
+  }
+  result.dates.sort();
+
+  await db.transaction(async (tx) => {
     if (opts.wipe) {
       for (const table of ["alert", "turn", "measurement", "check_in", "crew_member"]) {
-        db.prepare(`DELETE FROM ${table}`).run();
+        await tx.run(`DELETE FROM ${table}`);
       }
     }
 
-    const upsertCrew = db.prepare(
-      `INSERT INTO crew_member (id, name, role, preferred_language, mascot_variant, avatar_seed)
-       VALUES (@id, @name, @role, @lang, @mascot, @seed)
-       ON CONFLICT (id) DO UPDATE SET name = excluded.name, role = excluded.role,
+    await insertRows(
+      tx,
+      "INSERT INTO crew_member (id, name, role, preferred_language, mascot_variant, avatar_seed)",
+      "(?, ?, ?, ?, ?, ?)",
+      crewRows,
+      ` ON CONFLICT (id) DO UPDATE SET name = excluded.name, role = excluded.role,
          preferred_language = excluded.preferred_language, mascot_variant = excluded.mascot_variant,
          avatar_seed = excluded.avatar_seed`,
     );
-    const insertCheckIn = db.prepare(
+    await insertRows(
+      tx,
       `INSERT OR IGNORE INTO check_in
-         (id, crew_id, started_at, confirmed_at, local_date, language, summary_json, state, state_json)
-       VALUES (?, ?, ?, ?, ?, ?, NULL, 'DONE', '{}')`,
+         (id, crew_id, started_at, confirmed_at, local_date, language, summary_json, state, state_json)`,
+      "(?, ?, ?, ?, ?, ?, NULL, 'DONE', '{}')",
+      checkInRows,
     );
-    const insertMeasurement = db.prepare(
+    await insertRows(
+      tx,
       `INSERT OR IGNORE INTO measurement
-         (id, check_in_id, crew_id, key, value, value_text, unit, source_text, confidence, source, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, 'simulated', ?)`,
+         (id, check_in_id, crew_id, key, value, value_text, unit, source_text, confidence, source, created_at)`,
+      "(?, ?, ?, ?, ?, ?, ?, NULL, NULL, 'simulated', ?)",
+      measurementRows,
     );
-    // same columns as repos/alert.insertAlert, but bound to the `db` handle that is being seeded
-    // (the repo functions always use the process-wide getDb() singleton)
-    const insertAlert = db.prepare(
-      `INSERT OR IGNORE INTO alert (id, crew_id, check_in_id, created_at, level, rule, text_json)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    );
-    const setSummary = db.prepare(
-      "UPDATE check_in SET summary_json = ? WHERE id = ? AND crew_id = ? AND summary_json IS NULL",
-    );
-
-    for (const profile of SEED_CREW) {
-      upsertCrew.run({
-        id: profile.id,
-        name: profile.name,
-        role: profile.role,
-        lang: profile.preferredLanguage,
-        mascot: profile.mascotVariant,
-        seed: profile.avatarSeed,
-      });
-      result.crew += 1;
-
-      // separate stream for time jitter so it never perturbs the value draws
-      const timeRng = mulberry32(hashSeed(`${profile.avatarSeed}:time`));
-      const days = generateDays(profile);
-      /** confirmed days before the one being written, for the baseline of the last day's summary */
-      const history: HistoryDay[] = [];
-
-      for (const day of days) {
-        const daysBefore = SEED_DAYS - day.index;
-        const confirmed = confirmedAtFor(today, daysBefore, Math.floor(timeRng() * 21) - 8);
-        const started = new Date(confirmed.getTime() - 6 * 60_000);
-        const localDate = localDateISO(started);
-        const checkInId = `ci-${profile.id}-${localDate}`;
-
-        insertCheckIn.run(
-          checkInId,
-          profile.id,
-          started.toISOString(),
-          confirmed.toISOString(),
-          localDate,
-          profile.preferredLanguage,
-        );
-        result.checkIns += 1;
-        if (!result.dates.includes(localDate)) result.dates.push(localDate);
-
-        let n = 0;
-        const at = () => new Date(started.getTime() + (n++ + 1) * 20_000).toISOString();
-        for (const key of SEED_KEYS) {
-          insertMeasurement.run(`${checkInId}:${key}`, checkInId, profile.id, key, day.values[key], null, UNITS[key], at());
-          result.measurements += 1;
-        }
-        if (day.note !== null) {
-          insertMeasurement.run(`${checkInId}:day_note`, checkInId, profile.id, "day_note", null, day.note, null, at());
-          result.measurements += 1;
-        }
-
-        const values: HistoryDay["values"] = { ...day.values };
-        if (day.note !== null) values.day_note = day.note;
-
-        if (day.index === SEED_DAYS - 1) {
-          // last seeded check-in: stored summary (template wording) so ground has it from the start
-          const evaluation = evaluateDay(values, history);
-          const summary = composeTemplateSummary(evaluation.summary, profile.preferredLanguage);
-          setSummary.run(JSON.stringify(summary), checkInId, profile.id);
-
-          if (profile.story === "headache_vision") {
-            const flag = evaluation.redFlags.find((f) => f.rule === "HEADACHE_PLUS_VISION");
-            if (!flag) throw new Error("seed: Mira's last day must raise HEADACHE_PLUS_VISION");
-            const text: Bilingual = flag.text;
-            insertAlert.run(
-              `al-${checkInId}-HEADACHE_PLUS_VISION`,
-              profile.id,
-              checkInId,
-              new Date(confirmed.getTime() + 1_000).toISOString(),
-              "red",
-              "HEADACHE_PLUS_VISION",
-              JSON.stringify(text),
-            );
-            result.alerts += 1;
-          }
-        }
-        history.push({ date: localDate, values });
-      }
+    for (const [summaryJson, checkInId, crewId] of summaryRows) {
+      await tx.run(
+        "UPDATE check_in SET summary_json = ? WHERE id = ? AND crew_id = ? AND summary_json IS NULL",
+        summaryJson,
+        checkInId,
+        crewId,
+      );
     }
-    result.dates.sort();
+    // same columns as repos/alert.insertAlert, but written on the `db` handle that is being seeded
+    // (the repo functions always use the process-wide getDb() singleton)
+    await insertRows(
+      tx,
+      "INSERT OR IGNORE INTO alert (id, crew_id, check_in_id, created_at, level, rule, text_json)",
+      "(?, ?, ?, ?, ?, ?, ?)",
+      alertRows,
+    );
   });
-  run();
   return result;
 }
 
 /** Seeds only when there is no crew member yet. Returns null when nothing was done. */
-export function seedIfEmpty(db: Db, opts: Omit<SeedOptions, "wipe"> = {}): SeedResult | null {
-  const row = db.prepare("SELECT COUNT(*) AS n FROM crew_member").get() as { n: number };
-  return row.n > 0 ? null : seedDatabase(db, opts);
+export async function seedIfEmpty(db: Db, opts: Omit<SeedOptions, "wipe"> = {}): Promise<SeedResult | null> {
+  const row = await db.get<{ n: number }>("SELECT COUNT(*) AS n FROM crew_member");
+  return Number(row?.n ?? 0) > 0 ? null : seedDatabase(db, opts);
 }

@@ -13,19 +13,26 @@ export interface InsertAlertInput {
   text: Bilingual;
   createdAt?: string | Date;
   id?: string;
+  /**
+   * With a deterministic `id`: when an alert with that id already exists it is returned unchanged instead of a
+   * duplicate-key error. The insert itself is conditional (INSERT OR IGNORE), so concurrent callers get one row.
+   */
+  ifAbsent?: boolean;
 }
 
-export function insertAlert(crewId: string, input: InsertAlertInput): AlertRow {
+export async function insertAlert(crewId: string, input: InsertAlertInput): Promise<AlertRow> {
   if (input.level !== "yellow" && input.level !== "red") {
     throw new HttpError(400, "BAD_INPUT", "Invalid alert level");
   }
-  const db = getDb();
-  assertCheckInOwned(db, crewId, input.checkInId);
+  if (input.ifAbsent && input.id === undefined) {
+    throw new HttpError(400, "BAD_INPUT", "ifAbsent needs an alert id");
+  }
+  const db = await getDb();
+  await assertCheckInOwned(db, crewId, input.checkInId);
   const id = input.id ?? newId();
-  db.prepare(
-    `INSERT INTO alert (id, crew_id, check_in_id, created_at, level, rule, text_json)
+  await db.run(
+    `INSERT${input.ifAbsent ? " OR IGNORE" : ""} INTO alert (id, crew_id, check_in_id, created_at, level, rule, text_json)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
-  ).run(
     id,
     crewId,
     input.checkInId,
@@ -37,32 +44,36 @@ export function insertAlert(crewId: string, input: InsertAlertInput): AlertRow {
   return readAlert(crewId, id);
 }
 
-function readAlert(crewId: string, alertId: string): AlertRow {
-  const row = getDb()
-    .prepare(`SELECT ${ALERT_COLUMNS} FROM alert WHERE id = ? AND crew_id = ?`)
-    .get(alertId, crewId) as AlertDbRow | undefined;
+async function readAlert(crewId: string, alertId: string): Promise<AlertRow> {
+  const db = await getDb();
+  const row = await db.get<AlertDbRow>(
+    `SELECT ${ALERT_COLUMNS} FROM alert WHERE id = ? AND crew_id = ?`,
+    alertId,
+    crewId,
+  );
   if (!row) throw new NotFoundError("Alert not found");
   return mapAlert(row);
 }
 
 /** Newest first. */
-export function listAlerts(crewId: string): AlertRow[] {
-  const rows = getDb()
-    .prepare(
-      `SELECT ${ALERT_COLUMNS} FROM alert WHERE crew_id = ? ORDER BY created_at DESC, rowid DESC`,
-    )
-    .all(crewId) as AlertDbRow[];
+export async function listAlerts(crewId: string): Promise<AlertRow[]> {
+  const db = await getDb();
+  const rows = await db.all<AlertDbRow>(
+    `SELECT ${ALERT_COLUMNS} FROM alert WHERE crew_id = ? ORDER BY created_at DESC, rowid DESC`,
+    crewId,
+  );
   return rows.map(mapAlert);
 }
 
 /** Acknowledges the crew member's own alert. Idempotent: the first acknowledgement time is kept. */
-export function ackAlert(crewId: string, alertId: string, ackedAt?: string | Date): AlertRow {
-  const db = getDb();
-  const res = db
-    .prepare(
-      "UPDATE alert SET acknowledged_at = COALESCE(acknowledged_at, ?) WHERE id = ? AND crew_id = ?",
-    )
-    .run(toIso(ackedAt ?? new Date(), "ackedAt"), alertId, crewId);
+export async function ackAlert(crewId: string, alertId: string, ackedAt?: string | Date): Promise<AlertRow> {
+  const db = await getDb();
+  const res = await db.run(
+    "UPDATE alert SET acknowledged_at = COALESCE(acknowledged_at, ?) WHERE id = ? AND crew_id = ?",
+    toIso(ackedAt ?? new Date(), "ackedAt"),
+    alertId,
+    crewId,
+  );
   if (res.changes === 0) throw new NotFoundError("Alert not found");
   return readAlert(crewId, alertId);
 }

@@ -52,8 +52,8 @@ const GROUND_ENDPOINTS: Array<[string, (qs?: string) => Promise<Response>]> = [
   ["GET /api/ground/crew/bat/dashboard", (qs = "") => groundDash("bat", qs)],
 ];
 
-beforeEach(() => {
-  freshSeededDb();
+beforeEach(async () => {
+  await freshSeededDb();
   mocks.jar.clear();
   setClockForTests(NOW);
 });
@@ -89,10 +89,10 @@ describe("role separation", () => {
     const dash = await getDashboard(new Request(url("/api/dashboard")));
     expect(dash.status).toBe(403);
     expect((await errorOf(dash)).code).toBe("FORBIDDEN");
-    const miraAlert = listAlerts("mira")[0];
+    const miraAlert = (await listAlerts("mira"))[0];
     const res = await ack(miraAlert.id);
     expect(res.status).toBe(403);
-    expect(listAlerts("mira")[0].acknowledgedAt).toBeNull();
+    expect((await listAlerts("mira"))[0].acknowledgedAt).toBeNull();
   });
 
   it("no cookie gets 401 on /api/dashboard and on the alert acknowledge route", async () => {
@@ -139,7 +139,7 @@ describe("role separation", () => {
   it("with both cookies present, acknowledging acts as the crew member and the ground routes keep working", async () => {
     await signInCrew("mira");
     await signInGround();
-    expect((await ack(listAlerts("mira")[0].id)).status).toBe(200);
+    expect((await ack((await listAlerts("mira"))[0].id)).status).toBe(200);
     expect((await getGroundAlerts(new Request(url("/api/ground/alerts")))).status).toBe(200);
   });
 });
@@ -193,12 +193,12 @@ describe("GET /api/ground/crew", () => {
     expect(starStatus("alex", "bp_systolic")).toBe("yellow");
     expect(starStatus("bat", "bp_systolic")).toBe("green");
     expect(starStatus("bat", "day_note")).toBe("no_data");
-    expect(byId.bat.lastCheckInAt).toBe(latestConfirmedCheckIn("bat")!.confirmedAt);
+    expect(byId.bat.lastCheckInAt).toBe((await latestConfirmedCheckIn("bat"))!.confirmedAt);
   });
 
   it("applies the simulated link delay: a check-in confirmed 5 minutes ago is hidden at 20 min and shown at Live", async () => {
-    const fresh = addConfirmedCheckIn({ crewId: "bat", language: "mn", values: batDemoToday(), confirmedAt: ago(5 * MIN) });
-    const freshAt = latestConfirmedCheckIn("bat")!.confirmedAt;
+    const fresh = await addConfirmedCheckIn({ crewId: "bat", language: "mn", values: batDemoToday(), confirmedAt: ago(5 * MIN) });
+    const freshAt = (await latestConfirmedCheckIn("bat"))!.confirmedAt;
     const bat = async (delayMs: number) => {
       const cards = (await (await getGroundCrew(new Request(url(`/api/ground/crew?delayMs=${delayMs}`)))).json()) as CrewStatusCard[];
       return cards.find((c) => c.crew.id === "bat")!;
@@ -216,7 +216,7 @@ describe("GET /api/ground/crew", () => {
   });
 
   it("a check-in confirmed 2 minutes ago is also hidden at the 3 minute delay", async () => {
-    addConfirmedCheckIn({ crewId: "saraa", language: "mn", values: batDemoToday(), confirmedAt: ago(2 * MIN) });
+    await addConfirmedCheckIn({ crewId: "saraa", language: "mn", values: batDemoToday(), confirmedAt: ago(2 * MIN) });
     const at = async (delayMs: number) =>
       ((await (await getGroundCrew(new Request(url(`/api/ground/crew?delayMs=${delayMs}`)))).json()) as CrewStatusCard[]).find(
         (c) => c.crew.id === "saraa",
@@ -239,8 +239,8 @@ describe("GET /api/ground/crew", () => {
   });
 
   it("openAlerts counts only visible, unacknowledged alerts", async () => {
-    const id = addConfirmedCheckIn({ crewId: "bat", language: "mn", values: batDemoToday(), confirmedAt: ago(2 * MIN) });
-    addAlert("bat", id, ago(2 * MIN));
+    const id = await addConfirmedCheckIn({ crewId: "bat", language: "mn", values: batDemoToday(), confirmedAt: ago(2 * MIN) });
+    await addAlert("bat", id, ago(2 * MIN));
     const open = async (crew: string, delayMs: number) =>
       ((await (await getGroundCrew(new Request(url(`/api/ground/crew?delayMs=${delayMs}`)))).json()) as CrewStatusCard[]).find(
         (c) => c.crew.id === crew,
@@ -249,7 +249,7 @@ describe("GET /api/ground/crew", () => {
     expect(await open("bat", THREE)).toBe(0);
     // acknowledging Mira's alert closes it on the console
     await signInCrew("mira");
-    expect((await ack(listAlerts("mira")[0].id)).status).toBe(200);
+    expect((await ack((await listAlerts("mira"))[0].id)).status).toBe(200);
     await signInGround();
     expect(await open("mira", LIVE)).toBe(0);
   });
@@ -261,8 +261,8 @@ describe("GET /api/ground/alerts", () => {
   });
 
   it("lists Mira's seeded alert, newest first, and hides alerts whose check-in has not arrived", async () => {
-    const id = addConfirmedCheckIn({ crewId: "bat", language: "mn", values: batDemoToday(), confirmedAt: ago(5 * MIN) });
-    addAlert("bat", id, ago(4 * MIN));
+    const id = await addConfirmedCheckIn({ crewId: "bat", language: "mn", values: batDemoToday(), confirmedAt: ago(5 * MIN) });
+    await addAlert("bat", id, ago(4 * MIN));
 
     const live = (await (await getGroundAlerts(new Request(url("/api/ground/alerts")))).json()) as AlertRow[];
     expect(live.map((a) => a.crewId)).toEqual(["bat", "mira"]);
@@ -301,7 +301,7 @@ describe("GET /api/ground/crew/[crewId]/dashboard", () => {
   });
 
   it("carries the delay into the link and the visible check-in", async () => {
-    addConfirmedCheckIn({ crewId: "bat", language: "mn", values: batDemoToday(), confirmedAt: ago(5 * MIN) });
+    await addConfirmedCheckIn({ crewId: "bat", language: "mn", values: batDemoToday(), confirmedAt: ago(5 * MIN) });
     const live = (await (await groundDash("bat", `?delayMs=${LIVE}`)).json()) as DashboardPayload;
     expect(live.overall).toBe("yellow");
     const lagged = (await (await groundDash("bat", `?delayMs=${TWENTY}`)).json()) as DashboardPayload;
@@ -320,7 +320,7 @@ describe("GET /api/ground/crew/[crewId]/dashboard", () => {
 
   it("never exposes notes, source text or Claude's phrasing", async () => {
     const note = "PRIVATE-NOTE-for-the-crew-doctor-only-5530";
-    addConfirmedCheckIn({
+    await addConfirmedCheckIn({
       crewId: "bat",
       language: "en",
       values: { ...batDemoToday(), day_note: note, symptom_note: note },
@@ -343,7 +343,7 @@ describe("GET /api/dashboard (crew role)", () => {
     expect(res.status).toBe(200);
     const p = (await res.json()) as DashboardPayload;
     expect(p.crew.id).toBe("bat");
-    expect(p.checkIn.id).toBe(latestConfirmedCheckIn("bat")!.id);
+    expect(p.checkIn.id).toBe((await latestConfirmedCheckIn("bat"))!.id);
     expect(p.link.delayMs).toBe(0);
   });
 
@@ -352,7 +352,7 @@ describe("GET /api/dashboard (crew role)", () => {
     const own = await getDashboard(new Request(url("/api/dashboard?checkInId=ci-bat-2026-11-10")));
     expect(own.status).toBe(200);
     expect(((await own.json()) as DashboardPayload).checkIn.id).toBe("ci-bat-2026-11-10");
-    const foreign = await getDashboard(new Request(url(`/api/dashboard?checkInId=${latestConfirmedCheckIn("mira")!.id}`)));
+    const foreign = await getDashboard(new Request(url(`/api/dashboard?checkInId=${(await latestConfirmedCheckIn("mira"))!.id}`)));
     expect(foreign.status).toBe(404);
     expect((await errorOf(foreign)).code).toBe("NOT_FOUND");
     expect((await getDashboard(new Request(url("/api/dashboard?checkInId=nope")))).status).toBe(404);
@@ -361,7 +361,7 @@ describe("GET /api/dashboard (crew role)", () => {
   it("answers 404 when the crew member has no confirmed check-in yet and 400 for an empty checkInId", async () => {
     await signInCrew("bat");
     expect((await getDashboard(new Request(url("/api/dashboard?checkInId=")))).status).toBe(400);
-    insertCrew(getDb(), "newbie");
+    await insertCrew(await getDb(), "newbie");
     await signInCrew("newbie");
     const res = await getDashboard(new Request(url("/api/dashboard")));
     expect(res.status).toBe(404);
@@ -370,7 +370,7 @@ describe("GET /api/dashboard (crew role)", () => {
 
   it("gives the crew viewer their notes (the ground viewer never gets them)", async () => {
     const note = "my own note 6644";
-    addConfirmedCheckIn({
+    await addConfirmedCheckIn({
       crewId: "bat",
       language: "en",
       values: { ...batDemoToday(), day_note: note },
@@ -385,7 +385,7 @@ describe("GET /api/dashboard (crew role)", () => {
 describe("POST /api/alerts/[id]/ack", () => {
   it("lets a crew member acknowledge their own alert, idempotently, with the clock's time", async () => {
     await signInCrew("mira");
-    const id = listAlerts("mira")[0].id;
+    const id = (await listAlerts("mira"))[0].id;
     const res = await ack(id);
     expect(res.status).toBe(200);
     const row = (await res.json()) as AlertRow;
@@ -397,11 +397,11 @@ describe("POST /api/alerts/[id]/ack", () => {
 
   it("answers 404 for another crew member's alert and leaves it unacknowledged", async () => {
     await signInCrew("bat");
-    const miras = listAlerts("mira")[0].id;
+    const miras = (await listAlerts("mira"))[0].id;
     const res = await ack(miras);
     expect(res.status).toBe(404);
     expect((await errorOf(res)).code).toBe("NOT_FOUND");
-    expect(listAlerts("mira")[0].acknowledgedAt).toBeNull();
+    expect((await listAlerts("mira"))[0].acknowledgedAt).toBeNull();
     expect((await ack("no-such-alert")).status).toBe(404);
   });
 });

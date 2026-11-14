@@ -39,6 +39,9 @@ const fileEnv = loadDotEnv(path.join(process.cwd(), ".env.local"));
 // the conversation must be the scripted one (templates), on a private in-memory database
 process.env.DEMO_MODE = "scripted";
 process.env.AEGIS_DB_PATH = ":memory:";
+// (a DATABASE_URL / POSTGRES_URL in the shell would point getDb() at Postgres, and the seed below wipes it)
+delete process.env.DATABASE_URL;
+delete process.env.POSTGRES_URL;
 
 async function main() {
   const { getDb } = await import("@/server/db/client");
@@ -52,7 +55,7 @@ async function main() {
   const { getCheckIn } = await import("@/server/db/repos/checkin");
   const { demoAudioFileName } = await import("@/server/speech/tts");
 
-  seedDatabase(getDb(), { today: new Date(), wipe: true });
+  await seedDatabase(await getDb(), { today: new Date(), wipe: true });
 
   const sentences = new Map<string, { lang: Lang; text: string }>();
   const add = (lang: Lang, text: string) => {
@@ -61,18 +64,22 @@ async function main() {
   };
 
   for (const crewId of crewIds) {
-    const crew = getCrewPublic(crewId);
+    const crew = await getCrewPublic(crewId);
     const lang = crew.preferredLanguage as Lang;
-    const created = createOrResumeCheckIn(crewId, lang);
+    const created = await createOrResumeCheckIn(crewId, lang);
     add(lang, created.greeting.text);
     for (const line of DEMO_SCRIPTS[lang].lines) {
       for await (const ev of runTurn({ crewId, checkInId: created.checkInId, input: { kind: "typed", text: line.say } })) {
         if (ev.type === "assistant") add(lang, ev.text);
       }
     }
-    const checkIn = getCheckIn(crewId, created.checkInId);
+    const checkIn = await getCheckIn(crewId, created.checkInId);
     if (checkIn.confirmedAt) {
-      const facts = buildResultsFacts(loadTodayValues(crewId, checkIn.id).values, loadHistory(crewId, checkIn.localDate), lang);
+      const facts = buildResultsFacts(
+        (await loadTodayValues(crewId, checkIn.id)).values,
+        await loadHistory(crewId, checkIn.localDate),
+        lang,
+      );
       for (const step of buildTour(facts, lang)) add(lang, step.text);
     } else {
       console.warn(`[gen-demo-audio] ${crewId}: the scripted demo did not reach the summary - tour clips skipped`);

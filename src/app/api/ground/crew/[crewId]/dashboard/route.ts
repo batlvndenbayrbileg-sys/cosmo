@@ -19,7 +19,7 @@ export function GET(request: Request, ctx: { params: Promise<{ crewId: string }>
     const parsed = paramsSchema.safeParse(await ctx.params);
     if (!parsed.success) throw new HttpError(400, "BAD_INPUT", "Invalid crewId");
     const delayMs = parseDelayMs(new URL(request.url).searchParams);
-    const payload = buildDashboardPayload({
+    const payload = await buildDashboardPayload({
       crewId: parsed.data.crewId,
       viewer: "ground",
       asOf: groundAsOf(delayMs),

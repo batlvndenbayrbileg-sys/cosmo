@@ -7,7 +7,7 @@ import {
   mapMeasurement,
   type MeasurementDbRow,
 } from "../rows";
-import { assertCheckInOwned, isKpiKey, isTextKey, toIso } from "../shared";
+import { assertCheckInOwned, isKpiKey, isTextKey, lockCheckInOwned, toIso } from "../shared";
 
 const SOURCES: readonly MeasurementSource[] = ["typed", "voice", "simulated"];
 
@@ -26,78 +26,81 @@ export interface UpsertMeasurementInput {
 /**
  * Inserts or corrects a measurement (UNIQUE(check_in_id, key): a correction updates the row).
  * Refuses other crew members' check-ins (NotFoundError) and confirmed check-ins (409 WRONG_STATE:
- * confirmed values are what ground sees, they do not change afterwards).
+ * confirmed values are what ground sees, they do not change afterwards). The "not confirmed" check and the write run
+ * in one transaction with the check-in row locked, so a confirmation from another request cannot land in between.
  */
-export function upsertMeasurement(
+export async function upsertMeasurement(
   crewId: string,
   checkInId: string,
   input: UpsertMeasurementInput,
-): MeasurementRow {
-  const db = getDb();
-  const { confirmedAt } = assertCheckInOwned(db, crewId, checkInId);
-  if (confirmedAt !== null) {
-    throw new HttpError(409, "WRONG_STATE", "Check-in is already confirmed");
-  }
-  if (!isKpiKey(input.key)) throw new HttpError(400, "BAD_INPUT", `Unknown key: ${String(input.key)}`);
-  if (!SOURCES.includes(input.source)) throw new HttpError(400, "BAD_INPUT", "Invalid source");
-  if (input.confidence !== null && !Number.isFinite(input.confidence)) {
-    throw new HttpError(400, "BAD_INPUT", "Invalid confidence");
-  }
-
-  let value: number | null = null;
-  let valueText: string | null = null;
-  if (isTextKey(input.key)) {
-    if (typeof input.value !== "string") {
-      throw new HttpError(400, "BAD_INPUT", `${input.key} expects text`);
+): Promise<MeasurementRow> {
+  const db = await getDb();
+  return db.transaction(async () => {
+    const { confirmedAt } = await lockCheckInOwned(db, crewId, checkInId);
+    if (confirmedAt !== null) {
+      throw new HttpError(409, "WRONG_STATE", "Check-in is already confirmed");
     }
-    valueText = input.value;
-  } else {
-    if (typeof input.value !== "number" || !Number.isFinite(input.value)) {
-      throw new HttpError(400, "BAD_INPUT", `${input.key} expects a finite number`);
+    if (!isKpiKey(input.key)) throw new HttpError(400, "BAD_INPUT", `Unknown key: ${String(input.key)}`);
+    if (!SOURCES.includes(input.source)) throw new HttpError(400, "BAD_INPUT", "Invalid source");
+    if (input.confidence !== null && !Number.isFinite(input.confidence)) {
+      throw new HttpError(400, "BAD_INPUT", "Invalid confidence");
     }
-    value = input.value;
-  }
 
-  const createdAt = toIso(input.createdAt ?? new Date(), "createdAt");
-  db.prepare(
-    `INSERT INTO measurement
-       (id, check_in_id, crew_id, key, value, value_text, unit, source_text, confidence, source, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT (check_in_id, key) DO UPDATE SET
-       value = excluded.value, value_text = excluded.value_text, unit = excluded.unit,
-       source_text = excluded.source_text, confidence = excluded.confidence,
-       source = excluded.source, created_at = excluded.created_at`,
-  ).run(
-    `${checkInId}:${input.key}`,
-    checkInId,
-    crewId,
-    input.key,
-    value,
-    valueText,
-    input.unit,
-    input.sourceText,
-    input.confidence,
-    input.source,
-    createdAt,
-  );
+    let value: number | null = null;
+    let valueText: string | null = null;
+    if (isTextKey(input.key)) {
+      if (typeof input.value !== "string") {
+        throw new HttpError(400, "BAD_INPUT", `${input.key} expects text`);
+      }
+      valueText = input.value;
+    } else {
+      if (typeof input.value !== "number" || !Number.isFinite(input.value)) {
+        throw new HttpError(400, "BAD_INPUT", `${input.key} expects a finite number`);
+      }
+      value = input.value;
+    }
 
-  const row = db
-    .prepare(
+    const createdAt = toIso(input.createdAt ?? new Date(), "createdAt");
+    await db.run(
+      `INSERT INTO measurement
+         (id, check_in_id, crew_id, key, value, value_text, unit, source_text, confidence, source, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT (check_in_id, key) DO UPDATE SET
+         value = excluded.value, value_text = excluded.value_text, unit = excluded.unit,
+         source_text = excluded.source_text, confidence = excluded.confidence,
+         source = excluded.source, created_at = excluded.created_at`,
+      `${checkInId}:${input.key}`,
+      checkInId,
+      crewId,
+      input.key,
+      value,
+      valueText,
+      input.unit,
+      input.sourceText,
+      input.confidence,
+      input.source,
+      createdAt,
+    );
+
+    const row = (await db.get<MeasurementDbRow>(
       `SELECT ${MEASUREMENT_COLUMNS} FROM measurement WHERE crew_id = ? AND check_in_id = ? AND key = ?`,
-    )
-    .get(crewId, checkInId, input.key) as MeasurementDbRow;
-  return mapMeasurement(row);
+      crewId,
+      checkInId,
+      input.key,
+    )) as MeasurementDbRow;
+    return mapMeasurement(row);
+  });
 }
 
 /** Oldest first. Throws NotFoundError when the check-in is not this crew member's. */
-export function listMeasurements(crewId: string, checkInId: string): MeasurementRow[] {
-  const db = getDb();
-  assertCheckInOwned(db, crewId, checkInId);
-  const rows = db
-    .prepare(
-      `SELECT ${MEASUREMENT_COLUMNS} FROM measurement
-        WHERE crew_id = ? AND check_in_id = ? ORDER BY created_at ASC, rowid ASC`,
-    )
-    .all(crewId, checkInId) as MeasurementDbRow[];
+export async function listMeasurements(crewId: string, checkInId: string): Promise<MeasurementRow[]> {
+  const db = await getDb();
+  await assertCheckInOwned(db, crewId, checkInId);
+  const rows = await db.all<MeasurementDbRow>(
+    `SELECT ${MEASUREMENT_COLUMNS} FROM measurement
+      WHERE crew_id = ? AND check_in_id = ? ORDER BY created_at ASC, rowid ASC`,
+    crewId,
+    checkInId,
+  );
   return rows.map((r) => mapMeasurement(r));
 }

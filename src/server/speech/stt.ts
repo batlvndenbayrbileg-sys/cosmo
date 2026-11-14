@@ -45,6 +45,17 @@ export async function transcribeAudio(
   form.append("file", audio, fileNameFor(audio.type));
   form.append("model_id", env.sttModel);
   if (opts.languageHint) form.append("language_code", opts.languageHint);
+  // the crew may answer in the other language (an English sentence in a Mongolian check-in, or the reverse): scribe_v3
+  // transcribed both correctly with the "wrong" hint, measured 2026-11-15 (scratchpad stt-lang)
+  if (opts.languageHint && env.sttModel.startsWith("scribe_v3")) {
+    form.append("secondary_language_codes", opts.languageHint === "mn" ? "en" : "mn");
+  }
+  // one astronaut talking; no "(laughter)" / "(noise)" tags in the text (they read as an answer and got a "sorry")
+  form.append("num_speakers", "1");
+  form.append("tag_audio_events", "false");
+  // numbers as digits: measured 2026-11-15 on a Mongolian sample, scribe_v2 wrote "пульс жаран найм" as "жарн найм"
+  // or "жар нэг найма"; scribe_v3 with digits returned "124 дээр 82, пульс 68" exactly (scratchpad stt-compare)
+  if (env.sttModel.startsWith("scribe_v3")) form.append("numbers_format", "digits");
 
   const started = Date.now();
   let res: Response;

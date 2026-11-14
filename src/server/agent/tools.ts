@@ -319,11 +319,11 @@ function clampConfidence(c: number | undefined): number {
   return Math.min(1, Math.max(0, c));
 }
 
-function writeMeasurement(
+async function writeMeasurement(
   tc: ToolContext,
   name: "record_measurement" | "correct_measurement",
   input: { key: KpiKey; value: MeasurementValue; source_text?: string; confidence?: number },
-): ToolResult {
+): Promise<ToolResult> {
   const { key } = input;
   const def = KPI_DEFS[key];
 
@@ -379,7 +379,7 @@ function writeMeasurement(
   const change = name === "correct_measurement" ? "corrected" : "recorded";
   if (!tc.dryRun) {
     try {
-      upsertMeasurement(tc.crewId, tc.checkInId, {
+      await upsertMeasurement(tc.crewId, tc.checkInId, {
         key,
         value,
         unit: def.unit,
@@ -404,9 +404,9 @@ function round2(n: number | null): number | null {
   return n === null ? null : Math.round(n * 100) / 100;
 }
 
-function baselineData(tc: ToolContext): unknown {
-  const checkIn = getCheckIn(tc.crewId, tc.checkInId);
-  const history = loadHistory(tc.crewId, checkIn.localDate);
+async function baselineData(tc: ToolContext): Promise<unknown> {
+  const checkIn = await getCheckIn(tc.crewId, tc.checkInId);
+  const history = await loadHistory(tc.crewId, checkIn.localDate);
   const baselines = computeBaselines(history);
   const out: Record<string, { mean: number | null; sd: number | null; n: number }> = {};
   for (const [key, b] of Object.entries(baselines)) {
@@ -416,10 +416,10 @@ function baselineData(tc: ToolContext): unknown {
 }
 
 /** the findings for today's values, computed by code (never by the model) */
-export function computeFindings(crewId: string, checkInId: string): SummaryFindings {
-  const checkIn = getCheckIn(crewId, checkInId);
-  const { values } = loadTodayValues(crewId, checkInId);
-  return evaluateDay(values, loadHistory(crewId, checkIn.localDate)).summary;
+export async function computeFindings(crewId: string, checkInId: string): Promise<SummaryFindings> {
+  const checkIn = await getCheckIn(crewId, checkInId);
+  const { values } = await loadTodayValues(crewId, checkInId);
+  return evaluateDay(values, await loadHistory(crewId, checkIn.localDate)).summary;
 }
 
 /* ───────────── dispatcher ───────────── */
@@ -428,9 +428,9 @@ export function computeFindings(crewId: string, checkInId: string): SummaryFindi
  * Runs one tool call. Never throws for bad model input: every refusal is an `ok: false` result whose `error` is a
  * short instruction the model can act on (a clarification question to the astronaut, usually).
  */
-export function executeTool(tc: ToolContext, name: string, input: unknown): ToolResult {
+export async function executeTool(tc: ToolContext, name: string, input: unknown): Promise<ToolResult> {
   try {
-    return dispatch(tc, name, input);
+    return await dispatch(tc, name, input);
   } catch (err) {
     // a check-in that is not this crew member's looks exactly like one that does not exist
     if (err instanceof NotFoundError) return fail(isToolName(name) ? name : null, "not_found", "Check-in not found.");
@@ -438,7 +438,7 @@ export function executeTool(tc: ToolContext, name: string, input: unknown): Tool
   }
 }
 
-function dispatch(tc: ToolContext, name: string, input: unknown): ToolResult {
+async function dispatch(tc: ToolContext, name: string, input: unknown): Promise<ToolResult> {
   if (!isToolName(name)) return fail(null, "unknown_tool", `Unknown tool: ${name}.`);
   const parsed = INPUT_SCHEMAS[name].safeParse(input ?? {});
   if (!parsed.success) {
@@ -475,13 +475,13 @@ function dispatch(tc: ToolContext, name: string, input: unknown): ToolResult {
       };
     }
     case "get_baseline":
-      return { ok: true, name, data: baselineData(tc) };
+      return { ok: true, name, data: await baselineData(tc) };
     case "finish_confirmation": {
       const i = parsed.data as z.infer<(typeof INPUT_SCHEMAS)["finish_confirmation"]>;
-      const data = i.confirmed ? { confirmed: true, summary: computeFindings(tc.crewId, tc.checkInId) } : { confirmed: false };
+      const data = i.confirmed ? { confirmed: true, summary: await computeFindings(tc.crewId, tc.checkInId) } : { confirmed: false };
       return { ok: true, name, data, effect: { type: "confirmation", confirmed: i.confirmed } };
     }
     case "compose_summary":
-      return { ok: true, name, data: computeFindings(tc.crewId, tc.checkInId) };
+      return { ok: true, name, data: await computeFindings(tc.crewId, tc.checkInId) };
   }
 }

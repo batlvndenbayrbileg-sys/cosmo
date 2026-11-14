@@ -8,17 +8,15 @@ import { CREW_COLUMNS, mapCrew, type CrewDbRow } from "../rows";
  * Roster fields only (id, name, role, language, mascot, avatar seed): no health data, so this is
  * the one repo function without a crewId parameter. Insertion order.
  */
-export function listCrewPublic(): CrewPublic[] {
-  const rows = getDb()
-    .prepare(`SELECT ${CREW_COLUMNS} FROM crew_member ORDER BY rowid ASC`)
-    .all() as CrewDbRow[];
+export async function listCrewPublic(): Promise<CrewPublic[]> {
+  const db = await getDb();
+  const rows = await db.all<CrewDbRow>(`SELECT ${CREW_COLUMNS} FROM crew_member ORDER BY rowid ASC`);
   return rows.map(mapCrew);
 }
 
-export function getCrewPublic(crewId: string): CrewPublic {
-  const row = getDb()
-    .prepare(`SELECT ${CREW_COLUMNS} FROM crew_member WHERE id = ?`)
-    .get(crewId) as CrewDbRow | undefined;
+export async function getCrewPublic(crewId: string): Promise<CrewPublic> {
+  const db = await getDb();
+  const row = await db.get<CrewDbRow>(`SELECT ${CREW_COLUMNS} FROM crew_member WHERE id = ?`, crewId);
   if (!row) throw new NotFoundError("Crew member not found");
   return mapCrew(row);
 }

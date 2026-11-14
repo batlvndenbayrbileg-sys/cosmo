@@ -5,6 +5,7 @@ import {
   effectiveThreshold,
   rmsFromSamples,
   stepVad,
+  voicingFromSpectrum,
   type VadConfig,
   type VadSignal,
   type VadState,
@@ -58,9 +59,9 @@ describe("stepVad: utterance boundaries", () => {
     expect(step.state.phase).toBe("speaking");
   });
 
-  it("ends the utterance after 900 ms below the threshold, not before", () => {
+  it("ends the utterance after 1.5 s below the threshold, not before (0.9 s cut people off mid-sentence)", () => {
     const speaking = run(createVadState(), LOUD, 1000).state;
-    const almost = run(speaking, QUIET, 850);
+    const almost = run(speaking, QUIET, 1450);
     expect(almost.signals).toEqual([]);
     expect(almost.state.phase).toBe("speaking");
     const done = run(almost.state, QUIET, 50);
@@ -70,35 +71,35 @@ describe("stepVad: utterance boundaries", () => {
 
   it("a short pause inside a sentence does not end it, the silence counter restarts", () => {
     let state = run(createVadState(), LOUD, 500).state;
-    state = run(state, QUIET, 600).state; // pause shorter than 900 ms
+    state = run(state, QUIET, 1200).state; // a thinking pause, shorter than 1.5 s
     expect(state.phase).toBe("speaking");
     const resumed = run(state, LOUD, 200);
     expect(resumed.state.silenceMs).toBe(0);
-    const end = run(resumed.state, QUIET, 900);
+    const end = run(resumed.state, QUIET, 1500);
     expect(end.signals).toEqual(["utterance_end"]);
   });
 
-  it("discards an utterance with less than 300 ms of speech and goes back to waiting", () => {
-    const blip = run(createVadState(), LOUD, 200).state; // 200 ms of speech
-    const after = run(blip, QUIET, 900);
+  it("discards an utterance with less than 400 ms of speech and goes back to waiting", () => {
+    const blip = run(createVadState(), LOUD, 300).state; // 300 ms of speech
+    const after = run(blip, QUIET, 1500);
     expect(after.signals).toEqual(["too_short"]);
     expect(after.state.phase).toBe("waiting");
     expect(after.state.speechMs).toBe(0);
   });
 
   it("keeps an utterance with exactly the minimum of speech", () => {
-    const start = run(createVadState(), LOUD, 300).state;
-    expect(start.speechMs).toBe(300);
-    expect(run(start, QUIET, 900).signals).toEqual(["utterance_end"]);
+    const start = run(createVadState(), LOUD, 400).state;
+    expect(start.speechMs).toBe(400);
+    expect(run(start, QUIET, 1500).signals).toEqual(["utterance_end"]);
   });
 
   it("can capture a real utterance after a discarded blip", () => {
     let state = run(createVadState(), LOUD, 100).state;
-    state = run(state, QUIET, 900).state; // too_short
+    state = run(state, QUIET, 1500).state; // too_short
     const second = run(state, LOUD, 1500);
     expect(second.signals).toEqual(["speech_start"]);
     expect(second.state.phase).toBe("speaking");
-    expect(run(second.state, QUIET, 900).signals).toEqual(["utterance_end"]);
+    expect(run(second.state, QUIET, 1500).signals).toEqual(["utterance_end"]);
   });
 
   it("cuts an utterance at 30 s even when the person never stops talking", () => {
@@ -110,7 +111,7 @@ describe("stepVad: utterance boundaries", () => {
   });
 
   it("gives up with no_speech when nothing is said for the timeout", () => {
-    const { state, signals } = run(createVadState(), QUIET, 21_000);
+    const { state, signals } = run(createVadState(), QUIET, 31_000);
     expect(signals).toEqual(["no_speech"]);
     expect(state.phase).toBe("ended");
   });
@@ -214,7 +215,7 @@ describe("stepVad: calibration (steady room noise above the base threshold)", ()
   });
 
   it("gives up with no_speech after the timeout when the room is only noise", () => {
-    const { out } = trace(() => NOISE, 21_000);
+    const { out } = trace(() => NOISE, 31_000);
     expect(out.map((o) => o.signal)).toEqual(["no_speech"]);
   });
 
@@ -240,17 +241,111 @@ describe("stepVad: calibration (steady room noise above the base threshold)", ()
   it("does not calibrate again after a discarded blip", () => {
     let state = run(createVadState(), 0.004, 400).state; // calibrated, quiet room
     state = run(state, LOUD, 100).state;
-    const after = run(state, 0.004, 900);
+    const after = run(state, 0.004, 1500);
     expect(after.signals).toEqual(["too_short"]);
     expect(after.state.calibratedMs).toBeGreaterThanOrEqual(DEFAULT_VAD_CONFIG.calibrationMs);
     expect(stepVad(after.state, { rms: LOUD, dtMs: FRAME_MS }).signal).toBe("speech_start");
   });
 });
 
+/** frames with a known voicing flag (what the browser sends once the spectrum is analysed) */
+function runV(start: VadState, rms: number, voiced: boolean, ms: number) {
+  let state = start;
+  const signals: VadSignal[] = [];
+  for (let t = 0; t < ms; t += FRAME_MS) {
+    const step = stepVad(state, { rms, dtMs: FRAME_MS, voiced });
+    state = step.state;
+    if (step.signal !== "none") signals.push(step.signal);
+  }
+  return { state, signals };
+}
+
+describe("stepVad: background noise is not speech (voicing)", () => {
+  const room = () => calibrated(0.005);
+
+  it("loud noise that does not sound like a voice never starts an utterance, however long it lasts", () => {
+    const { signals, state } = runV(room(), 0.3, false, 20_000);
+    expect(signals).toEqual([]);
+    expect(state.phase).toBe("waiting");
+  });
+
+  it("a single voice-like frame of noise does not start speech: it takes 150 ms of continuous voice", () => {
+    let s = room();
+    for (let i = 0; i < 40; i++) {
+      // voiced every other frame: never 150 ms in a row
+      s = stepVad(s, { rms: 0.3, dtMs: FRAME_MS, voiced: i % 2 === 0 }).state;
+    }
+    expect(s.phase).toBe("waiting");
+    const start = runV(s, 0.3, true, 150);
+    expect(start.signals).toEqual(["speech_start"]);
+  });
+
+  it("speech followed by steady noise ends after 2.5 s without voice, instead of running to the 30 s cap", () => {
+    let s = runV(room(), 0.3, true, 1500).state;
+    const after = runV(s, 0.3, false, 3000);
+    expect(after.signals).toEqual(["utterance_end"]);
+    s = after.state;
+    expect(s.utteranceMs).toBeLessThan(5000);
+  });
+
+  it("an utterance that was mostly noise with a little voice in it is dropped, not sent", () => {
+    let s = runV(room(), 0.3, true, 450).state; // 450 ms of voice
+    s = runV(s, 0.3, false, 2000).state; // then 2 s of loud noise (voiced share < 35 %)
+    const end = runV(s, 0.001, false, 1500);
+    expect(end.signals).toEqual(["too_short"]);
+    expect(end.state.phase).toBe("waiting");
+  });
+
+  it("soft speech in a noisy room still gets through: a voice only has to clear the room by 1.4x", () => {
+    const noisy = calibrated(0.05); // a fan
+    expect(runV(noisy, 0.08, false, 1000).signals).toEqual([]); // the same level as noise: ignored
+    expect(runV(noisy, 0.08, true, 200).signals).toEqual(["speech_start"]);
+  });
+
+  it("soft voiced sound does not count as room noise (the threshold must not climb over the speaker)", () => {
+    const s = runV(calibrated(0.01), 0.012, true, 3000).state; // voiced but below the threshold
+    expect(s.noiseFloor).toBeCloseTo(0.01, 6);
+  });
+});
+
+describe("voicingFromSpectrum", () => {
+  const SR = 48_000;
+  const N = 2048;
+  /** a spectrum in dB with energy only at the given frequencies (everything else at -140 dB) */
+  function tones(freqs: number[], level = -20): Float32Array {
+    const db = new Float32Array(N / 2).fill(-140);
+    for (const f of freqs) db[Math.round((f * N) / SR)] = level;
+    return db;
+  }
+
+  it("calls a harmonic sound in the speech band a voice", () => {
+    const v = voicingFromSpectrum(tones([200, 400, 600, 800, 1000, 1200, 2400]), SR, N);
+    expect(v.voiced).toBe(true);
+    expect(v.bandShare).toBeGreaterThan(0.9);
+    expect(v.flatness).toBeLessThan(0.05);
+  });
+
+  it("rejects flat noise (hiss): every bin equal", () => {
+    const v = voicingFromSpectrum(new Float32Array(N / 2).fill(-50), SR, N);
+    expect(v.voiced).toBe(false);
+    expect(v.flatness).toBeGreaterThan(0.9);
+  });
+
+  it("rejects a low hum (fan, air conditioning): the energy is below the speech band", () => {
+    const v = voicingFromSpectrum(tones([70, 90, 110]), SR, N);
+    expect(v.voiced).toBe(false);
+    expect(v.bandShare).toBeLessThan(0.5);
+  });
+
+  it("returns not-voiced for silence (-Infinity everywhere)", () => {
+    expect(voicingFromSpectrum(new Float32Array(N / 2).fill(-Infinity), SR, N).voiced).toBe(false);
+  });
+});
+
 describe("DEFAULT_VAD_CONFIG", () => {
-  it("matches the brief: 900 ms silence, 300 ms minimum speech, 30 s maximum", () => {
-    expect(DEFAULT_VAD_CONFIG.silenceMs).toBe(900);
-    expect(DEFAULT_VAD_CONFIG.minSpeechMs).toBe(300);
+  it("1.5 s pause tolerance, 400 ms minimum speech, 30 s maximum (team feedback 2026-11-15: 0.9 s cut people off)", () => {
+    expect(DEFAULT_VAD_CONFIG.silenceMs).toBe(1500);
+    expect(DEFAULT_VAD_CONFIG.minSpeechMs).toBe(400);
     expect(DEFAULT_VAD_CONFIG.maxUtteranceMs).toBe(30_000);
   });
 });

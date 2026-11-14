@@ -18,6 +18,7 @@ import { AnimatePresence, LayoutGroup, MotionConfig, motion } from "framer-motio
 import { Play } from "lucide-react";
 import { SharedCosmo } from "./CosmoStage";
 import { CaptureBubble, PenTrail, PenTrailDefs } from "./CaptureBubble";
+import { VisionCard } from "./VisionCard";
 import { FloorRing, type RingMode } from "./FloorRing";
 import {
   BackControl,
@@ -791,6 +792,13 @@ export function CheckInExperience() {
               y={mascot.y + mascot.size * 0.01}
               maxWidth={questionWidth}
             />
+
+            {/* the vision self-check needs something to read: show it while Cosmo asks that question */}
+            <AnimatePresence>
+              {!preparing && phase !== "dashboard" && state.conversation === "KPI_CAPTURE" && state.expectedQuestion === "vision" ? (
+                <VisionCard key="vision" />
+              ) : null}
+            </AnimatePresence>
 
             {/* captured values */}
             <ul aria-label={t("checkin.bubbles.title")} className="contents">
