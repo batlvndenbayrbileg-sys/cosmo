@@ -1,0 +1,4 @@
+# Signature Triage source data and reference fixtures: keep the bytes exactly as downloaded / generated, so the
+# SHA-256 manifest and the byte-identical reference-script check hold on every checkout (no CRLF conversion).
+/data/nasa/*.csv -text
+/docs/signature_reference/** -text

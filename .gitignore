@@ -38,7 +38,9 @@ yarn-error.log*
 /public/mediapipe/
 
 # local SQLite database (seeded by `pnpm db:seed`)
-/data/
+/data/*
+# NASA OSDR source files for Signature Triage (read-only, must reach CI and the Vercel bundle)
+!/data/nasa/
 
 # vercel
 .vercel
@@ -46,3 +48,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Python bytecode (the Signature Triage reference scripts import each other)
+__pycache__/
