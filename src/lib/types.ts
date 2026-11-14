@@ -297,7 +297,10 @@ export interface CrewStatusCard {
 
 export type SessionRole = "crew" | "ground";
 
+export type SessionPayload = { role: "crew"; crewId: CrewId } | { role: "ground" };
+
 export type ApiErrorCode =
+  | "INTERNAL"
   | "NO_SESSION"
   | "FORBIDDEN"
   | "NOT_FOUND"
