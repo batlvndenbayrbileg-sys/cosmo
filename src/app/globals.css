@@ -71,24 +71,24 @@
   color-scheme: light;
 
   /* docs/DASHBOARD_PLAN.md section 3 */
-  --background: #f6f8fa;
+  --background: #f7faff;
   --foreground: #0f1b2d;
   --card: #ffffff;
   --card-foreground: #0f1b2d;
   --popover: #ffffff;
   --popover-foreground: #0f1b2d;
-  --primary: #0b6e7f;
+  --primary: #2f5bd3;
   --primary-foreground: #ffffff;
   --secondary: #eef2f6;
   --secondary-foreground: #0f1b2d;
   --muted: #eef2f6;
   --muted-foreground: #5b6678;
-  --accent: #0b6e7f;
+  --accent: #2f5bd3;
   --accent-foreground: #ffffff;
   --destructive: #c53030;
   --border: #e3e8ef;
   --input: #e3e8ef;
-  --ring: #0b6e7f;
+  --ring: #4f86f7;
   --radius: 0.875rem;
 
   /* status tokens (demo palette; always paired with a distinct shape, never colour alone) */
@@ -105,20 +105,44 @@
   --status-nodata-soft: #eef1f5;
   --status-nodata-ink: #5b6678;
 
-  --chart-1: #0b6e7f;
+  --chart-1: #4f86f7;
   --chart-2: #8a94a6;
-  --chart-3: #5fa8b5;
+  --chart-3: #d6e4ff;
   --chart-4: #3e4c63;
   --chart-5: #c9d2de;
 
   --sidebar: #ffffff;
   --sidebar-foreground: #0f1b2d;
-  --sidebar-primary: #0b6e7f;
+  --sidebar-primary: #2f5bd3;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #eef2f6;
   --sidebar-accent-foreground: #0f1b2d;
   --sidebar-border: #e3e8ef;
-  --sidebar-ring: #0b6e7f;
+  --sidebar-ring: #4f86f7;
+
+  /* ── design v2 "glass clinic" tokens (docs/DESIGN_V2.md section 1) ── */
+  --aegis-bg-from: #c9dcff;
+  --aegis-bg-mid: #e6efff;
+  --aegis-bg-to: #f7faff;
+  --aegis-ink: #0f1b2d;
+  --aegis-label: #5b6678;
+  --aegis-accent: #4f86f7;
+  --aegis-accent-deep: #2f5bd3;
+  --aegis-chart: #d6e4ff;
+  --aegis-hairline: rgba(15, 27, 45, 0.06);
+  --aegis-frame-bg: rgba(255, 255, 255, 0.55);
+  --aegis-frame-border: rgba(255, 255, 255, 0.8);
+  --aegis-frame-shadow: 0 30px 80px -30px rgba(40, 80, 160, 0.25);
+  --aegis-card-bg: rgba(255, 255, 255, 0.85);
+  --aegis-card-shadow: 0 8px 24px -12px rgba(40, 80, 160, 0.18);
+  --aegis-pastel-yellow: #fff5c7;
+  --aegis-pastel-blue: #dce9ff;
+  --aegis-pastel-mint: #ddf7ea;
+  --aegis-pastel-lilac: #ede3ff;
+  --aegis-coral: #ff9f8a;
+  --aegis-lilac: #a78bfa;
+  --aegis-radius-frame: 34px;
+  --aegis-radius-card: 24px;
 }
 
 @layer base {
@@ -131,8 +155,15 @@
     font-size: 17px;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply text-foreground;
     line-height: 1.5;
+    /* design v2: the page background is the .aegis-bg gradient by default */
+    background-color: var(--aegis-bg-mid);
+    background-image:
+      radial-gradient(42% 38% at 18% 22%, rgba(255, 255, 255, 0.4), transparent 70%),
+      radial-gradient(38% 34% at 82% 78%, rgba(255, 255, 255, 0.4), transparent 70%),
+      linear-gradient(135deg, var(--aegis-bg-from) 0%, var(--aegis-bg-mid) 50%, var(--aegis-bg-to) 100%);
+    min-height: 100dvh;
   }
   @media (prefers-reduced-motion: reduce) {
     *,
@@ -150,4 +181,145 @@
 @utility tnum {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum" 1;
+}
+
+/* ───────────── design v2 utilities (docs/DESIGN_V2.md section 1) ───────────── */
+
+/* page gradient + two blurred white blobs; usable on any full-bleed wrapper */
+@utility aegis-bg {
+  position: relative;
+  isolation: isolate;
+  background-color: var(--aegis-bg-mid);
+  background-image:
+    radial-gradient(42% 38% at 18% 22%, rgba(255, 255, 255, 0.4), transparent 70%),
+    radial-gradient(38% 34% at 82% 78%, rgba(255, 255, 255, 0.4), transparent 70%),
+    linear-gradient(135deg, var(--aegis-bg-from) 0%, var(--aegis-bg-mid) 50%, var(--aegis-bg-to) 100%);
+  min-height: 100dvh;
+}
+
+/* one large frosted frame around a whole screen */
+@utility glass-frame {
+  position: relative;
+  border-radius: var(--aegis-radius-frame);
+  background: var(--aegis-frame-bg);
+  -webkit-backdrop-filter: blur(24px) saturate(140%);
+  backdrop-filter: blur(24px) saturate(140%);
+  border: 1px solid var(--aegis-frame-border);
+  box-shadow: var(--aegis-frame-shadow);
+  padding: 30px;
+}
+
+/* white card inside the frame */
+@utility glass-card {
+  position: relative;
+  border-radius: var(--aegis-radius-card);
+  background: var(--aegis-card-bg);
+  border: 1px solid var(--aegis-hairline);
+  box-shadow: var(--aegis-card-shadow);
+}
+
+/* fully rounded white pill: value 17px medium + unit 11px muted */
+@utility pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: #ffffff;
+  border: 1px solid var(--aegis-hairline);
+  box-shadow: 0 4px 14px -8px rgba(40, 80, 160, 0.22);
+  color: var(--aegis-ink);
+  font-size: 17px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* 38px black circle with a white line icon */
+@utility icon-chip {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  background: var(--aegis-ink);
+  color: #ffffff;
+}
+
+@utility pastel-yellow {
+  background-color: var(--aegis-pastel-yellow);
+}
+@utility pastel-blue {
+  background-color: var(--aegis-pastel-blue);
+}
+@utility pastel-mint {
+  background-color: var(--aegis-pastel-mint);
+}
+@utility pastel-lilac {
+  background-color: var(--aegis-pastel-lilac);
+}
+
+/* big number 34-44px regular, tabular */
+@utility num-xl {
+  font-size: clamp(30px, 2.4vw, 40px);
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--aegis-ink);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* small uppercase unit/label (AVG, RANGE, BPM) */
+@utility unit-label {
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--aegis-label);
+}
+
+/* gentle status pulse for hotspots (disabled by the reduced-motion rule above) */
+@keyframes aegis-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.55;
+  }
+  70% {
+    transform: scale(2.1);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(2.1);
+    opacity: 0;
+  }
+}
+
+/* design v2: shadcn cards inside the dashboard take the glass-card look */
+[data-slot="dashboard"] [data-slot="card"] {
+  border-radius: var(--aegis-radius-card);
+  background: var(--aegis-card-bg);
+  box-shadow: var(--aegis-card-shadow);
+  --tw-ring-color: var(--aegis-hairline);
+}
+
+/* diagonal hatch used on "today" bars */
+.aegis-hatch {
+  background-image: repeating-linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.38) 0 3px,
+    transparent 3px 7px
+  );
+}
+
+/* hide scrollbars on horizontal strips but keep them scrollable */
+.aegis-noscrollbar {
+  scrollbar-width: none;
+}
+.aegis-noscrollbar::-webkit-scrollbar {
+  display: none;
 }

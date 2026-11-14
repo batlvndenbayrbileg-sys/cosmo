@@ -37,6 +37,21 @@ import {
   type MachineEvent,
 } from "./machine";
 import { ScriptedAgent } from "./scriptedAgent";
+import { HybridAgent } from "./hybridAgent";
+import { buildResultsFacts, numeralsAreGrounded, type ResultsFacts } from "./resultsFacts";
+
+/** without the model: today's headline, the first suggestion, and an invitation to ask about any part */
+export function offlineResultsAnswer(facts: ResultsFacts, lang: Lang): string {
+  const first = facts.plan[0];
+  const parts = [facts.headline];
+  if (first) parts.push(lang === "mn" ? `Өнөөдрийн эхний санал: ${first.title}.` : `Today's first suggestion: ${first.title}.`);
+  parts.push(
+    lang === "mn"
+      ? "Хяналтын самбарын аль ч хэсгийг тайлбарлаж өгье, асуугаарай."
+      : "Ask me about any part of the dashboard and I'll explain it.",
+  );
+  return parts.join(" ").replace(/\.\./g, ".");
+}
 import * as T from "./templates";
 import { executeTool, type ToolContext, type ToolName, type ToolResult } from "./tools";
 
@@ -85,12 +100,18 @@ export function scriptedAgent(): Agent {
   return scriptedSingleton;
 }
 
-/** the live agent in live mode with a key, otherwise the scripted one */
+let hybridSingleton: HybridAgent | undefined;
+
+/**
+ * Live mode with a key: the hybrid agent (instant rule-based path for clear answers, Claude for everything else and
+ * for phrasing the summary). Otherwise the scripted one.
+ */
 export function defaultAgent(): Agent {
   const env = getEnv();
   if (env.demoMode === "live" && env.anthropicApiKey) {
     claudeSingleton ??= new ClaudeAgent();
-    return claudeSingleton;
+    hybridSingleton ??= new HybridAgent(claudeSingleton);
+    return hybridSingleton;
   }
   return scriptedAgent();
 }
@@ -573,9 +594,27 @@ async function* runTurnInner(args: RunTurnArgs, started: number): AsyncGenerator
       template = join(TEMPLATES_EXTRA.updated[lang], template);
     }
     assistantText = template;
+    // after the check-in the astronaut can keep talking to Cosmo about today's results (dashboard Q&A)
+    const afterCheckIn = ctx0.state === "DONE";
+    if (afterCheckIn) {
+      const facts = buildResultsFacts(valuesNow, history14, lang);
+      let answer: string | null = null;
+      if (used.answerAboutResults && used === primary) {
+        const askedAt = performance.now();
+        try {
+          answer = await used.answerAboutResults({ facts, question: text, lang, history });
+        } catch {
+          answer = null;
+        }
+        llmMs += Math.round(performance.now() - askedAt);
+      }
+      assistantText =
+        answer && answer.length <= 600 && numeralsAreGrounded(answer, facts, text) ? answer : offlineResultsAnswer(facts, lang);
+    }
     // the model's wording replaces the template only where the machine leaves room for it: never when a question was
     // just skipped (the template carries the "add it at the confirmation" notice), never at the read-back
     const modelMayWord =
+      !afterCheckIn &&
       decision.replyText !== undefined &&
       MODEL_WORDING_KINDS.has(effect.kind) &&
       effect.skippedQuestion === undefined &&

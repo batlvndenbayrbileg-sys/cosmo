@@ -1,28 +1,17 @@
 "use client";
 
-import { createContext, useContext, useEffect, type Dispatch, type SetStateAction } from "react";
-
-/** Header details a page can publish to the app frame (primitives only, so effects stay stable). */
+/** Header details a page used to publish to the old global header (design v1). */
 export interface ShellHeaderInfo {
   title?: string;
   crewName?: string;
   missionDay?: number;
 }
 
-export const ShellHeaderContext = createContext<Dispatch<SetStateAction<ShellHeaderInfo>> | null>(
-  null,
-);
-
 /**
- * Call from a client page to show the crew name / mission day in the shared header.
- * The values are cleared again when the page unmounts.
+ * Design v2 has no global header: every screen draws its own glass top bar (TopBar), and the
+ * check-in screen has no chrome at all. This hook is kept so existing callers keep compiling; it is
+ * a harmless no-op.
  */
-export function useShellHeader({ title, crewName, missionDay }: ShellHeaderInfo): void {
-  const setInfo = useContext(ShellHeaderContext);
-
-  useEffect(() => {
-    if (!setInfo) return;
-    setInfo({ title, crewName, missionDay });
-    return () => setInfo({});
-  }, [setInfo, title, crewName, missionDay]);
+export function useShellHeader(info: ShellHeaderInfo): void {
+  void info; // intentionally empty
 }

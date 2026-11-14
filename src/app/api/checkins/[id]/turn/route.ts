@@ -27,7 +27,12 @@ function frame(event: TurnEvent): Uint8Array {
   return encoder.encode(`data: ${JSON.stringify(event)}\n\n`);
 }
 
-async function readInput(request: Request): Promise<TurnInput> {
+/**
+ * @param fallbackHint the check-in's language (the crew member's preferred language). Used as the speech-recognition
+ * hint when the client sends none: an explicit hint matters for Mongolian, which Scribe can otherwise mistake for a
+ * neighbouring language (Mongolian is in Scribe's "moderate" accuracy tier, see docs/sources.md).
+ */
+async function readInput(request: Request, fallbackHint: Lang | null): Promise<TurnInput> {
   const contentType = request.headers.get("content-type") ?? "";
 
   if (contentType.includes("multipart/form-data")) {
@@ -43,7 +48,7 @@ async function readInput(request: Request): Promise<TurnInput> {
     }
     if (audio.size > MAX_AUDIO_BYTES) throw new HttpError(400, "BAD_INPUT", "Audio is too long");
     const rawHint = form.get("language");
-    const hint: Lang | null = typeof rawHint === "string" ? normalizeLanguageCode(rawHint) : null;
+    const hint: Lang | null = (typeof rawHint === "string" ? normalizeLanguageCode(rawHint) : null) ?? fallbackHint;
     // throws HttpError(502, STT_FAILED) when speech recognition is unavailable: the client keeps the text box usable
     const heard = await transcribeAudio(audio, { languageHint: hint });
     if (heard.text.trim().length === 0) throw new HttpError(502, "STT_FAILED", "No speech was recognised");
@@ -71,8 +76,9 @@ export function POST(request: Request, context: { params: Promise<{ id: string }
   return handle(async () => {
     const { crewId } = await requireCrewSession();
     const { id } = await context.params;
-    getCheckIn(crewId, id); // 404 for another crew member's check-in, before anything is read or transcribed
-    const input = await readInput(request);
+    // 404 for another crew member's check-in, before anything is read or transcribed
+    const checkIn = getCheckIn(crewId, id);
+    const input = await readInput(request, normalizeLanguageCode(checkIn.language));
 
     const iterator = runTurn({ crewId, checkInId: id, input })[Symbol.asyncIterator]();
     const stream = new ReadableStream<Uint8Array>({

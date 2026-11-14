@@ -20,6 +20,15 @@ import {
   waitUntil,
 } from "@/components/checkin/demo";
 import { StartGate, capReached, recordingCapMs } from "@/components/checkin/recording";
+import {
+  ROWS_PER_SIDE,
+  bubbleItems,
+  computeStageLayout,
+  splitValueUnit,
+  trailEnd,
+  trailPath,
+  worstStatus,
+} from "@/components/checkin/bubbles";
 import { DEFAULT_VAD_CONFIG } from "@/components/checkin/vad";
 import {
   audioFileName,
@@ -1007,5 +1016,130 @@ describe("recordingCapMs: the recorder's own hard limit", () => {
   it("capReached is inclusive of the limit", () => {
     expect(capReached(29_999, 30_000)).toBe(false);
     expect(capReached(30_000, 30_000)).toBe(true);
+  });
+});
+
+describe("Siri-style stage: bubble items", () => {
+  const m = (over: Partial<Extract<TurnEvent, { type: "measurement" }>>): TurnEvent => ({
+    type: "measurement",
+    key: "sleep_hours",
+    value: 5.5,
+    unit: "h",
+    sourceText: "",
+    confidence: 0.9,
+    status: "green",
+    reason: "fixed_range",
+    change: "recorded",
+    ...over,
+  });
+
+  it("lists bubbles in capture order and merges blood pressure into one bubble", () => {
+    const s = reduce([
+      CREATED,
+      ev(m({ key: "sleep_hours" })),
+      ev(m({ key: "bp_diastolic", value: 82, unit: "mmHg", status: "yellow" })),
+      ev(m({ key: "mood", value: 4, unit: null })),
+      ev(m({ key: "bp_systolic", value: 124, unit: "mmHg", status: "green" })),
+    ]);
+    const items = bubbleItems(s.cards);
+    expect(items.map((i) => i.id)).toEqual(["sleep_hours", "bp", "mood"]);
+    const bp = items[1];
+    expect(bp.cards.map((c) => c.key)).toEqual(["bp_systolic", "bp_diastolic"]);
+    expect(bp.status).toBe("yellow");
+  });
+
+  it("keeps a corrected bubble in its slot and bumps its flash", () => {
+    let s = reduce([CREATED, ev(m({ key: "sleep_hours" })), ev(m({ key: "mood", value: 4, unit: null }))]);
+    s = checkInReducer(s, ev(m({ key: "sleep_hours", value: 7, change: "corrected" })));
+    const items = bubbleItems(s.cards);
+    expect(items.map((i) => i.id)).toEqual(["sleep_hours", "mood"]);
+    expect(items[0].flash).toBe(1);
+  });
+
+  it("worstStatus ranks red > yellow > green > no data", () => {
+    expect(worstStatus(["green", "red", "yellow"])).toBe("red");
+    expect(worstStatus(["no_data", "green"])).toBe("green");
+    expect(worstStatus([])).toBe("no_data");
+  });
+
+  it("splits a trailing unit off a formatted value only when the KPI has one", () => {
+    expect(splitValueUnit("124 mmHg", "mmHg")).toEqual({ value: "124", unit: "mmHg" });
+    expect(splitValueUnit("5.5 цаг", "h")).toEqual({ value: "5.5", unit: "цаг" });
+    expect(splitValueUnit("Slightly blurred", null)).toEqual({ value: "Slightly blurred", unit: "" });
+    expect(splitValueUnit("4/5", null)).toEqual({ value: "4/5", unit: "" });
+  });
+});
+
+describe("Siri-style stage: layout", () => {
+  const overlaps = (a: { x: number; y: number; w: number; h: number }, b: typeof a) =>
+    a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+
+  for (const [w, h] of [
+    [1920, 1080],
+    [1440, 900],
+    [1280, 720],
+    [1024, 768],
+  ] as const) {
+    it(`${w}x${h}: mascot ~70% high, 14 bubbles alternate sides, never over the body or each other`, () => {
+      const layout = computeStageLayout(w, h, 14);
+      expect(layout.mode).toBe("wide");
+      expect(layout.mascot.size).toBeLessThanOrEqual(h * 0.7 + 0.5);
+      expect(layout.slots).toHaveLength(14);
+      const body = {
+        x: w / 2 - layout.mascot.size * 0.43,
+        y: layout.mascot.y,
+        w: layout.mascot.size * 0.86,
+        h: layout.mascot.size,
+      };
+      const boxes = layout.slots.map((s) => ({ x: s.x, y: s.y, w: layout.bubbleWidth, h: layout.bubbleHeight }));
+      boxes.forEach((b, i) => {
+        expect(overlaps(b, body), `slot ${i} over the mascot`).toBe(false);
+        expect(b.x).toBeGreaterThanOrEqual(0);
+        expect(b.x + b.w).toBeLessThanOrEqual(w);
+        expect(layout.slots[i].side).toBe(i % 2 === 0 ? "left" : "right");
+        for (let j = i + 1; j < boxes.length; j += 1) {
+          expect(overlaps(b, boxes[j]), `slots ${i} and ${j}`).toBe(false);
+        }
+      });
+      // top to bottom on each side
+      const lefts = layout.slots.filter((s) => s.side === "left").map((s) => s.y);
+      expect([...lefts].sort((a, b) => a - b)).toEqual(lefts);
+      expect(lefts).toHaveLength(ROWS_PER_SIDE);
+    });
+  }
+
+  it("squeezes more than 7 rows per side rather than dropping a bubble", () => {
+    const layout = computeStageLayout(1440, 900, 16);
+    expect(layout.slots).toHaveLength(16);
+    const last = layout.slots[15];
+    expect(last.y + layout.bubbleHeight).toBeLessThanOrEqual(layout.mascot.y + layout.mascot.size + 1);
+  });
+
+  it("phones: mascot on top, bubbles in a two-column grid below, stage grows to fit", () => {
+    const layout = computeStageLayout(390, 844, 15);
+    expect(layout.mode).toBe("narrow");
+    expect(layout.slots.every((s) => s.side === "below")).toBe(true);
+    expect(layout.slots[0].y).toBeGreaterThan(layout.mascot.y + layout.mascot.size);
+    const last = layout.slots[14];
+    expect(layout.height).toBeGreaterThanOrEqual(last.y + layout.bubbleHeight);
+    expect(layout.slots.every((s) => s.x >= 0 && s.x + layout.bubbleWidth <= 390)).toBe(true);
+  });
+
+  it("the chest sits inside the mascot box and the floor under its feet", () => {
+    const l = computeStageLayout(1440, 900, 0);
+    expect(l.chest.x).toBeGreaterThan(l.mascot.x);
+    expect(l.chest.x).toBeLessThan(l.mascot.x + l.mascot.size);
+    expect(l.chest.y).toBeGreaterThan(l.mascot.y + l.mascot.size * 0.4);
+    expect(l.floor.cy).toBeGreaterThan(l.mascot.y + l.mascot.size * 0.9);
+    expect(l.captionY).toBeGreaterThan(l.floor.cy);
+  });
+
+  it("the pen trail ends on the bubble edge that faces the mascot and is a curved path", () => {
+    const slotL = { x: 100, y: 200, side: "left" as const };
+    const slotR = { x: 900, y: 200, side: "right" as const };
+    expect(trailEnd(slotL, 260, 58)).toEqual({ x: 360, y: 229 });
+    expect(trailEnd(slotR, 260, 58)).toEqual({ x: 900, y: 229 });
+    const d = trailPath({ x: 700, y: 500 }, { x: 360, y: 229 });
+    expect(d).toMatch(/^M 700 500 Q [-\d.]+ [-\d.]+ 360 229$/);
   });
 });

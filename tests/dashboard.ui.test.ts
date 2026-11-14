@@ -15,8 +15,20 @@ import {
   saraaGreen,
 } from "@/lib/fixtures/dashboard";
 import {
+  BODY_HOTSPOTS,
   addMs,
+  axisHazard,
+  axisIndicators,
+  axisKeys,
   buildKpiCards,
+  buildTimeline,
+  cycleAxis,
+  demoTarget,
+  highlightKey,
+  historySummary,
+  recentBars,
+  targetFraction,
+  worstAxis,
   cardStatus,
   cardsRelatedToHazard,
   crewCardReadiness,
@@ -632,4 +644,154 @@ describe("dashboard fixtures", () => {
       }
     });
   }
+});
+
+/* ───────────── design v2 helpers (docs/DESIGN_V2.md section 2) ───────────── */
+
+describe("body map helpers", () => {
+  it("has exactly one hotspot per radar axis, inside the image", () => {
+    expect([...BODY_HOTSPOTS.map((h) => h.axis)].sort()).toEqual([...AXIS_KEYS].sort());
+    for (const h of BODY_HOTSPOTS) {
+      expect(h.x).toBeGreaterThan(0);
+      expect(h.x).toBeLessThan(1);
+      expect(h.y).toBeGreaterThan(0);
+      expect(h.y).toBeLessThan(1);
+    }
+  });
+
+  it("cycles the axes head to knee and wraps both ways", () => {
+    expect(cycleAxis(null, 1)).toBe("neuro_ocular");
+    expect(cycleAxis(null, -1)).toBe("musculoskeletal");
+    expect(cycleAxis("neuro_ocular", 1)).toBe("sleep");
+    expect(cycleAxis("musculoskeletal", 1)).toBe("neuro_ocular");
+    expect(cycleAxis("neuro_ocular", -1)).toBe("musculoskeletal");
+  });
+
+  it("maps each axis to its indicators and its most linked NASA hazard", () => {
+    expect(axisKeys("cardio")).toEqual(["bp_systolic", "bp_diastolic", "heart_rate"]);
+    expect(axisKeys("sleep")).toEqual(["sleep_hours"]);
+    expect(axisHazard("sleep")).toBe("isolation_confinement");
+    expect(axisHazard("cardio")).toBe("gravity");
+    expect(axisHazard("metabolic")).toBe("hostile_closed_environment");
+    expect(axisHazard("musculoskeletal")).toBe("gravity");
+    for (const axis of AXIS_KEYS) expect(axisHazard(axis)).not.toBeNull();
+  });
+
+  it("lists the worst indicators of an axis first, at most three", () => {
+    const neuro = axisIndicators("neuro_ocular", miraRed.kpis);
+    expect(neuro).toHaveLength(3);
+    expect(neuro[0].status).not.toBe("green");
+    expect(axisIndicators("metabolic", batYellow.kpis, 3)[0].key).toBe("water_ml");
+    expect(axisIndicators("metabolic", batYellow.kpis, 2)).toHaveLength(2);
+  });
+
+  it("picks the worst axis, or none without data", () => {
+    expect(worstAxis(batYellow.axes)).toBe("sleep");
+    expect(worstAxis(alexNoData.axes)).toBeNull();
+  });
+});
+
+describe("highlight vital helpers", () => {
+  it("uses the first chartable finding, else a non-green chartable reading, else heart rate", () => {
+    expect(highlightKey(batYellow.summary.findings, batYellow.kpis)).toBe("sleep_hours");
+    const mira = highlightKey(miraRed.summary.findings, miraRed.kpis);
+    expect(KPI_DEFS[mira].type).not.toBe("boolean");
+    expect(KPI_DEFS[mira].type).not.toBe("category");
+    expect(highlightKey([], saraaGreen.kpis)).toBe("heart_rate");
+    expect(highlightKey(alexNoData.summary.findings, alexNoData.kpis)).toBe("heart_rate");
+  });
+
+  it("summarises the past days: personal mean, min and max", () => {
+    const sleep = stat(batYellow, "sleep_hours");
+    const s = historySummary(sleep)!;
+    expect(s.n).toBe(14);
+    expect(s.avg).toBeCloseTo(sleep.baselineMean!, 6);
+    expect(s.min).toBe(6.8);
+    expect(s.max).toBe(7.6);
+    expect(historySummary(stat(alexNoData, "sleep_hours"))).toBeNull();
+  });
+
+  it("keeps the last bars with today last, and no today bar without a value", () => {
+    const bars = recentBars(stat(batYellow, "sleep_hours"), 10);
+    expect(bars).toHaveLength(10);
+    expect(bars[9]).toEqual({ date: null, value: 5.5, today: true });
+    expect(bars[8].date).toBe("2026-11-13");
+    expect(bars.filter((b) => b.today)).toHaveLength(1);
+    expect(recentBars(stat(alexNoData, "sleep_hours"), 10)).toEqual([]);
+  });
+
+  it("measures progress against the demo-parameter target", () => {
+    expect(demoTarget("water_ml")).toBe(2000);
+    expect(demoTarget("exercise_min")).toBe(45);
+    expect(demoTarget("sleep_hours")).toBe(7);
+    expect(targetFraction(1800, 2000)).toBeCloseTo(0.9);
+    expect(targetFraction(3000, 2000)).toBe(1);
+    expect(targetFraction(null, 2000)).toBeNull();
+  });
+});
+
+describe("timeline", () => {
+  const input = (p: DashboardPayload) => ({
+    kpis: p.kpis,
+    overall: p.overall,
+    axes: p.axes,
+    confirmedAt: p.checkIn.confirmedAt,
+  });
+
+  it("covers the last 15 days ending today, oldest first", () => {
+    const days = buildTimeline(input(batYellow));
+    expect(days).toHaveLength(15);
+    expect(days[0].date).toBe("2026-10-31");
+    expect(days[14]).toMatchObject({ date: "2026-11-14", today: true, status: "yellow", axis: "sleep" });
+    expect(days.filter((d) => d.today)).toHaveLength(1);
+  });
+
+  it("re-evaluates past days with the health engine and never invents data", () => {
+    const days = buildTimeline(input(saraaGreen));
+    for (const d of days.slice(0, 14)) {
+      expect(d.hasData).toBe(true);
+      if (d.status === "green") expect(d.axis).toBeNull();
+      if (d.status === "yellow" || d.status === "red") expect(d.axis).not.toBeNull();
+    }
+    const empty = buildTimeline(input(alexNoData));
+    expect(empty.every((d) => d.status === "no_data" && d.axis === null)).toBe(true);
+    expect(empty.slice(0, 14).every((d) => !d.hasData)).toBe(true);
+  });
+
+  it("shows a hollow day when a date is missing from the history", () => {
+    const gappy = batYellow.kpis.map((k) => ({
+      ...k,
+      history: k.history.filter((h) => h.date !== "2026-11-05"),
+    }));
+    const days = buildTimeline({ ...input(batYellow), kpis: gappy });
+    expect(days.find((d) => d.date === "2026-11-05")).toMatchObject({
+      status: "no_data",
+      hasData: false,
+      axis: null,
+    });
+  });
+});
+
+describe("dictionary coverage for the v2 dashboard", () => {
+  it("has every new label in both languages", () => {
+    const keys = [
+      ...["overview", "vitals", "plan", "trends", "earth"].map((n) => `dashboard.nav.${n}`),
+      "dashboard.top.welcome",
+      "dashboard.highlight.avg",
+      "dashboard.highlight.range",
+      "dashboard.body.hotspot",
+      "dashboard.radar.titleLight",
+      "dashboard.radar.titleStrong",
+      "dashboard.plan.titleLight",
+      "dashboard.plan.titleStrong",
+      "dashboard.heart.title",
+      "dashboard.hydration.title",
+      "dashboard.timeline.title",
+      "dashboard.profile.readinessNote",
+    ];
+    for (const lang of ["en", "mn"] as const) {
+      for (const key of keys) expect(text(lang, key), `${lang} ${key}`).toBeTruthy();
+    }
+    expect(text("en", "dashboard.profile.readinessNote")).toContain("demo calculation");
+  });
 });

@@ -5,7 +5,9 @@
  *
  *  1. Plays the turn's audio URL (same origin) through an <audio> element wired to
  *     useAudioAmplitude, so the mouth follows the real signal.
- *  2. If the request fails (404 / 5xx / unsupported) or autoplay is blocked it falls back to
+ *  0. If the browser's autoplay policy refuses to play (no user gesture yet) nothing is voiced and
+ *     `blocked` turns true: the screen shows one "Tap to start" and speaks again from that tap.
+ *  2. If the request fails (404 / 5xx / unsupported) it falls back to
  *     window.speechSynthesis with a voice picked by language. speechSynthesis has no AnalyserNode,
  *     so the mouth is driven by useSimulatedAmplitude.
  *  3. If no voice exists for the language (typical for Mongolian) the audio is skipped altogether:
@@ -52,9 +54,16 @@ export interface SpeechPlayer {
   mode: SpeechMode | null;
   /** a fallback happened: the UI shows a small non-blocking banner */
   fallback: "browser" | "silent" | null;
+  /**
+   * The last speak() was refused by the browser's autoplay policy (no user gesture yet). Nothing was
+   * voiced; the UI offers one "Tap to start" and calls speak() again from that tap.
+   */
+  blocked: boolean;
+  clearBlocked: () => void;
 }
 
-type Outcome = "ended" | "failed" | "stopped";
+/** "blocked": the browser refused to play without a user gesture (autoplay policy) */
+type Outcome = "ended" | "failed" | "stopped" | "blocked";
 
 function synth(): SpeechSynthesis | null {
   return typeof window !== "undefined" && "speechSynthesis" in window ? window.speechSynthesis : null;
@@ -113,6 +122,7 @@ export function useSpeechPlayer(options: UseSpeechPlayerOptions = {}): SpeechPla
   const [status, setStatusState] = useState<SpeechStatus>("idle");
   const [mode, setMode] = useState<SpeechMode | null>(null);
   const [fallback, setFallback] = useState<"browser" | "silent" | null>(null);
+  const [blocked, setBlocked] = useState(false);
   const [simulating, setSimulating] = useState(false);
   /** which signal drives the mouth for the turn being voiced right now */
   const [source, setSource] = useState<"audio" | "local">("audio");
@@ -175,6 +185,10 @@ export function useSpeechPlayer(options: UseSpeechPlayerOptions = {}): SpeechPla
         }).catch((error: unknown) => {
           // NotAllowedError = autoplay blocked; NotSupportedError = the route answered 404/5xx
           if (error instanceof DOMException && error.name === "AbortError") return; // superseded
+          if (error instanceof DOMException && error.name === "NotAllowedError") {
+            finish("blocked");
+            return;
+          }
           finish("failed");
         });
       });
@@ -218,6 +232,7 @@ export function useSpeechPlayer(options: UseSpeechPlayerOptions = {}): SpeechPla
         utterance.onerror = (e) => {
           // "canceled" / "interrupted" are our own stop(); anything else leaves the text on screen
           if (e.error === "canceled" || e.error === "interrupted") finish("stopped", "browser");
+          else if (e.error === "not-allowed") finish("blocked", "browser"); // autoplay policy, not a missing voice
           else finish("ended", "silent"); // engine refused (for example not-allowed): the text stays on screen
         };
         // safety net: some engines never fire `end`
@@ -259,6 +274,13 @@ export function useSpeechPlayer(options: UseSpeechPlayerOptions = {}): SpeechPla
           return;
         }
         if (outcome === "stopped") return;
+        if (outcome === "blocked") {
+          // the speech route works, the browser just wants a gesture first: not a failure, no fallback
+          teardown();
+          setBlocked(true);
+          setStatus("idle");
+          return;
+        }
         audioFailures.current += 1;
         teardown();
       }
@@ -266,6 +288,12 @@ export function useSpeechPlayer(options: UseSpeechPlayerOptions = {}): SpeechPla
 
       const { outcome, mode: usedMode } = await playLocal(turn, mine);
       if (runId.current !== mine) return;
+      if (outcome === "blocked") {
+        setSimulating(false);
+        setBlocked(true);
+        setStatus("idle");
+        return;
+      }
       setMode(usedMode);
       setFallback(usedMode === "browser" ? "browser" : "silent");
       setSimulating(false);
@@ -284,9 +312,13 @@ export function useSpeechPlayer(options: UseSpeechPlayerOptions = {}): SpeechPla
     };
   }, [audio]);
 
+  const clearBlocked = useCallback(() => setBlocked(false), []);
+
   return {
     speak,
     stop,
+    blocked,
+    clearBlocked,
     speaking: status === "playing",
     status,
     amplitude: source === "audio" ? audioAmplitude : simulatedAmplitude,

@@ -41,7 +41,7 @@ export default function RootLayout({
       lang="en"
       className={`${inter.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="flex min-h-full flex-col">
+      <body className="flex min-h-dvh flex-col">
         <I18nProvider>
           <TooltipProvider>
             <CosmoConfigProvider rive={rive}>

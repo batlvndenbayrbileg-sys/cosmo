@@ -1,8 +1,5 @@
 export { CheckInExperience } from "./CheckInExperience";
-export { SharedCosmo, CosmoStage } from "./CosmoStage";
-export { KpiCard } from "./KpiCard";
-export { KpiCardRail } from "./KpiCardRail";
-export { MicButton, type MicState } from "./MicButton";
-export { TextFallbackInput } from "./TextFallbackInput";
-export { RunDemoButton } from "./RunDemoButton";
-export { TranscriptPanel } from "./TranscriptPanel";
+export { SharedCosmo } from "./CosmoStage";
+export { CaptureBubble, PenTrail, KPI_ICONS } from "./CaptureBubble";
+export { FloorRing, type RingMode } from "./FloorRing";
+export { bubbleItems, computeStageLayout, type BubbleItem, type StageLayout } from "./bubbles";

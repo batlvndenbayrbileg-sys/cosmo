@@ -11,6 +11,7 @@ import type { InterpretedRecord } from "./interpret";
 import type { MachineCtx, StartAnswer } from "./machine";
 import type { ClarifyReason } from "./templates";
 import type { ToolResult } from "./tools";
+import type { ResultsFacts } from "./resultsFacts";
 
 /**
  * The seam between the conversation and whoever understands the astronaut's words.
@@ -85,4 +86,10 @@ export interface Agent {
    * text only when every numeral in it appears in the findings; null means "use the template".
    */
   phraseSummary?(args: { findings: SummaryFindings; lang: Lang; crew: CrewPublic }): Promise<string | null>;
+  /**
+   * Optional: after the check-in (state DONE), answer the astronaut's question about today's results using ONLY the
+   * code-computed facts. The pipeline accepts the text only when every numeral in it appears in the facts or in the
+   * astronaut's words; null means "use the template".
+   */
+  answerAboutResults?(args: { facts: ResultsFacts; question: string; lang: Lang; history: TurnRow[] }): Promise<string | null>;
 }

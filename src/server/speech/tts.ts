@@ -5,19 +5,56 @@ import { getEnv } from "@/server/env";
 import { HttpError } from "@/server/http";
 
 /**
- * Text-to-speech. STUB: the ElevenLabs stream is filled in by the speech lane (docs/PLAN.md section 9, S14).
- * The contract stays: any problem is HttpError(502, "TTS_FAILED"), which the audio route turns into a JSON error that
- * the client treats as "use speechSynthesis".
+ * Text-to-speech with ElevenLabs (streamed):
+ *   POST https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/stream?output_format=mp3_44100_128
+ *   header xi-api-key; JSON { text, model_id }
+ * Model: Mongolian uses ELEVENLABS_TTS_MODEL_MN (default eleven_v4_turbo - the live GET /v1/models on this account
+ * lists Mongolian only for eleven_v4 / eleven_v4_turbo); English uses ELEVENLABS_TTS_MODEL_EN or eleven_v4_turbo.
+ * Any problem is HttpError(502, "TTS_FAILED"), which the audio route turns into a JSON error that the client treats
+ * as "use speechSynthesis". The API key never leaves the server.
  */
 
-export async function synthesizeSpeech(text: string, lang: Lang): Promise<Response> {
-  void text;
-  void lang;
+const BASE = "https://api.elevenlabs.io/v1/text-to-speech";
+const TIMEOUT_MS = 20_000;
+
+export function ttsConfigFor(lang: Lang): { voiceId?: string; modelId: string } {
   const env = getEnv();
-  if (env.demoMode === "scripted" || !env.elevenlabsApiKey) {
+  return lang === "mn"
+    ? { voiceId: env.voiceIdMn, modelId: env.ttsModelMn }
+    : { voiceId: env.voiceIdEn, modelId: env.ttsModelEn ?? "eleven_v4_turbo" };
+}
+
+export async function synthesizeSpeech(text: string, lang: Lang): Promise<Response> {
+  const env = getEnv();
+  const { voiceId, modelId } = ttsConfigFor(lang);
+  if (env.demoMode === "scripted" || !env.elevenlabsApiKey || !voiceId) {
     throw new HttpError(502, "TTS_FAILED", "Speech synthesis is not available.");
   }
-  throw new HttpError(502, "TTS_FAILED", "Speech synthesis is not implemented yet.");
+  const clean = text.trim();
+  if (!clean) throw new HttpError(400, "BAD_INPUT", "Nothing to say.");
+
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}/${encodeURIComponent(voiceId)}/stream?output_format=mp3_44100_128`, {
+      method: "POST",
+      headers: {
+        "xi-api-key": env.elevenlabsApiKey,
+        "content-type": "application/json",
+        accept: "audio/mpeg",
+      },
+      body: JSON.stringify({ text: clean, model_id: modelId }),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+  } catch (err) {
+    console.error("[aegis] TTS request failed:", err instanceof Error ? err.message : err);
+    throw new HttpError(502, "TTS_FAILED", "Speech synthesis did not respond.");
+  }
+  if (!res.ok || !res.body) {
+    const detail = (await res.text().catch(() => "")).slice(0, 200);
+    console.error(`[aegis] TTS HTTP ${res.status} (model ${modelId}, lang ${lang}): ${detail}`);
+    throw new HttpError(502, "TTS_FAILED", "Speech synthesis failed.");
+  }
+  return res;
 }
 
 /**

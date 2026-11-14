@@ -1,36 +1,40 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { Radar as RadarIcon } from "lucide-react";
 import type { DashboardPayload, HazardKey, KpiKey, KpiStat } from "@/lib/types";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ConstellationGlyph, StatusPill } from "@/components/status";
 import { useShellHeader } from "@/components/shell";
 import { useI18n } from "@/i18n/I18nProvider";
-import { isReadinessAvailable } from "@/lib/health/scores";
-import { AlertsStrip } from "./AlertsStrip";
+import { BodyHero } from "./BodyHero";
 import { CosmoDock } from "./CosmoDock";
 import { DayArc } from "./DayArc";
 import { EarthLinkCard } from "./EarthLinkCard";
 import { HazardLens } from "./HazardLens";
 import { HealthRadar } from "./HealthRadar";
+import { HighlightVital } from "./HighlightVital";
 import { KpiCard } from "./KpiCard";
-import { ReadinessOrb } from "./ReadinessOrb";
-import { TodayPlan } from "./TodayPlan";
-import { cardsRelatedToHazard, buildKpiCards, formatClockLabel, sortCardsForHazard } from "./logic";
+import { PlanCards } from "./PlanCards";
+import { CrewHeading, ProfileCard, StatPills } from "./ProfileCard";
+import { HeartCard, HydrationCard } from "./SmallCards";
+import { Timeline } from "./Timeline";
+import { TopBar, type NavSection } from "./TopBar";
+import { buildKpiCards, cardsRelatedToHazard, sortCardsForHazard } from "./logic";
 import { Reveal } from "./motion";
+import { TwoToneTitle } from "./parts";
 
 /**
  * Contract between the check-in lane and the dashboard lane. The props are fixed.
  *
- * - `viewer: "crew"`   the astronaut's own dashboard (Cosmo docked bottom-right)
- * - `viewer: "ground"` read-only Earth console view (no Cosmo dock, no replay, no free-text notes)
- * - `dockSlot`         optional element rendered inside the Cosmo dock. The check-in screen passes
+ * - `viewer: "crew"`   the astronaut's own dashboard (Cosmo card bottom-right)
+ * - `viewer: "ground"` read-only Earth console view (no Cosmo card, no replay, no free-text notes)
+ * - `dockSlot`         optional element rendered inside the Cosmo card. The check-in screen passes
  *                      its shared Cosmo element (a motion.div with layoutId COSMO_LAYOUT_ID) so
- *                      framer-motion can animate Cosmo from the full-screen stage into the dock
- *                      inside ONE React tree. When absent the dock renders its own CosmoAvatar.
+ *                      framer-motion can animate Cosmo from the full-screen stage into the card
+ *                      inside ONE React tree. When absent the card renders its own CosmoAvatar.
  *
  * Entrance animation can be switched off from outside with <DashboardMotionProvider animate={false}>.
+ * Layout: docs/DESIGN_V2.md section 2 (one glass frame: top bar; left profile column; centre body figure;
+ * right radar / plan / small cards; bottom timeline; then all readings, hazards, day and Earth link).
  */
 export interface DashboardViewProps {
   payload: DashboardPayload;
@@ -38,9 +42,18 @@ export interface DashboardViewProps {
   dockSlot?: ReactNode;
 }
 
+const SECTION_ID: Record<NavSection, string> = {
+  overview: "dashboard-top",
+  vitals: "dashboard-vitals",
+  plan: "dashboard-plan",
+  trends: "dashboard-trends",
+  earth: "dashboard-earth",
+};
+
 export function DashboardView({ payload, viewer, dockSlot }: DashboardViewProps) {
-  const { t, lang } = useI18n();
+  const { t } = useI18n();
   const [selectedHazard, setSelectedHazard] = useState<HazardKey | null>(null);
+  const [section, setSection] = useState<NavSection>("overview");
 
   useShellHeader({
     crewName: `${payload.crew.name} · ${payload.crew.role}`,
@@ -56,151 +69,151 @@ export function DashboardView({ payload, viewer, dockSlot }: DashboardViewProps)
   const ordered = useMemo(() => sortCardsForHazard(cards, hazardStat), [cards, hazardStat]);
   const related = useMemo(() => cardsRelatedToHazard(cards, hazardStat), [cards, hazardStat]);
 
-  const readinessAvailable = isReadinessAvailable(payload.axes);
-  const stars = payload.kpis.map((k) => ({ key: k.key, status: k.status }));
+  const navigate = useCallback((next: NavSection) => {
+    setSection(next);
+    const el = document.getElementById(SECTION_ID[next]);
+    if (!el) return;
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    el.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "start" });
+  }, []);
 
   return (
-    <div data-slot="dashboard" data-viewer={viewer} className="flex flex-col gap-6">
-      {/* header */}
-      <Reveal index={0}>
-        <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
-          <div className="flex flex-col gap-0.5">
-            <p className="text-sm font-medium text-muted-foreground">{t("dashboard.title")}</p>
-            <h1 className="text-3xl font-semibold tracking-tight text-foreground">{payload.crew.name}</h1>
-            <p className="text-lg text-muted-foreground">
-              {payload.crew.role} · {t("shell.header.missionDay", { day: payload.missionDay })}
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-            <span className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">{t("dashboard.overall")}</span>
-              <StatusPill status={payload.overall} size="lg" />
-            </span>
-            <span className="tnum text-sm text-muted-foreground">
-              {t("dashboard.checkIn.confirmed", {
-                time: formatClockLabel(payload.checkIn.confirmedAt, lang),
-              })}
-            </span>
-            {viewer === "ground" ? (
-              <Badge variant="outline" className="h-6 px-2.5 text-xs">
-                {t("dashboard.viewer.ground")}
-              </Badge>
-            ) : null}
-            {payload.simulatedHistory ? (
-              <Badge variant="secondary" className="h-6 px-2.5 text-xs">
-                {t("dashboard.simulatedHistory")}
-              </Badge>
-            ) : null}
-          </div>
-        </header>
-      </Reveal>
+    <div
+      data-slot="dashboard"
+      data-viewer={viewer}
+      className="relative mx-auto flex w-full max-w-[1360px] flex-col gap-6"
+    >
+      <div
+        id="dashboard-top"
+        className="glass-frame backdrop-filter-none! flex scroll-mt-24 flex-col gap-6 p-4! sm:p-6! xl:p-8!"
+      >
+        <Reveal index={0}>
+          <TopBar payload={payload} viewer={viewer} active={section} onNavigate={navigate} />
+        </Reveal>
 
-      {payload.overall === "no_data" ? (
-        <p
-          role="status"
-          className="rounded-lg border border-dashed border-border bg-card px-4 py-3 text-base text-muted-foreground"
-        >
-          {t("dashboard.noDataBanner")}
-        </p>
-      ) : null}
+        {payload.overall === "no_data" ? (
+          <p
+            role="status"
+            className="rounded-2xl border border-dashed border-status-nodata/50 bg-white/60 px-4 py-3 text-[15px] text-[var(--aegis-label)]"
+          >
+            {t("dashboard.noDataBanner")}
+          </p>
+        ) : null}
 
-      {/* row 1: constellation + readiness | radar | alerts + Earth link */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-12">
-        <Reveal index={1} className="xl:col-span-4">
-          <Card data-slot="hero" className="h-full gap-3">
-            <CardHeader>
-              <CardTitle className="text-lg">{t("dashboard.readiness.title")}</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-4">
-              <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-4">
-                <div className="flex flex-col items-center gap-1">
-                  <ConstellationGlyph
-                    stars={stars}
-                    readiness={readinessAvailable ? payload.readiness : null}
-                    size={200}
-                  />
-                  <span className="text-xs text-muted-foreground">
-                    {t("dashboard.constellation.caption")}
-                  </span>
-                </div>
-                <ReadinessOrb
-                  readiness={payload.readiness}
-                  baseline={payload.readinessBaseline}
-                  available={readinessAvailable}
-                  overall={payload.overall}
-                />
+        {/* three columns on desktop; one column in the DESIGN_V2 mobile order below xl */}
+        <div className="flex flex-col gap-6 xl:grid xl:grid-cols-[minmax(0,27fr)_minmax(0,40fr)_minmax(0,27fr)] xl:items-start xl:gap-7">
+          {/* left column */}
+          <div className="contents xl:flex xl:flex-col xl:gap-5">
+            <Reveal index={1} className="order-1 xl:order-none">
+              <CrewHeading payload={payload} viewer={viewer} />
+            </Reveal>
+            <Reveal index={2} className="order-2 xl:order-none">
+              <div className="hidden xl:block">
+                <ProfileCard payload={payload} />
               </div>
-              <p className="text-xs text-muted-foreground">{t("dashboard.readiness.explain")}</p>
-            </CardContent>
-          </Card>
-        </Reveal>
-
-        <Reveal index={2} className="xl:col-span-4">
-          <Card data-slot="radar-card" className="h-full gap-3">
-            <CardHeader>
-              <CardTitle className="text-lg">{t("dashboard.radar.title")}</CardTitle>
-              <p className="text-sm text-muted-foreground">{t("dashboard.radar.subtitle")}</p>
-            </CardHeader>
-            <CardContent>
-              <HealthRadar axes={payload.axes} />
-            </CardContent>
-          </Card>
-        </Reveal>
-
-        <Reveal index={3} className="flex flex-col gap-4 lg:col-span-2 xl:col-span-4">
-          <AlertsStrip alerts={payload.alerts} viewer={viewer} />
-          <EarthLinkCard link={payload.link} viewer={viewer} />
-        </Reveal>
-      </div>
-
-      {/* row 2: hazard lens + day arc */}
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-        <Reveal index={4} className="xl:col-span-7">
-          <HazardLens hazards={payload.hazards} selected={selectedHazard} onSelect={setSelectedHazard} />
-        </Reveal>
-        <Reveal index={5} className="xl:col-span-5">
-          <DayArc dayArc={payload.dayArc} />
-        </Reveal>
-      </div>
-
-      {/* row 3: today's plan */}
-      <Reveal index={6}>
-        <TodayPlan tasks={payload.tasks} selectedHazard={hazardStat} />
-      </Reveal>
-
-      {/* row 4: vitals grid */}
-      <section aria-labelledby="vitals-title" data-slot="vitals" className="flex flex-col gap-3">
-        <Reveal index={7}>
-          <div className="flex flex-col gap-0.5">
-            <h2 id="vitals-title" className="text-xl font-semibold text-foreground">
-              {t("dashboard.vitals.title")}
-            </h2>
-            <p className="text-sm text-muted-foreground">{t("dashboard.vitals.subtitle")}</p>
-            <p className="text-sm text-muted-foreground">{t("dashboard.vitals.legend")}</p>
-            {hazardStat ? (
-              <p role="status" className="text-sm font-medium text-primary">
-                {t("dashboard.vitals.sorted")}
-              </p>
-            ) : null}
-            {viewer === "ground" ? (
-              <p className="text-sm text-muted-foreground">{t("dashboard.vitals.textHidden")}</p>
-            ) : null}
+              <StatPills payload={payload} className="xl:hidden" />
+            </Reveal>
+            <Reveal index={4} className="order-4 xl:order-none">
+              <HighlightVital payload={payload} />
+            </Reveal>
           </div>
+
+          {/* centre hero */}
+          <Reveal index={3} className="order-3 xl:order-none">
+            <BodyHero payload={payload} />
+          </Reveal>
+
+          {/* right column */}
+          <div className="contents xl:flex xl:flex-col xl:gap-5">
+            <Reveal index={5} className="order-5 xl:order-none">
+              <section aria-labelledby="radar-title" data-slot="radar-card" className="flex flex-col gap-3">
+                <TwoToneTitle
+                  id="radar-title"
+                  icon={RadarIcon}
+                  light={t("dashboard.radar.titleLight")}
+                  strong={t("dashboard.radar.titleStrong")}
+                />
+                <div className="glass-card px-3 pt-2 pb-3">
+                  <p className="px-2 pt-1 text-[12px] text-[var(--aegis-label)]">{t("dashboard.radar.subtitle")}</p>
+                  <HealthRadar axes={payload.axes} />
+                </div>
+              </section>
+            </Reveal>
+            <Reveal index={6} className="order-6 xl:order-none">
+              <section
+                id="dashboard-plan"
+                aria-labelledby="plan-title"
+                data-slot="today-plan"
+                className="flex scroll-mt-24 flex-col gap-3"
+              >
+                <TwoToneTitle
+                  id="plan-title"
+                  light={t("dashboard.plan.titleLight")}
+                  strong={t("dashboard.plan.titleStrong")}
+                />
+                <PlanCards tasks={payload.tasks} selectedHazard={hazardStat} />
+              </section>
+            </Reveal>
+            <Reveal index={7} className="order-7 xl:order-none">
+              <div className="grid grid-cols-2 gap-3">
+                <HeartCard stat={byKey.get("heart_rate")} />
+                <HydrationCard byKey={byKey} />
+              </div>
+            </Reveal>
+          </div>
+        </div>
+
+        <Reveal index={8}>
+          <Timeline payload={payload} />
         </Reveal>
-        <ul className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {ordered.map((card, i) => (
-            <li key={card.id}>
-              <Reveal index={8 + i} className="h-full">
-                <KpiCard card={card} byKey={byKey} viewer={viewer} highlighted={related.has(card.id)} />
-              </Reveal>
-            </li>
-          ))}
-        </ul>
-      </section>
+      </div>
+
+      {/* details: every reading, the hazard lens, the day and the Earth link */}
+      <div className="glass-frame backdrop-filter-none! flex flex-col gap-6 p-4! sm:p-6! xl:p-8!">
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+          <section
+            id="dashboard-vitals"
+            aria-labelledby="vitals-title"
+            data-slot="vitals"
+            className="flex scroll-mt-24 flex-col gap-3"
+          >
+            <div className="flex flex-col gap-0.5">
+              <h2 id="vitals-title" className="text-[26px] leading-tight font-light text-[var(--aegis-ink)]">
+                {t("dashboard.details.title")}
+              </h2>
+              <p className="text-[13px] text-[var(--aegis-label)]">{t("dashboard.vitals.subtitle")}</p>
+              <p className="text-[13px] text-[var(--aegis-label)]">{t("dashboard.vitals.legend")}</p>
+              {hazardStat ? (
+                <p role="status" className="text-[13px] font-medium text-[var(--aegis-accent-deep)]">
+                  {t("dashboard.vitals.sorted")}
+                </p>
+              ) : null}
+              {viewer === "ground" ? (
+                <p className="text-[13px] text-[var(--aegis-label)]">{t("dashboard.vitals.textHidden")}</p>
+              ) : null}
+            </div>
+            <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 2xl:grid-cols-3">
+              {ordered.map((card) => (
+                <li key={card.id}>
+                  <KpiCard card={card} byKey={byKey} viewer={viewer} highlighted={related.has(card.id)} />
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          <div className="flex flex-col gap-4">
+            <HazardLens hazards={payload.hazards} selected={selectedHazard} onSelect={setSelectedHazard} />
+            <DayArc dayArc={payload.dayArc} />
+            <section id="dashboard-earth" aria-label={t("dashboard.nav.earth")} className="scroll-mt-24">
+              <EarthLinkCard link={payload.link} viewer={viewer} />
+            </section>
+          </div>
+        </div>
+      </div>
 
       {viewer === "crew" ? (
         <>
-          <div aria-hidden="true" className="h-[22rem]" />
+          <div aria-hidden="true" className="hidden h-64 md:block" />
           <CosmoDock payload={payload} dockSlot={dockSlot} />
         </>
       ) : null}

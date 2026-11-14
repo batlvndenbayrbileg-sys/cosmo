@@ -9,6 +9,10 @@ export const earthStrings: AreaDicts = {
     "earth.title": "Earth console - simulated link",
     "earth.subtitle": "Read-only view of crew status as it would arrive on Earth.",
     "earth.simulatedBadge": "Simulated link",
+    "earth.topbar.title": "Earth console",
+    "earth.topbar.sub": "simulated link",
+    "earth.heading.lead": "Crew",
+    "earth.heading.accent": "status",
 
     "earth.delay.label": "Simulated link delay",
     "earth.delay.live": "Live",
@@ -26,6 +30,8 @@ export const earthStrings: AreaDicts = {
     "earth.crew.alertBadge": "Alert raised",
     "earth.crew.open": "Open dashboard",
     "earth.crew.cardLabel": "{name}, {role}",
+    "earth.crew.lastLabel": "Last check-in",
+    "earth.crew.never": "Not yet",
 
     "earth.alerts.title": "Alerts",
     "earth.alerts.subtitle": "Newest first",
@@ -52,6 +58,10 @@ export const earthStrings: AreaDicts = {
     "earth.title": "Дэлхийн хяналтын төв - симуляци холболт",
     "earth.subtitle": "Багийн төлөв Дэлхийд хүрэх хэлбэрээрээ зөвхөн харах горимд харагдана.",
     "earth.simulatedBadge": "Симуляци холболт",
+    "earth.topbar.title": "Дэлхийн хяналтын төв",
+    "earth.topbar.sub": "симуляци холболт",
+    "earth.heading.lead": "Багийн",
+    "earth.heading.accent": "төлөв",
 
     "earth.delay.label": "Холболтын симуляци саатал",
     "earth.delay.live": "Шууд",
@@ -69,6 +79,8 @@ export const earthStrings: AreaDicts = {
     "earth.crew.alertBadge": "Сэрэмжлүүлэг гарсан",
     "earth.crew.open": "Самбар нээх",
     "earth.crew.cardLabel": "{name}, {role}",
+    "earth.crew.lastLabel": "Сүүлийн шалгалт",
+    "earth.crew.never": "Хараахан алга",
 
     "earth.alerts.title": "Сэрэмжлүүлэг",
     "earth.alerts.subtitle": "Хамгийн сүүлийнх эхэнд",

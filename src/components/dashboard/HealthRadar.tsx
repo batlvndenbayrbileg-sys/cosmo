@@ -16,7 +16,7 @@ export function HealthRadar({ axes }: { axes: AxisScore[] }) {
 
   const rows = axes.map((a) => ({
     axis: a.axis,
-    label: t(`dashboard.axis.${a.axis}`) + (a.score === null ? ` (${t("dashboard.radar.noData")})` : ""),
+    label: t(`dashboard.axis.${a.axis}`) + (a.score === null ? " (–)" : ""),
     today: a.score ?? 0,
     usual: a.baseline ?? 0,
     score: a.score,
@@ -26,27 +26,27 @@ export function HealthRadar({ axes }: { axes: AxisScore[] }) {
   const anyMissing = axes.some((a) => a.score === null);
 
   const config = {
-    today: { label: t("dashboard.radar.today"), color: "var(--primary)" },
-    usual: { label: t("dashboard.radar.usual"), color: "var(--chart-2)" },
+    today: { label: t("dashboard.radar.today"), color: "var(--aegis-accent)" },
+    usual: { label: t("dashboard.radar.usual"), color: "#9aa6b8" },
   } satisfies ChartConfig;
 
   const summary = rows
-    .map((r) => `${r.label}: ${r.score === null ? t("dashboard.radar.noData") : Math.round(r.score)}`)
+    .map((r) => `${t(`dashboard.axis.${r.axis}`)}: ${r.score === null ? t("dashboard.radar.noData") : Math.round(r.score)}`)
     .join(", ");
 
   return (
-    <div data-slot="health-radar" className="flex flex-col gap-3">
+    <div data-slot="health-radar" className="flex flex-col gap-1">
       <div role="img" aria-label={`${t("dashboard.radar.title")}. ${summary}`}>
-        <ChartContainer config={config} className="mx-auto aspect-square w-full max-w-[22rem]">
-          <RadarChart data={rows} outerRadius="68%" margin={{ top: 18, right: 44, bottom: 18, left: 44 }}>
-            <PolarGrid />
-            <PolarAngleAxis dataKey="label" tick={{ fontSize: 13 }} />
+        <ChartContainer config={config} className="mx-auto aspect-[1.25] w-full max-w-[24rem]">
+          <RadarChart data={rows} outerRadius="74%" margin={{ top: 14, right: 74, bottom: 14, left: 74 }}>
+            <PolarGrid stroke="rgba(15,27,45,0.08)" />
+            <PolarAngleAxis dataKey="label" tick={{ fontSize: 11, fill: "#5b6678" }} />
             <PolarRadiusAxis domain={[0, 100]} tick={false} axisLine={false} />
             {anyUsual ? (
               <Radar
                 name={t("dashboard.radar.usual")}
                 dataKey="usual"
-                stroke="var(--chart-2)"
+                stroke="#9aa6b8"
                 strokeWidth={2}
                 strokeDasharray="6 4"
                 fill="none"
@@ -56,20 +56,20 @@ export function HealthRadar({ axes }: { axes: AxisScore[] }) {
             <Radar
               name={t("dashboard.radar.today")}
               dataKey="today"
-              stroke="var(--primary)"
+              stroke="var(--aegis-accent)"
               strokeWidth={2.5}
-              fill="var(--primary)"
-              fillOpacity={0.2}
+              fill="var(--aegis-accent)"
+              fillOpacity={0.22}
               isAnimationActive={animate}
             />
           </RadarChart>
         </ChartContainer>
       </div>
 
-      <ul className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-sm text-foreground">
+      <ul className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-[12px] text-[var(--aegis-label)]">
         <li className="flex items-center gap-2">
           <svg width="28" height="8" aria-hidden="true" focusable="false">
-            <line x1="1" y1="4" x2="27" y2="4" strokeWidth="3" strokeLinecap="round" stroke="var(--primary)" />
+            <line x1="1" y1="4" x2="27" y2="4" strokeWidth="3" strokeLinecap="round" stroke="var(--aegis-accent)" />
           </svg>
           {t("dashboard.radar.today")}
         </li>
@@ -84,7 +84,7 @@ export function HealthRadar({ axes }: { axes: AxisScore[] }) {
                 strokeWidth="2.5"
                 strokeLinecap="round"
                 strokeDasharray="5 4"
-                stroke="var(--chart-2)"
+                stroke="#9aa6b8"
               />
             </svg>
             {t("dashboard.radar.usual")}

@@ -10,6 +10,7 @@ import { SYSTEM_PROMPT } from "./prompt";
 import { detectSkip, startAnswerFor } from "./scriptedAgent";
 import type { ClarifyReason } from "./templates";
 import { TOOL_DEFINITIONS, type ToolResult } from "./tools";
+import type { ResultsFacts } from "./resultsFacts";
 
 /**
  * The live agent: Claude through the Messages API with tool use (docs/PLAN.md sections 4.2 to 4.4).
@@ -321,6 +322,34 @@ export class ClaudeAgent implements Agent {
     }
     if (text.length > 0) decision.replyText = text;
     return decision;
+  }
+
+  async answerAboutResults(args: {
+    facts: ResultsFacts;
+    question: string;
+    lang: Lang;
+    history: TurnRow[];
+  }): Promise<string | null> {
+    const { facts, question, lang } = args;
+    const prompt = [
+      "DIRECTIVE (written by the system, not by the astronaut)",
+      "state: DONE - the daily check-in is complete and the astronaut is looking at the dashboard.",
+      `reply_language: ${lang === "mn" ? "Mongolian (Cyrillic)" : "English"} (if the question is clearly in the other language, answer in that one)`,
+      "instruction: Answer the astronaut's question about today's results in a warm, calm voice, at most three short sentences.",
+      "Use ONLY the facts below. Never add, change, compute or estimate a number; quote numbers exactly as written in the facts.",
+      "Never diagnose, never name a disease, drug, dose or treatment. For anything medical beyond these facts, say the crew medical officer or flight surgeon can help.",
+      "Thresholds are demo parameters, not clinical limits; say so if asked whether something is dangerous.",
+      "If the question is not about the results, answer briefly and kindly and offer to explain any part of the dashboard. Do not call any tool.",
+      `facts: ${JSON.stringify(facts)}`,
+      `astronaut_question: ${JSON.stringify(question)}`,
+    ].join("\n");
+    try {
+      const message = await this.call([{ role: "user", content: prompt }]);
+      const out = textOf(message).trim();
+      return out.length > 0 ? out : null;
+    } catch {
+      return null;
+    }
   }
 
   async phraseSummary(args: { findings: SummaryFindings; lang: Lang; crew: { name: string } }): Promise<string | null> {

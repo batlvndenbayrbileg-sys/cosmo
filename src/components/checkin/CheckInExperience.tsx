@@ -1,48 +1,77 @@
 "use client";
 
 /**
- * CheckInExperience: the whole /checkin screen as one client component with two views.
+ * CheckInExperience: the Siri-style check-in (docs/DESIGN_V2.md section 3).
  *
- *  - view "conversation": Cosmo full-screen, live transcript, captured cards, mic + text + demo.
- *  - view "dashboard":    <DashboardView> from the dashboard lane, with the SAME shared Cosmo element
- *                         passed as `dockSlot`, so Cosmo glides from the stage into the dock.
- *
- * Flow: createCheckIn -> greeting spoken -> voice or text turns (SSE) -> `summary` event ->
- * GET /api/dashboard -> switch view -> Cosmo speaks the summary.
+ *  - phase "conversation": nothing but the big Cosmo on the .aegis-bg gradient. She greets as soon
+ *    as the page opens; after every sentence the microphone opens by itself (VAD ends the utterance
+ *    after 900 ms of silence). Each captured value flies out of her chest as a glass bubble and is
+ *    "written" into it. Ghost controls in the corners: back, language + captions, keyboard, demo.
+ *  - phase "preparing": after the confirmation (the `summary` event) the bubbles converge into
+ *    Cosmo, she thinks, "Preparing your dashboard..." shows for at least PREPARE_MIN_MS.
+ *  - phase "dashboard": <DashboardView> with the SAME shared Cosmo element as `dockSlot`, so Cosmo
+ *    shrinks into the dashboard's Cosmo card; then she speaks the summary.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
-import { LayoutGroup, MotionConfig } from "framer-motion";
-import { CosmoStage, SharedCosmo } from "./CosmoStage";
-import { ClarificationBubble } from "./ClarificationBubble";
-import { ConversationView } from "./ConversationView";
-import { KpiCardRail } from "./KpiCardRail";
-import { MicButton, type MicState } from "./MicButton";
-import { RunDemoButton } from "./RunDemoButton";
-import { TextFallbackInput } from "./TextFallbackInput";
-import { TranscriptPanel } from "./TranscriptPanel";
+import { AnimatePresence, LayoutGroup, MotionConfig, motion } from "framer-motion";
+import { Play } from "lucide-react";
+import { SharedCosmo } from "./CosmoStage";
+import { CaptureBubble, PenTrail, PenTrailDefs } from "./CaptureBubble";
+import { FloorRing, type RingMode } from "./FloorRing";
+import {
+  BackControl,
+  Corner,
+  DemoControl,
+  GLASS,
+  KeyboardControl,
+  LanguageCaptionControls,
+  ProgressArc,
+  QuestionBubble,
+  StageToasts,
+  type StageToast,
+} from "./StageControls";
 import { ApiClientError, fetchDashboard, fetchHealth } from "./api";
+import { bubbleItems, computeStageLayout } from "./bubbles";
 import type { CheckInError } from "./state";
 import { useDemoRunner } from "./useDemoRunner";
 import { DashboardView } from "@/components/dashboard";
 import { parseStoredCrew, readSelectedCrewRaw } from "@/components/crew/selectedCrew";
-import { FallbackBanner } from "@/components/shell/FallbackBanner";
-import { useShellHeader } from "@/components/shell/ShellHeaderContext";
-import { Button } from "@/components/ui/button";
 import { useCheckIn } from "@/hooks/useCheckIn";
 import { useRecorder } from "@/hooks/useRecorder";
-import { useSpeechPlayer, type SpeechPlayer } from "@/hooks/useSpeechPlayer";
+import { useSpeechPlayer, type SpeakTurn, type SpeechPlayer } from "@/hooks/useSpeechPlayer";
 import { useI18n } from "@/i18n/I18nProvider";
+import { cn } from "@/lib/utils";
 import type { DashboardPayload, HealthResponse, SummaryPayload } from "@/lib/types";
 
-/** Let the layout glide start before Cosmo starts reading the summary. */
-const SUMMARY_SPEECH_DELAY_MS = 600;
+/** Let Cosmo's glide into the dashboard settle before she starts reading the summary. */
+const SUMMARY_SPEECH_DELAY_MS = 700;
 /** After Cosmo stops talking, wait this long before the microphone opens again (no self-echo). */
 const RELISTEN_DELAY_MS = 450;
 /** A recording smaller than this is a click or noise, not speech: it is not sent. */
 const MIN_AUDIO_BYTES = 1200;
+/** The "preparing" moment lasts at least this long, so the dashboard never just flashes in. */
+const PREPARE_MIN_MS = 1200;
+
+type Phase = "conversation" | "preparing" | "dashboard";
 
 const subscribeNever = () => () => {};
+function subscribeResize(onChange: () => void) {
+  window.addEventListener("resize", onChange);
+  return () => window.removeEventListener("resize", onChange);
+}
+const readViewport = () => `${window.innerWidth}x${window.innerHeight}`;
+const serverViewport = () => "1440x900";
+
+function useViewport(): { width: number; height: number } {
+  const raw = useSyncExternalStore(subscribeResize, readViewport, serverViewport);
+  return useMemo(() => {
+    const [w, h] = raw.split("x").map(Number);
+    return { width: w || 1440, height: h || 900 };
+  }, [raw]);
+}
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 function errorText(t: (key: string) => string, error: CheckInError): string {
   switch (error.code) {
@@ -59,28 +88,35 @@ function errorText(t: (key: string) => string, error: CheckInError): string {
   }
 }
 
-interface BannerItem {
-  id: string;
-  text: string;
-  onDismiss?: () => void;
+/** Space is push-to-talk unless the person is typing or pressing another control. */
+function spaceBelongsToControl(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  if (target.closest("[data-mascot]")) return false;
+  return target.closest("input, textarea, select, button, a, [contenteditable='true']") !== null;
 }
 
 export function CheckInExperience() {
   const router = useRouter();
   const { lang, t } = useI18n();
+  const viewport = useViewport();
 
   const rawCrew = useSyncExternalStore(subscribeNever, readSelectedCrewRaw, () => null);
   const crew = useMemo(() => parseStoredCrew(rawCrew), [rawCrew]);
 
   const [initialLang] = useState(lang);
-  const [view, setView] = useState<"conversation" | "dashboard">("conversation");
+  const [phase, setPhase] = useState<Phase>("conversation");
   const [dashboard, setDashboard] = useState<DashboardPayload | null>(null);
-  const [dashboardStatus, setDashboardStatus] = useState<"idle" | "loading" | "error">("idle");
+  /** the dashboard load failed: what "Show dashboard" retries */
+  const [dashboardFailed, setDashboardFailed] = useState<{ checkInId: string; summary: SummaryPayload | null } | null>(null);
+  const [veil, setVeil] = useState(true);
   const [health, setHealth] = useState<HealthResponse | null>(null);
-  const [conversationMode, setConversationMode] = useState(false);
-  const [pushToTalk, setPushToTalk] = useState(false);
+  /** hands-free: listen again by itself after every Cosmo sentence */
+  const [conversationMode, setConversationMode] = useState(true);
   const [voiceIssue, setVoiceIssue] = useState<"denied" | "unsupported" | "failed" | null>(null);
   const [dismissed, setDismissed] = useState<ReadonlySet<string>>(() => new Set());
+  const [captions, setCaptions] = useState(false);
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const [tapped, setTapped] = useState(false);
   const alive = useRef(true);
 
   useEffect(() => {
@@ -94,25 +130,35 @@ export function CheckInExperience() {
   // check-in callbacks reach them through refs that are filled in an effect below.
   const speakRef = useRef<SpeechPlayer["speak"] | null>(null);
   const cancelRecordingRef = useRef<(() => void) | null>(null);
+  /** the last thing Cosmo said, replayed by "Tap to start" when autoplay was blocked */
+  const lastTurn = useRef<SpeakTurn | null>(null);
 
-  /* ───────────── dashboard hand-over ───────────── */
+  /* ───────────── preparing -> dashboard ───────────── */
 
   const openDashboard = useCallback(
     async (checkInId: string, summary: SummaryPayload | null) => {
-      setDashboardStatus("loading");
+      setPhase("preparing");
+      setDashboardFailed(null);
+      const started = performance.now();
+      let payload: DashboardPayload;
       try {
-        const payload = await fetchDashboard(checkInId);
-        if (!alive.current) return;
-        setDashboard(payload);
-        setView("dashboard");
-        setDashboardStatus("idle");
+        payload = await fetchDashboard(checkInId);
       } catch (error) {
         if (!alive.current) return;
-        if (error instanceof ApiClientError && error.code === "NO_SESSION") router.replace("/");
-        setDashboardStatus("error");
+        if (error instanceof ApiClientError && error.code === "NO_SESSION") {
+          router.replace("/");
+          return;
+        }
+        setDashboardFailed({ checkInId, summary });
+        return;
       }
-      if (summary && alive.current) {
-        await new Promise((resolve) => setTimeout(resolve, SUMMARY_SPEECH_DELAY_MS));
+      const wait = PREPARE_MIN_MS - (performance.now() - started);
+      if (wait > 0) await sleep(wait);
+      if (!alive.current) return;
+      setDashboard(payload);
+      setPhase("dashboard");
+      if (summary) {
+        await sleep(SUMMARY_SPEECH_DELAY_MS);
         if (!alive.current) return;
         void speakRef.current?.({
           checkInId,
@@ -130,12 +176,14 @@ export function CheckInExperience() {
   const checkIn = useCheckIn({
     language: initialLang,
     onAssistant: (turn) => {
-      void speakRef.current?.({
+      const speakTurn: SpeakTurn = {
         checkInId: turn.checkInId,
         turnId: turn.turnId,
         text: turn.text,
         language: turn.language,
-      });
+      };
+      lastTurn.current = speakTurn;
+      void speakRef.current?.(speakTurn);
     },
     onSummary: (summary, checkInId) => {
       setConversationMode(false);
@@ -143,6 +191,7 @@ export function CheckInExperience() {
       void openDashboard(checkInId, summary);
     },
     onResumedFinished: (checkInId) => {
+      setConversationMode(false);
       void openDashboard(checkInId, null);
     },
     onNoSession: () => router.replace("/"),
@@ -156,18 +205,16 @@ export function CheckInExperience() {
       if (blob.size < MIN_AUDIO_BYTES) return;
       void sendAudio(blob);
     },
-    onRecordingChange: (recording) => {
-      setRecording(recording);
-      if (!recording) setPushToTalk(false);
-    },
+    onRecordingChange: setRecording,
     onError: (error) => {
       setVoiceIssue(error.kind === "denied" ? "denied" : error.kind === "unsupported" ? "unsupported" : "failed");
       setConversationMode(false);
     },
+    // nothing but silence for a while: stop listening; a tap on Cosmo or Space starts again
     onNoSpeech: () => setConversationMode(false),
   });
 
-  const { speak, stop: stopSpeech } = player;
+  const { speak, stop: stopSpeech, clearBlocked } = player;
   const { start: startRecorder, stop: stopRecorder, cancel: cancelRecorder } = recorder;
 
   useEffect(() => {
@@ -175,7 +222,7 @@ export function CheckInExperience() {
     cancelRecordingRef.current = cancelRecorder;
   }, [speak, cancelRecorder]);
 
-  // start the check-in and look at /api/health once
+  // start the check-in (Cosmo greets right away) and look at /api/health once
   useEffect(() => {
     void createCheckIn();
     let cancelled = false;
@@ -187,8 +234,6 @@ export function CheckInExperience() {
     };
   }, [createCheckIn]);
 
-  useShellHeader({ crewName: crew?.name, missionDay: dashboard?.missionDay });
-
   /* ───────────── derived facts ───────────── */
 
   const ready = state.status === "ready";
@@ -197,16 +242,7 @@ export function CheckInExperience() {
   const micUsable =
     recorder.supported && recorder.permission !== "unsupported" && !micBlocked && voiceIssue === null && !sttDown;
   const scripted = health?.mode === "scripted";
-
-  const micState: MicState = !micUsable
-    ? "unavailable"
-    : state.cosmoState === "talking"
-      ? "speaking"
-      : state.cosmoState === "thinking"
-        ? "thinking"
-        : recorder.recording
-          ? "listening"
-          : "idle";
+  const talking = phase === "conversation";
 
   /* ───────────── demo ───────────── */
 
@@ -214,9 +250,9 @@ export function CheckInExperience() {
   useEffect(() => {
     live.current = {
       idle: ready && !state.busy && state.speech === "idle",
-      finished: view === "dashboard" || state.conversation === "DONE" || state.summary !== null,
+      finished: phase !== "conversation" || state.conversation === "DONE" || state.summary !== null,
     };
-  }, [ready, state.busy, state.speech, view, state.conversation, state.summary]);
+  }, [ready, state.busy, state.speech, phase, state.conversation, state.summary]);
 
   const demo = useDemoRunner({
     language: state.language ?? lang,
@@ -225,37 +261,75 @@ export function CheckInExperience() {
     readLive: () => live.current,
     onStart: () => {
       setConversationMode(false);
+      setKeyboardOpen(false);
       cancelRecorder();
       stopSpeech();
     },
   });
 
-  /* ───────────── microphone gestures ───────────── */
+  /* ───────────── voice gestures ───────────── */
 
   const startListening = useCallback(
     (vad: boolean) => {
-      if (!ready || state.busy || demo.running) return;
+      if (!ready || state.busy || demo.running || !talking) return;
       stopSpeech();
-      setPushToTalk(!vad);
       void startRecorder({ vad });
     },
-    [ready, state.busy, demo.running, stopSpeech, startRecorder],
+    [ready, state.busy, demo.running, talking, stopSpeech, startRecorder],
   );
 
-  const handleMicToggle = () => {
-    if (micState === "listening") {
+  const tapToStart = useCallback(() => {
+    setTapped(true);
+    clearBlocked();
+    setConversationMode(true);
+    if (lastTurn.current) void speak(lastTurn.current);
+  }, [clearBlocked, speak]);
+
+  const showTapToStart = player.blocked && !tapped && talking;
+
+  /** The mascot itself is the (invisible) talk button. */
+  const handleMascot = () => {
+    if (showTapToStart) {
+      tapToStart();
+      return;
+    }
+    if (!micUsable) {
+      setKeyboardOpen(true);
+      return;
+    }
+    if (recorder.recording) {
       stopRecorder();
       return;
     }
-    if (micState === "speaking" || micState === "idle") {
-      setConversationMode(true);
-      startListening(true);
-    }
+    if (state.cosmoState === "thinking") return;
+    setConversationMode(true);
+    startListening(true);
   };
-  const handleHoldStart = () => {
-    if (micState === "speaking" || micState === "idle") startListening(false);
-  };
-  const handleHoldEnd = () => stopRecorder();
+
+  // Space = push-to-talk (hold to talk, release to send)
+  const pushToTalk = useRef(false);
+  useEffect(() => {
+    if (!talking || !micUsable) return;
+    const down = (e: KeyboardEvent) => {
+      if (e.code !== "Space" || spaceBelongsToControl(e.target)) return;
+      e.preventDefault();
+      if (e.repeat || pushToTalk.current) return;
+      pushToTalk.current = true;
+      startListening(false);
+    };
+    const up = (e: KeyboardEvent) => {
+      if (e.code !== "Space" || !pushToTalk.current) return;
+      e.preventDefault();
+      pushToTalk.current = false;
+      stopRecorder();
+    };
+    window.addEventListener("keydown", down);
+    window.addEventListener("keyup", up);
+    return () => {
+      window.removeEventListener("keydown", down);
+      window.removeEventListener("keyup", up);
+    };
+  }, [talking, micUsable, startListening, stopRecorder]);
 
   // hands-free: after Cosmo has finished, listen again (half-duplex: never while she speaks)
   useEffect(() => {
@@ -263,7 +337,9 @@ export function CheckInExperience() {
       !conversationMode ||
       !micUsable ||
       !ready ||
-      view !== "conversation" ||
+      !talking ||
+      keyboardOpen ||
+      player.blocked ||
       state.conversation === "DONE" ||
       state.busy ||
       state.speech !== "idle" ||
@@ -280,7 +356,9 @@ export function CheckInExperience() {
     conversationMode,
     micUsable,
     ready,
-    view,
+    talking,
+    keyboardOpen,
+    player.blocked,
     state.conversation,
     state.busy,
     state.speech,
@@ -290,183 +368,344 @@ export function CheckInExperience() {
   ]);
 
   const handleSendText = useCallback(
-    async (text: string) => {
+    (text: string) => {
       cancelRecorder();
       stopSpeech();
-      return sendText(text);
+      void sendText(text);
     },
     [cancelRecorder, stopSpeech, sendText],
   );
 
-  /* ───────────── banners ───────────── */
+  const retryDashboard = useCallback(() => {
+    if (dashboardFailed) void openDashboard(dashboardFailed.checkInId, dashboardFailed.summary);
+  }, [dashboardFailed, openDashboard]);
+
+  /* ───────────── toasts ───────────── */
 
   const dismiss = (id: string) => setDismissed((prev) => new Set(prev).add(id));
-  const banners: BannerItem[] = [];
+  const toasts: StageToast[] = [];
   if (scripted) {
-    banners.push({ id: "scripted", text: t("shell.banner.scripted"), onDismiss: () => dismiss("scripted") });
+    toasts.push({ id: "scripted", tone: "info", text: t("shell.banner.scripted"), onDismiss: () => dismiss("scripted") });
   }
   if (micBlocked) {
-    banners.push({ id: "mic", text: t("shell.banner.micBlocked") });
+    toasts.push({ id: "mic", tone: "info", text: t("shell.banner.micBlocked"), onDismiss: () => dismiss("mic") });
   } else if (!micUsable && ready) {
-    banners.push({ id: "voice", text: t("shell.banner.voiceUnavailable") });
+    toasts.push({ id: "voice", tone: "info", text: t("shell.banner.voiceUnavailable"), onDismiss: () => dismiss("voice") });
   }
   if (player.fallback === "browser") {
-    banners.push({ id: "browserVoice", text: t("checkin.banner.browserVoice"), onDismiss: () => dismiss("browserVoice") });
+    toasts.push({ id: "browserVoice", tone: "info", text: t("checkin.banner.browserVoice"), onDismiss: () => dismiss("browserVoice") });
   } else if (player.fallback === "silent") {
-    banners.push({ id: "speech", text: t("shell.banner.speechUnavailable"), onDismiss: () => dismiss("speech") });
+    toasts.push({ id: "speech", tone: "info", text: t("shell.banner.speechUnavailable"), onDismiss: () => dismiss("speech") });
   }
-  if (state.error && state.status !== "failed") {
-    banners.push({ id: "error", text: errorText(t, state.error), onDismiss: checkIn.dismissError });
+  if (state.status === "failed" && state.error?.code !== "NO_SESSION") {
+    toasts.push({
+      id: "start",
+      tone: "error",
+      text: t("checkin.start.failed"),
+      action: t("shell.action.retry"),
+    });
+  } else if (state.error) {
+    toasts.push({ id: "error", tone: "error", text: errorText(t, state.error), onDismiss: checkIn.dismissError });
   }
   if (demo.failed) {
-    banners.push({ id: "demo", text: t("checkin.demo.failed"), onDismiss: () => dismiss("demo") });
+    toasts.push({ id: "demo", tone: "error", text: t("checkin.demo.failed"), onDismiss: () => dismiss("demo") });
   }
-  const visibleBanners = banners.filter((b) => b.id === "error" || !dismissed.has(b.id));
+  if (dashboardFailed) {
+    toasts.push({
+      id: "dashboard",
+      tone: "error",
+      text: t("checkin.error.dashboard"),
+      action: t("checkin.dashboard.retry"),
+    });
+  }
+  const visibleToasts = toasts.filter((x) => x.id === "error" || x.id === "start" || x.id === "dashboard" || !dismissed.has(x.id));
+
+  const handleToastAction = (id: string) => {
+    if (id === "start") void createCheckIn();
+    if (id === "dashboard") retryDashboard();
+  };
 
   /* ───────────── render ───────────── */
 
   const variant = crew?.mascotVariant ?? dashboard?.crew.mascotVariant ?? 0;
-  const statusKey =
-    state.cosmoState === "talking" ? "speaking" : state.cosmoState;
+  const cosmoState = phase === "preparing" ? "thinking" : state.cosmoState;
 
   const cosmo = (
     <SharedCosmo
       variant={variant}
-      state={state.cosmoState}
+      state={cosmoState}
       emotion={state.emotion}
       amplitude={player.amplitude}
       label={t("checkin.stage.label")}
     />
   );
 
-  if (view === "dashboard" && dashboard) {
+  if (phase === "dashboard" && dashboard) {
     return (
       <MotionConfig reducedMotion="user">
         <LayoutGroup>
           <DashboardView payload={dashboard} viewer="crew" dockSlot={cosmo} />
+          {veil ? (
+            <motion.div
+              aria-hidden="true"
+              className="aegis-bg pointer-events-none fixed inset-0 z-30"
+              initial={{ opacity: 1, scale: 1 }}
+              animate={{ opacity: 0, scale: 1.04 }}
+              transition={{ duration: 0.75, ease: [0.4, 0, 0.2, 1] }}
+              onAnimationComplete={() => setVeil(false)}
+            />
+          ) : null}
         </LayoutGroup>
       </MotionConfig>
     );
   }
 
-  const startFailed = state.status === "failed" && state.error?.code !== "NO_SESSION";
+  const items = bubbleItems(state.cards);
+  const layout = computeStageLayout(viewport.width, viewport.height, items.length);
+  const { mascot } = layout;
+  const preparing = phase === "preparing";
+
+  const ringMode: RingMode = preparing
+    ? "thinking"
+    : state.cosmoState === "talking"
+      ? "speaking"
+      : state.cosmoState === "thinking"
+        ? "thinking"
+        : state.cosmoState === "listening"
+          ? "listening"
+          : "idle";
+  const statusKey = cosmoState === "talking" ? "speaking" : cosmoState;
+
+  const lastLine = state.transcript[state.transcript.length - 1] ?? null;
+  const lastCosmo = [...state.transcript].reverse().find((l) => l.speaker === "cosmo") ?? null;
+  const pending = state.pendingCrew;
+  const caption: { text: string; who: "crew" | "cosmo" | "hint" } | null = pending?.text
+    ? { text: pending.text, who: "crew" }
+    : recorder.recording
+      ? { text: `${t("checkin.status.listening")}…`, who: "hint" }
+      : pending
+        ? { text: t("checkin.captions.transcribing"), who: "hint" }
+        : lastLine
+          ? { text: lastLine.text, who: lastLine.speaker }
+          : null;
+
+  const mascotLabel = showTapToStart
+    ? t("checkin.tapToStart")
+    : !micUsable
+      ? t("checkin.text.label")
+      : recorder.recording
+        ? t("checkin.mascot.stop")
+        : t("checkin.mascot.talk");
+
+  const questionWidth = Math.min(300, Math.max(200, layout.width - (mascot.x + mascot.size * 0.68) - 16));
 
   return (
     <MotionConfig reducedMotion="user">
       <LayoutGroup>
-        <h1 className="sr-only">{t("checkin.page.label")}</h1>
-        <ConversationView
-          label={t("checkin.page.label")}
-          banners={
-            <>
-              {visibleBanners.map((b) => (
-                <FallbackBanner key={b.id} message={b.text} onDismiss={b.onDismiss} />
-              ))}
-              {dashboardStatus === "error" && state.checkInId ? (
-                <div className="flex flex-wrap items-center gap-3 rounded-xl border border-status-alert/30 bg-status-alert-soft px-4 py-2.5 text-base text-status-alert-ink">
-                  <span className="min-w-0 flex-1" role="status">
-                    {t("checkin.error.dashboard")}
-                  </span>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="h-9 rounded-lg px-3 text-sm"
-                    onClick={() => {
-                      if (state.checkInId) void openDashboard(state.checkInId, null);
-                    }}
-                  >
-                    {t("checkin.dashboard.retry")}
-                  </Button>
-                </div>
-              ) : null}
-              {dashboardStatus === "loading" ? (
-                <p role="status" className="text-center text-base text-muted-foreground">
-                  {t("checkin.dashboard.opening")}
-                </p>
-              ) : null}
-            </>
-          }
-          stage={
-            <CosmoStage
-              caption={
-                <p role="status" className="flex items-center gap-2 text-base font-medium text-muted-foreground">
-                  <span
-                    aria-hidden="true"
-                    className={
-                      state.cosmoState === "idle"
-                        ? "size-2.5 rounded-full bg-status-nodata"
-                        : "size-2.5 animate-pulse rounded-full bg-primary"
-                    }
-                  />
-                  {t(`checkin.status.${statusKey}`)}
-                </p>
-              }
-            >
-              {cosmo}
-            </CosmoStage>
-          }
-          transcript={
-            state.status === "creating" || state.status === "idle" ? (
-              <p role="status" className="m-auto text-base text-muted-foreground">
-                {t("checkin.starting")}
-              </p>
-            ) : startFailed ? (
-              <div className="m-auto flex flex-col items-center gap-3 text-center">
-                <p role="alert" className="text-base text-status-alert-ink">
-                  {t("checkin.start.failed")}
-                </p>
-                <Button type="button" variant="outline" className="rounded-xl" onClick={() => void createCheckIn()}>
-                  {t("shell.action.retry")}
-                </Button>
-              </div>
-            ) : (
-              <TranscriptPanel
-                lines={state.transcript}
-                pending={state.pendingCrew}
-                className="min-h-0 flex-1"
-              />
-            )
-          }
-          clarification={
-            state.clarification ? (
-              <ClarificationBubble clarification={state.clarification} onDismiss={checkIn.dismissClarification} />
-            ) : null
-          }
-          controls={
-            <div className="flex flex-col items-center gap-3 sm:flex-row sm:items-start sm:gap-5">
-              <MicButton
-                state={micState}
-                pushToTalk={pushToTalk || !recorder.autoStop}
-                level={recorder.level}
-                onToggle={handleMicToggle}
-                onHoldStart={handleHoldStart}
-                onHoldEnd={handleHoldEnd}
-                describedBy="checkin-mic-hint"
-              />
-              <div className="flex w-full min-w-0 flex-1 flex-col gap-2 pt-1">
-                <TextFallbackInput onSend={handleSendText} disabled={!ready || state.busy || demo.running} />
-                <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-                  <p id="checkin-mic-hint" className="min-w-0 flex-1 text-sm text-muted-foreground">
-                    {micUsable ? t("checkin.mic.hint") : t("checkin.mic.unavailable")}
-                  </p>
-                  <div className="flex flex-col items-end gap-1">
-                    <RunDemoButton
-                      running={demo.running}
-                      emphasised={scripted === true}
-                      disabled={!ready || state.busy}
-                      onRun={() => void demo.run()}
-                      onStop={demo.stop}
+        <div
+          data-slot="checkin-stage"
+          data-phase={phase}
+          className="aegis-bg fixed inset-0 z-50 overflow-x-hidden overflow-y-auto"
+        >
+          <h1 className="sr-only">{t("checkin.page.label")}</h1>
+          <p role="status" className="sr-only">
+            {preparing ? t("checkin.preparing") : t(`checkin.status.${statusKey}`)}
+          </p>
+          <p aria-live="polite" className="sr-only">
+            {lastCosmo?.text ?? ""}
+          </p>
+          <p id="checkin-space-hint" className="sr-only">
+            {t("checkin.hint.space")}
+          </p>
+
+          <div className="relative w-full" style={{ height: layout.height }}>
+            {/* pen trails behind the bubbles */}
+            {!preparing ? (
+              <svg
+                aria-hidden="true"
+                focusable="false"
+                className="pointer-events-none absolute inset-0 overflow-visible"
+                width={layout.width}
+                height={layout.height}
+              >
+                <PenTrailDefs />
+                {items.map((item, i) =>
+                  layout.slots[i] ? (
+                    <PenTrail
+                      key={item.id}
+                      writeKey={`${item.id}-${item.flash}`}
+                      from={layout.chest}
+                      slot={layout.slots[i]}
+                      width={layout.bubbleWidth}
+                      height={layout.bubbleHeight}
                     />
-                    {scripted && !demo.running ? (
-                      <p className="max-w-64 text-right text-sm text-muted-foreground">{t("checkin.demo.hint")}</p>
-                    ) : null}
-                  </div>
-                </div>
-              </div>
+                  ) : null,
+                )}
+              </svg>
+            ) : null}
+
+            <FloorRing
+              {...layout.floor}
+              mode={ringMode}
+              amplitude={player.amplitude}
+              level={recorder.recording ? recorder.level : null}
+            />
+
+            {/* the big mascot: also the invisible talk button */}
+            <motion.div
+              className="absolute"
+              style={{ left: mascot.x, top: mascot.y, width: mascot.size, height: mascot.size }}
+              initial={{ opacity: 0, scale: 0.9, y: 24 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              transition={{ type: "spring", stiffness: 120, damping: 20 }}
+            >
+              <button
+                type="button"
+                data-mascot=""
+                onClick={handleMascot}
+                aria-label={mascotLabel}
+                aria-describedby="checkin-space-hint"
+                aria-pressed={micUsable ? recorder.recording : undefined}
+                disabled={preparing}
+                className="size-full cursor-pointer rounded-[38%] outline-none focus-visible:ring-4 focus-visible:ring-[var(--aegis-accent)]/30 disabled:cursor-default"
+              >
+                {cosmo}
+              </button>
+            </motion.div>
+
+            <QuestionBubble
+              clarification={preparing ? null : state.clarification}
+              x={mascot.x + mascot.size * 0.66}
+              y={mascot.y + mascot.size * 0.01}
+              maxWidth={questionWidth}
+            />
+
+            {/* captured values */}
+            <ul aria-label={t("checkin.bubbles.title")} className="contents">
+              {items.map((item, i) =>
+                layout.slots[i] ? (
+                  <CaptureBubble
+                    key={item.id}
+                    item={item}
+                    index={i}
+                    slot={layout.slots[i]}
+                    width={layout.bubbleWidth}
+                    height={layout.bubbleHeight}
+                    chest={layout.chest}
+                    converge={preparing}
+                  />
+                ) : null,
+              )}
+            </ul>
+
+            {/* caption line (CC) or the preparing line, under the floor */}
+            <div
+              className="absolute inset-x-0 flex justify-center px-6"
+              style={{ top: layout.captionY }}
+            >
+              <AnimatePresence mode="wait">
+                {preparing ? (
+                  <motion.p
+                    key="preparing"
+                    role="status"
+                    className="flex items-center gap-2.5 text-[17px] font-normal text-[var(--aegis-ink)]"
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.35 }}
+                  >
+                    <ProgressArc />
+                    {t("checkin.preparing")}
+                  </motion.p>
+                ) : captions && caption ? (
+                  <motion.p
+                    key="caption"
+                    data-slot="caption"
+                    className={cn(
+                      "line-clamp-2 max-w-[min(46rem,92vw)] text-center text-[15.5px] leading-snug",
+                      // the open text field sits bottom-right: keep the caption clear of it on wide screens
+                      keyboardOpen && layout.mode === "wide" && "max-w-[max(16rem,calc(100vw-58rem))]",
+                      caption.who === "crew" && "font-medium text-[var(--aegis-ink)]",
+                      caption.who === "cosmo" && "text-[var(--aegis-ink)]/80",
+                      caption.who === "hint" && "text-[var(--aegis-label)] italic",
+                    )}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.25 }}
+                  >
+                    {caption.text}
+                  </motion.p>
+                ) : null}
+              </AnimatePresence>
             </div>
-          }
-          rail={<KpiCardRail cards={state.cards} />}
-        />
+
+            {/* autoplay was blocked: one tap starts Cosmo, shown once */}
+            <AnimatePresence>
+              {showTapToStart ? (
+                <motion.div
+                  key="tap"
+                  className="absolute inset-x-0 flex justify-center"
+                  style={{ top: mascot.y + mascot.size * 0.5 }}
+                  initial={{ opacity: 0, scale: 0.92 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.96 }}
+                >
+                  <button
+                    type="button"
+                    onClick={tapToStart}
+                    autoFocus
+                    className={cn(
+                      GLASS,
+                      "flex h-14 items-center gap-3 rounded-full px-7 text-[17px] font-medium text-[var(--aegis-ink)] outline-none focus-visible:ring-4 focus-visible:ring-[var(--aegis-accent)]/40",
+                    )}
+                  >
+                    <span className="inline-flex size-8 items-center justify-center rounded-full bg-[var(--aegis-ink)] text-white">
+                      <Play className="size-3.5 translate-x-px fill-current" aria-hidden="true" />
+                    </span>
+                    {t("checkin.tapToStart")}
+                  </button>
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
+          </div>
+
+          <StageToasts toasts={visibleToasts} onAction={handleToastAction} />
+
+          <Corner className="fixed top-4 left-4">
+            <BackControl />
+          </Corner>
+          <Corner className="fixed top-4 right-4">
+            <LanguageCaptionControls captions={captions} onCaptions={setCaptions} />
+          </Corner>
+          {!preparing ? (
+            <>
+              <Corner className="fixed bottom-16 left-4 sm:bottom-9">
+                <DemoControl
+                  running={demo.running}
+                  disabled={!ready || state.busy}
+                  onRun={() => void demo.run()}
+                  onStop={demo.stop}
+                />
+              </Corner>
+              <Corner className="fixed right-4 bottom-16 items-end sm:bottom-9">
+                <KeyboardControl
+                  open={keyboardOpen}
+                  onOpenChange={setKeyboardOpen}
+                  onSend={handleSendText}
+                  disabled={!ready || state.busy || demo.running}
+                />
+              </Corner>
+            </>
+          ) : null}
+
+          <p
+            data-slot="prototype-ribbon"
+            className="fixed inset-x-0 bottom-0 z-10 px-4 py-1.5 text-center text-[11px] leading-tight text-[var(--aegis-label)]"
+          >
+            {t("shell.ribbon.text")}
+          </p>
+        </div>
       </LayoutGroup>
     </MotionConfig>
   );

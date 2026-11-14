@@ -3,8 +3,11 @@ import type { AreaDicts } from "../types";
 /** Crew-select screen strings. Keys are prefixed "crew." and identical in en and mn. */
 export const crewStrings: AreaDicts = {
   en: {
-    "crew.title": "Who is checking in?",
+    "crew.title": "Who is checking in today?",
+    "crew.title.lead": "Who is checking in",
+    "crew.title.accent": "today?",
     "crew.subtitle": "Choose your profile to start today's check-in with Cosmo.",
+    "crew.eyebrow": "Daily check-in",
     "crew.list.label": "Crew members",
     "crew.card.start": "Start check-in",
     "crew.card.starting": "Opening...",
@@ -24,8 +27,11 @@ export const crewStrings: AreaDicts = {
     "crew.role.medical_officer": "Medical officer",
   },
   mn: {
-    "crew.title": "Хэн үзлэгт орох вэ?",
-    "crew.subtitle": "Cosmo-той өнөөдрийн үзлэгээ эхлэхийн тулд өөрийн профайлыг сонгоно уу.",
+    "crew.title": "Өнөөдөр хэн үзлэгт орох вэ?",
+    "crew.title.lead": "Өнөөдөр хэн",
+    "crew.title.accent": "үзлэгт орох вэ?",
+    "crew.subtitle": "Cosmo-той өнөөдрийн үзлэгээ эхлэхийн тулд профайлаа сонгоно уу.",
+    "crew.eyebrow": "Өдрийн үзлэг",
     "crew.list.label": "Багийн гишүүд",
     "crew.card.start": "Үзлэг эхлэх",
     "crew.card.starting": "Нээж байна...",
@@ -36,8 +42,8 @@ export const crewStrings: AreaDicts = {
     "crew.error.load": "Багийн жагсаалтыг ачаалж чадсангүй.",
     "crew.error.session": "Сесс нээж чадсангүй. Дахин оролдоно уу.",
     "crew.privacy": "Энэ дэлгэцэд эрүүл мэндийн мэдээлэл харуулахгүй.",
-    "crew.earth.link": "Дэлхийн хяналтын самбар",
-    "crew.earth.hint": "Газрын багт зориулсан зөвхөн харах горим (симуляци холбоо)",
+    "crew.earth.link": "Дэлхийн хяналтын төв",
+    "crew.earth.hint": "Газрын багт зориулсан зөвхөн харах горим (симуляци холболт)",
 
     "crew.role.flight_engineer": "Нислэгийн инженер",
     "crew.role.mission_specialist": "Нислэгийн мэргэжилтэн",

@@ -1,5 +1,6 @@
 export { CrewSelect } from "./CrewSelect";
 export { CrewCard } from "./CrewCard";
+export { MascotPortrait, variantTint } from "./MascotPortrait";
 export {
   parseStoredCrew,
   saveSelectedCrew,

@@ -1,12 +1,15 @@
 /**
  * Pure helpers behind the dashboard UI (no React, no DOM, no I/O) so they can be unit-tested in node.
  * Everything here only arranges and formats values the server already computed: no medical number,
- * status or comparison is decided in this file.
+ * status or comparison is decided in this file. The one exception is the timeline (buildTimeline), which
+ * re-runs the shared health engine (src/lib/health) on the recorded history days, exactly as the server would.
  */
 
 import type {
   AxisKey,
+  AxisScore,
   DayArcSlot,
+  HazardKey,
   HazardStat,
   KpiKey,
   KpiStat,
@@ -19,7 +22,10 @@ import type {
 import { KPI_KEYS } from "@/lib/types";
 import { KPI_DEFS, asNumber, formatValue } from "@/lib/kpi/registry";
 import { formatNumber } from "@/lib/health/format";
-import { MIN_AXES_FOR_READINESS } from "@/lib/health/scores";
+import { MIN_AXES_FOR_READINESS, computeOverall } from "@/lib/health/scores";
+import { computeBaselines, type HistoryDay } from "@/lib/health/baseline";
+import { evaluateIndicators } from "@/lib/health/status";
+import { evaluateRedFlags } from "@/lib/health/flags";
 import { dictionaries } from "@/i18n/dictionary";
 import { translate } from "@/i18n/translate";
 
@@ -388,4 +394,234 @@ const STEP_S = 0.06;
 /** Delay in seconds for the n-th card of the staggered entrance (capped so late cards do not wait). */
 export function staggerDelay(index: number): number {
   return Math.min(Math.max(index, 0) * STEP_S, MAX_DELAY_S);
+}
+
+/* ═════════════ design v2 (docs/DESIGN_V2.md section 2) ═════════════ */
+
+/* ───────────── body map ───────────── */
+
+export interface BodyHotspot {
+  axis: AxisKey;
+  /** normalised position on public/body/body-figure.png (0..1 of width / height) */
+  x: number;
+  y: number;
+}
+
+/**
+ * One hotspot per radar axis, head to knee (also the ‹ › cycling order). Positions were checked against the
+ * 1020x1536 render: head centre, forehead side, the glowing heart, the figure's right shoulder, the navel, the
+ * figure's right knee.
+ */
+export const BODY_HOTSPOTS: readonly BodyHotspot[] = [
+  { axis: "neuro_ocular", x: 0.5, y: 0.085 },
+  { axis: "sleep", x: 0.565, y: 0.05 },
+  { axis: "cardio", x: 0.515, y: 0.245 },
+  { axis: "behavioral", x: 0.37, y: 0.205 },
+  { axis: "metabolic", x: 0.5, y: 0.37 },
+  { axis: "musculoskeletal", x: 0.425, y: 0.665 },
+];
+
+const AXIS_CYCLE: readonly AxisKey[] = BODY_HOTSPOTS.map((h) => h.axis);
+
+/** next / previous axis in the head-to-knee order (wraps); null starts at the first */
+export function cycleAxis(current: AxisKey | null, step: 1 | -1): AxisKey {
+  if (current === null) return step === 1 ? AXIS_CYCLE[0] : AXIS_CYCLE[AXIS_CYCLE.length - 1];
+  const i = AXIS_CYCLE.indexOf(current);
+  const n = AXIS_CYCLE.length;
+  return AXIS_CYCLE[(((i + step) % n) + n) % n];
+}
+
+/** indicators (non-text) that feed a body axis, registry order */
+export function axisKeys(axis: AxisKey): KpiKey[] {
+  return KPI_KEYS.filter((k) => KPI_DEFS[k].axis === axis && KPI_DEFS[k].type !== "text");
+}
+
+/** the NASA hazard most of an axis's indicators are linked to (ties: registry order) */
+export function axisHazard(axis: AxisKey): HazardKey | null {
+  const counts = new Map<HazardKey, number>();
+  for (const key of axisKeys(axis)) {
+    for (const h of KPI_DEFS[key].hazards) counts.set(h, (counts.get(h) ?? 0) + 1);
+  }
+  let best: HazardKey | null = null;
+  let bestN = 0;
+  for (const [h, n] of counts) {
+    if (n > bestN) {
+      best = h;
+      bestN = n;
+    }
+  }
+  return best;
+}
+
+/** up to `max` indicator stats of an axis, worst status first (values before missing ones), registry order inside */
+export function axisIndicators(axis: AxisKey, kpis: readonly KpiStat[], max = 3): KpiStat[] {
+  const keys = axisKeys(axis);
+  const stats = kpis.filter((k) => keys.includes(k.key));
+  return [...stats]
+    .sort((a, b) => SEVERITY[b.status] - SEVERITY[a.status] || keys.indexOf(a.key) - keys.indexOf(b.key))
+    .slice(0, max);
+}
+
+/** the axis with the worst status today (first in head-to-knee order on ties); null when none has data */
+export function worstAxis(axes: readonly AxisScore[]): AxisKey | null {
+  let best: AxisScore | null = null;
+  for (const axis of AXIS_CYCLE) {
+    const a = axes.find((x) => x.axis === axis);
+    if (!a || a.status === "no_data") continue;
+    if (!best || SEVERITY[a.status] > SEVERITY[best.status]) best = a;
+  }
+  return best ? best.axis : null;
+}
+
+/* ───────────── highlight vital ───────────── */
+
+const CHARTABLE = new Set(["number", "integer", "scale"]);
+
+/** true for indicators that can be drawn as bars (numbers, integers, scales) */
+export function isChartable(key: KpiKey): boolean {
+  return CHARTABLE.has(KPI_DEFS[key].type);
+}
+
+/**
+ * The indicator of the highlight card: the first summary finding that can be charted, else the chartable indicator
+ * furthest from the person's usual among the non-green ones, else heart rate.
+ */
+export function highlightKey(
+  findings: ReadonlyArray<{ key: KpiKey }>,
+  kpis: readonly KpiStat[],
+): KpiKey {
+  for (const f of findings) if (isChartable(f.key)) return f.key;
+  let best: KpiStat | null = null;
+  for (const k of kpis) {
+    if (!isChartable(k.key) || k.status === "green" || k.status === "no_data") continue;
+    const score = SEVERITY[k.status] * 100 + Math.abs(k.z ?? 0);
+    const bestScore = best ? SEVERITY[best.status] * 100 + Math.abs(best.z ?? 0) : -1;
+    if (score > bestScore) best = k;
+  }
+  return best ? best.key : "heart_rate";
+}
+
+export interface HistorySummary {
+  /** the personal 14-day mean (baselineMean, else the mean of the history) */
+  avg: number;
+  min: number;
+  max: number;
+  n: number;
+}
+
+/** AVG and RANGE of a stat's past days; null without history */
+export function historySummary(stat: KpiStat): HistorySummary | null {
+  const values = stat.history.map((h) => h.value).filter((v) => Number.isFinite(v));
+  if (values.length === 0) return null;
+  const mean = values.reduce((a, b) => a + b, 0) / values.length;
+  return {
+    avg: stat.baselineMean ?? mean,
+    min: Math.min(...values),
+    max: Math.max(...values),
+    n: values.length,
+  };
+}
+
+export interface Bar {
+  date: string | null;
+  value: number;
+  today: boolean;
+}
+
+/** the last `count` bars: past days oldest first, then today when it has a number */
+export function recentBars(stat: KpiStat, count: number): Bar[] {
+  const today = stat.value === null ? null : asNumber(stat.value);
+  const pastCount = Math.max(count - (today === null ? 0 : 1), 0);
+  const past = stat.history.slice(-pastCount).map((h) => ({ date: h.date, value: h.value, today: false }));
+  return today === null ? past : [...past, { date: null, value: today, today: true }];
+}
+
+/** progress of a value towards a target, 0..1 (null value -> null) */
+export function targetFraction(value: number | null, target: number): number | null {
+  if (value === null || !Number.isFinite(value) || target <= 0) return null;
+  return Math.min(Math.max(value / target, 0), 1);
+}
+
+/** the "low / yellow" demo-parameter threshold of a key, used as the daily target on the mini donuts */
+export function demoTarget(key: KpiKey): number | null {
+  return KPI_DEFS[key].thresholds?.low?.yellow ?? null;
+}
+
+/* ───────────── timeline ───────────── */
+
+export interface TimelineDay {
+  /** YYYY-MM-DD (UTC) */
+  date: string;
+  status: Status;
+  /** axis of the day's worst indicator; null for normal days and days without data */
+  axis: AxisKey | null;
+  /** at least one value was recorded that day */
+  hasData: boolean;
+  today: boolean;
+}
+
+const DAY_MS = 86_400_000;
+
+function isoDate(ms: number): string {
+  return new Date(ms).toISOString().slice(0, 10);
+}
+
+/**
+ * The last `days` days ending today (UTC dates). Past days are re-evaluated with the same health engine the
+ * server uses (src/lib/health), from the values recorded that day against the days before it; nothing is
+ * invented: a day without recorded values is "no_data". Today takes the payload's overall status.
+ */
+export function buildTimeline(
+  input: { kpis: readonly KpiStat[]; overall: Status; axes: readonly AxisScore[]; confirmedAt: string },
+  days = 15,
+): TimelineDay[] {
+  const end = new Date(input.confirmedAt);
+  const endMs = Number.isNaN(end.getTime()) ? Date.now() : end.getTime();
+  const todayIso = isoDate(endMs);
+  const todayStart = Date.parse(`${todayIso}T00:00:00.000Z`);
+
+  const byDate = new Map<string, Partial<Record<KpiKey, MeasurementValue>>>();
+  for (const k of input.kpis) {
+    for (const p of k.history) {
+      const values = byDate.get(p.date) ?? {};
+      values[k.key] = p.value;
+      byDate.set(p.date, values);
+    }
+  }
+  const allPast: HistoryDay[] = [...byDate.entries()]
+    .filter(([date]) => date < todayIso)
+    .map(([date, values]) => ({ date, values }))
+    .sort((a, b) => (a.date < b.date ? -1 : 1));
+
+  const out: TimelineDay[] = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const date = isoDate(todayStart - i * DAY_MS);
+    if (date === todayIso) {
+      const axis = input.overall === "green" || input.overall === "no_data" ? null : worstAxis(input.axes);
+      out.push({ date, status: input.overall, axis, hasData: input.overall !== "no_data", today: true });
+      continue;
+    }
+    const values = byDate.get(date);
+    if (!values || Object.keys(values).length === 0) {
+      out.push({ date, status: "no_data", axis: null, hasData: false, today: false });
+      continue;
+    }
+    const prior = allPast.filter((d) => d.date < date);
+    const indicators = evaluateIndicators(values, computeBaselines(prior));
+    const status = computeOverall(indicators, evaluateRedFlags(values, indicators));
+    let axis: AxisKey | null = null;
+    if (status === "yellow" || status === "red") {
+      let worst = 0;
+      for (const key of KPI_KEYS) {
+        const s = SEVERITY[indicators[key].status];
+        const a = KPI_DEFS[key].axis;
+        if (a !== null && s > worst) {
+          worst = s;
+          axis = a;
+        }
+      }
+    }
+    out.push({ date, status, axis, hasData: true, today: false });
+  }
+  return out;
 }

@@ -11,7 +11,7 @@ import { useI18n } from "@/i18n/I18nProvider";
 import { COSMO_LAYOUT_ID } from "@/lib/motion";
 import { useSummaryAudio } from "./useSummaryAudio";
 
-const AVATAR_PX = 76;
+const AVATAR_PX = 64;
 
 function emotionFor(overall: DashboardPayload["overall"]): CosmoEmotion {
   if (overall === "red") return "concerned";
@@ -41,7 +41,8 @@ export function CosmoDock({
   dockSlot?: ReactNode;
 }) {
   const { t, pick } = useI18n();
-  const [open, setOpen] = useState(true);
+  // open right after the check-in hand-off (dockSlot given); collapsed on reloads so it does not cover the cards
+  const [open, setOpen] = useState(dockSlot !== undefined);
   const { summary } = payload;
   const audio = useSummaryAudio({
     checkInId: payload.checkIn.id,
@@ -58,7 +59,7 @@ export function CosmoDock({
       data-slot="cosmo-dock"
       role="region"
       aria-label={t("dashboard.dock.region")}
-      className="fixed right-4 bottom-12 z-40 flex w-[min(24rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl bg-card shadow-lg ring-1 ring-foreground/15"
+      className="z-40 flex w-full flex-col overflow-hidden rounded-[24px] border border-white/80 bg-white/75 shadow-[0_30px_70px_-30px_rgba(40,80,160,0.55)] backdrop-blur-xl md:fixed md:right-5 md:bottom-12 md:w-[min(21.5rem,calc(100vw-2rem))]"
     >
       <div className="flex items-center gap-3 p-3">
         <div className="shrink-0" style={{ width: AVATAR_PX, height: AVATAR_PX }}>
@@ -76,8 +77,8 @@ export function CosmoDock({
           )}
         </div>
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <p className="text-sm font-medium text-muted-foreground">{t("dashboard.dock.title")}</p>
-          <p data-slot="dock-headline" className="text-base leading-snug font-semibold text-foreground">
+          <p className="unit-label">{t("dashboard.dock.title")}</p>
+          <p data-slot="dock-headline" className="line-clamp-2 text-[15px] leading-snug font-medium text-[var(--aegis-ink)]">
             {pick(summary.headline)}
           </p>
         </div>
@@ -94,15 +95,15 @@ export function CosmoDock({
       </div>
 
       {open ? (
-        <div className="flex max-h-[min(24rem,52vh)] flex-col gap-3 overflow-y-auto border-t border-border px-4 py-3">
+        <div className="flex max-h-[min(24rem,52vh)] flex-col gap-3 overflow-y-auto border-t border-[var(--aegis-hairline)] px-4 py-3">
           <section aria-label={t("dashboard.dock.findings")} className="flex flex-col gap-1.5">
-            <h3 className="text-sm font-medium text-muted-foreground">{t("dashboard.dock.findings")}</h3>
+            <h3 className="unit-label">{t("dashboard.dock.findings")}</h3>
             {findings.length === 0 ? (
-              <p className="text-base text-foreground">{t("dashboard.dock.noFindings")}</p>
+              <p className="text-[14px] text-[var(--aegis-ink)]">{t("dashboard.dock.noFindings")}</p>
             ) : (
               <ul className="flex flex-col gap-1.5">
                 {findings.map((f) => (
-                  <li key={f.key} className="text-base text-foreground">
+                  <li key={f.key} className="text-[14px] leading-snug text-[var(--aegis-ink)]">
                     {pick(f.text)}
                   </li>
                 ))}
@@ -112,12 +113,12 @@ export function CosmoDock({
 
           {recommendations.length > 0 ? (
             <section aria-label={t("dashboard.dock.recommendations")} className="flex flex-col gap-1.5">
-              <h3 className="text-sm font-medium text-muted-foreground">
+              <h3 className="unit-label">
                 {t("dashboard.dock.recommendations")}
               </h3>
               <ul className="flex flex-col gap-2">
                 {recommendations.map((r) => (
-                  <li key={r.id} className="flex flex-col text-base text-foreground">
+                  <li key={r.id} className="flex flex-col rounded-2xl bg-[var(--aegis-pastel-blue)]/70 px-3 py-2 text-[14px] leading-snug text-[var(--aegis-ink)]">
                     <span className="font-medium">{pick(r.title)}</span>
                   </li>
                 ))}
@@ -125,13 +126,14 @@ export function CosmoDock({
             </section>
           ) : null}
 
-          <p className="text-sm text-muted-foreground">{pick(summary.disclaimer)}</p>
+          <p className="text-[12px] text-[var(--aegis-label)]">{pick(summary.disclaimer)}</p>
 
           <div className="flex flex-col gap-1.5">
             <Button
               type="button"
               size="lg"
               variant="outline"
+              className="rounded-full bg-white"
               disabled={!audio.canPlay}
               aria-pressed={audio.playing}
               onClick={audio.playing ? audio.stop : audio.play}

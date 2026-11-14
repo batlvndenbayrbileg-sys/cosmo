@@ -1,23 +1,29 @@
 "use client";
 
 import { useState } from "react";
+import { MotionConfig, motion } from "framer-motion";
+import { Info, ShieldCheck } from "lucide-react";
 import type { AlertRow, CrewStatusCard } from "@/lib/types";
-import { Badge } from "@/components/ui/badge";
+import { PageFrame } from "@/components/shell/PageFrame";
+import { TopBar } from "@/components/shell/TopBar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useI18n } from "@/i18n/I18nProvider";
 import { AlertsFeed } from "./AlertsFeed";
 import { CrewCard } from "./CrewCard";
 import { DelaySelector } from "./DelaySelector";
+import { EarthTitle } from "./EarthTitle";
 import { ErrorNotice } from "./ErrorNotice";
 import { delayMsFor, parseDelayId, type DelayId } from "./delay";
 import { useResource } from "./useResource";
 
+const CREW_GRID = "grid grid-cols-1 gap-4 sm:grid-cols-2";
+
 function CrewSkeletons() {
   const { t } = useI18n();
   return (
-    <div role="status" aria-label={t("earth.loading")} className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div role="status" aria-label={t("earth.loading")} className={CREW_GRID}>
       {[0, 1, 2, 3].map((i) => (
-        <Skeleton key={i} className="h-72 rounded-xl" />
+        <Skeleton key={i} className="h-[268px] rounded-[var(--aegis-radius-card)] bg-white/60" />
       ))}
     </div>
   );
@@ -43,62 +49,92 @@ export function EarthConsole({ initialDelay }: { initialDelay?: string }) {
   };
 
   return (
-    <div data-slot="earth-console" className="flex flex-col gap-6">
-      <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-3xl font-semibold tracking-tight text-foreground">{t("earth.title")}</h1>
-          <p className="text-lg text-muted-foreground">{t("earth.subtitle")}</p>
+    <MotionConfig reducedMotion="user">
+      <PageFrame data-slot="earth-console">
+        <TopBar center={<EarthTitle />} />
+
+        {/* heading + delay */}
+        <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <h1 className="text-[30px] leading-tight font-light tracking-tight text-[color:var(--aegis-ink)] sm:text-[34px]">
+              {t("earth.heading.lead")} <span className="font-medium">{t("earth.heading.accent")}</span>
+            </h1>
+            <p className="max-w-xl text-[16px] text-[color:var(--aegis-label)]">{t("earth.subtitle")}</p>
+          </div>
+          <section aria-label={t("earth.delay.label")} className="flex flex-col items-start gap-1.5 lg:items-end">
+            <DelaySelector value={delayId} onChange={setDelayId} />
+            <p className="flex items-center gap-1.5 text-[12px] text-[color:var(--aegis-label)]">
+              <Info className="size-3.5 shrink-0" aria-hidden="true" />
+              {t("earth.delay.hint")}
+            </p>
+            <p className="text-[11px] text-[color:var(--aegis-label)]/80">{t("earth.delay.notNasa")}</p>
+          </section>
         </div>
-        <Badge variant="outline" className="h-6 border-dashed px-2.5 text-xs">
-          {t("earth.simulatedBadge")}
-        </Badge>
-      </header>
 
-      <section aria-label={t("earth.delay.label")} className="flex flex-col gap-1.5">
-        <DelaySelector value={delayId} onChange={setDelayId} />
-        <p className="text-sm text-muted-foreground">{t("earth.delay.hint")}</p>
-        <p className="text-xs text-muted-foreground">{t("earth.delay.notNasa")}</p>
-      </section>
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_400px]">
+          <section aria-labelledby="earth-crew-title" className="flex min-w-0 flex-col gap-3">
+            <h2 id="earth-crew-title" className="sr-only">
+              {t("earth.crew.title")}
+            </h2>
+            {crew.status === "loading" ? <CrewSkeletons /> : null}
+            {crew.status === "error" ? (
+              <ErrorNotice title={t("earth.error")} detail={crew.error.message} onRetry={retry} />
+            ) : null}
+            {crew.status === "ready" ? (
+              <ul className={CREW_GRID}>
+                {crewCards.map((card, i) => (
+                  <motion.li
+                    key={card.crew.id}
+                    initial={{ opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ type: "spring", stiffness: 150, damping: 22, delay: i * 0.06 }}
+                  >
+                    <CrewCard card={card} delayId={delayId} />
+                  </motion.li>
+                ))}
+              </ul>
+            ) : null}
+          </section>
 
-      <section aria-labelledby="earth-crew-title" className="flex flex-col gap-3">
-        <h2 id="earth-crew-title" className="text-xl font-semibold text-foreground">
-          {t("earth.crew.title")}
-        </h2>
-        {crew.status === "loading" ? <CrewSkeletons /> : null}
-        {crew.status === "error" ? (
-          <ErrorNotice title={t("earth.error")} detail={crew.error.message} onRetry={retry} />
-        ) : null}
-        {crew.status === "ready" ? (
-          <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {crewCards.map((card) => (
-              <li key={card.crew.id}>
-                <CrewCard card={card} delayId={delayId} />
-              </li>
-            ))}
-          </ul>
-        ) : null}
-      </section>
+          <div className="flex min-w-0 flex-col gap-5">
+            {alerts.status === "loading" ? (
+              <Skeleton
+                role="status"
+                aria-label={t("earth.loading")}
+                className="h-48 rounded-[var(--aegis-radius-card)] bg-white/60"
+              />
+            ) : null}
+            {alerts.status === "error" ? (
+              <ErrorNotice title={t("earth.error")} detail={alerts.error.message} onRetry={retry} />
+            ) : null}
+            {alerts.status === "ready" ? (
+              <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ type: "spring", stiffness: 150, damping: 22, delay: 0.15 }}
+              >
+                <AlertsFeed alerts={alerts.data ?? []} crew={crewCards} delayId={delayId} />
+              </motion.div>
+            ) : null}
 
-      {alerts.status === "loading" ? (
-        <Skeleton role="status" aria-label={t("earth.loading")} className="h-32 rounded-xl" />
-      ) : null}
-      {alerts.status === "error" ? (
-        <ErrorNotice title={t("earth.error")} detail={alerts.error.message} onRetry={retry} />
-      ) : null}
-      {alerts.status === "ready" ? (
-        <AlertsFeed alerts={alerts.data ?? []} crew={crewCards} delayId={delayId} />
-      ) : null}
-
-      <aside
-        aria-labelledby="earth-privacy-title"
-        className="flex flex-col gap-1 rounded-xl border border-border bg-card px-4 py-3"
-      >
-        <h2 id="earth-privacy-title" className="text-sm font-medium text-foreground">
-          {t("earth.privacy.title")}
-        </h2>
-        <p className="text-sm text-muted-foreground">{t("earth.privacy.note")}</p>
-        <p className="text-sm text-muted-foreground">{t("earth.privacy.noText")}</p>
-      </aside>
-    </div>
+            <aside
+              aria-labelledby="earth-privacy-title"
+              className="glass-card flex items-start gap-3 !bg-white/60 p-4 sm:p-5"
+            >
+              <span className="icon-chip !size-9">
+                <ShieldCheck className="size-[18px]" aria-hidden="true" />
+              </span>
+              <div className="flex min-w-0 flex-col gap-1">
+                <h2 id="earth-privacy-title" className="text-[15px] font-medium text-[color:var(--aegis-ink)]">
+                  {t("earth.privacy.title")}
+                </h2>
+                <p className="text-[13px] leading-snug text-[color:var(--aegis-label)]">{t("earth.privacy.note")}</p>
+                <p className="text-[13px] leading-snug text-[color:var(--aegis-label)]">{t("earth.privacy.noText")}</p>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </PageFrame>
+    </MotionConfig>
   );
 }

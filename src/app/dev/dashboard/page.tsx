@@ -31,6 +31,7 @@ function Segmented<T extends string>({
           key={o.id}
           type="button"
           size="lg"
+          className="rounded-full"
           variant={o.id === value ? "default" : "outline"}
           aria-pressed={o.id === value}
           onClick={() => onChange(o.id)}
@@ -51,7 +52,7 @@ export default function DashboardPlaygroundPage() {
     <div className="flex flex-col gap-6">
       <section
         aria-label="Fixture controls"
-        className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4"
+        className="glass-card mx-auto flex w-full max-w-[1360px] flex-col gap-3 p-4"
       >
         <h1 className="text-xl font-semibold">Dashboard playground</h1>
         <p className="text-sm text-muted-foreground">
