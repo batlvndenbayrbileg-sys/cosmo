@@ -1,5 +1,7 @@
 import "server-only";
+import { evaluateDay, type HistoryDay } from "@/lib/health";
 import type { Bilingual, CrewPublic, KpiKey, Lang } from "@/lib/types";
+import { composeTemplateSummary } from "@/server/dashboard/template";
 import type { Db } from "./client";
 import { localDateISO } from "./shared";
 
@@ -12,8 +14,14 @@ import { localDateISO } from "./shared";
  * Each continuous key's 14 noise draws are standardised (sample mean 0, sd 1) before they are
  * scaled, so the 14-day mean and sd really are the profile's numbers ("usual sleep 7.2 h").
  *
- * Seeded check-ins carry NO summary_json (the summary is computed by src/lib/health from the
- * measurements); they have no turns.
+ * Only the LAST seeded check-in of each crew member carries a summary_json (a SummaryPayload with
+ * template spoken text in the member's language, computed by src/lib/health from the seeded
+ * values), so the Earth console has summaries from the start. Older seeded check-ins have none
+ * and no turns. Mira's last day also gets the HEADACHE_PLUS_VISION alert, worded by the red flag
+ * that evaluateDay produces for it.
+ *
+ * Bat is the demo user: his last seeded day is forced calm (workload capped at the demo "green"
+ * bound) so it evaluates green overall, whatever the noise draw was.
  */
 
 export const SEED_DAYS = 14;
@@ -213,10 +221,8 @@ const NOTES: Record<Lang, readonly string[]> = {
   ],
 };
 
-const MIRA_ALERT_TEXT: Bilingual = {
-  en: "Alert: headache together with blurred vision was reported. This is an alert, not a diagnosis. Your crew medical officer and ground have been informed (simulated link).",
-  mn: "Анхааруулга: толгой өвдөх болон хараа бүдгэрэх мэдээлэл ирлээ. Энэ бол анхааруулга, онош биш. Багийн эмч болон Дэлхийн төв мэдэгдсэн (дуурайсан холбоо).",
-};
+/** demo "green" bound of workload (docs/DASHBOARD_PLAN.md section 1.1: high yellow 3) */
+const CALM_WORKLOAD = 3;
 
 /* ───────────── deterministic PRNG ───────────── */
 
@@ -317,6 +323,11 @@ function generateDays(p: Profile): SeedDay[] {
       values.vision_check = 1;
     }
 
+    if (p.story === "steady" && i === SEED_DAYS - 1) {
+      // the demo user's (and Saraa's) latest day must read green: no workload spike on the last day
+      values.workload = Math.min(values.workload, CALM_WORKLOAD);
+    }
+
     days.push({
       index: i,
       values,
@@ -385,9 +396,14 @@ export function seedDatabase(db: Db, opts: SeedOptions = {}): SeedResult {
          (id, check_in_id, crew_id, key, value, value_text, unit, source_text, confidence, source, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, 'simulated', ?)`,
     );
+    // same columns as repos/alert.insertAlert, but bound to the `db` handle that is being seeded
+    // (the repo functions always use the process-wide getDb() singleton)
     const insertAlert = db.prepare(
       `INSERT OR IGNORE INTO alert (id, crew_id, check_in_id, created_at, level, rule, text_json)
-       VALUES (?, ?, ?, ?, 'red', 'HEADACHE_PLUS_VISION', ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    );
+    const setSummary = db.prepare(
+      "UPDATE check_in SET summary_json = ? WHERE id = ? AND crew_id = ? AND summary_json IS NULL",
     );
 
     for (const profile of SEED_CREW) {
@@ -404,6 +420,8 @@ export function seedDatabase(db: Db, opts: SeedOptions = {}): SeedResult {
       // separate stream for time jitter so it never perturbs the value draws
       const timeRng = mulberry32(hashSeed(`${profile.avatarSeed}:time`));
       const days = generateDays(profile);
+      /** confirmed days before the one being written, for the baseline of the last day's summary */
+      const history: HistoryDay[] = [];
 
       for (const day of days) {
         const daysBefore = SEED_DAYS - day.index;
@@ -434,16 +452,32 @@ export function seedDatabase(db: Db, opts: SeedOptions = {}): SeedResult {
           result.measurements += 1;
         }
 
-        if (profile.story === "headache_vision" && day.index === SEED_DAYS - 1) {
-          insertAlert.run(
-            `al-${checkInId}-HEADACHE_PLUS_VISION`,
-            profile.id,
-            checkInId,
-            new Date(confirmed.getTime() + 1_000).toISOString(),
-            JSON.stringify(MIRA_ALERT_TEXT),
-          );
-          result.alerts += 1;
+        const values: HistoryDay["values"] = { ...day.values };
+        if (day.note !== null) values.day_note = day.note;
+
+        if (day.index === SEED_DAYS - 1) {
+          // last seeded check-in: stored summary (template wording) so ground has it from the start
+          const evaluation = evaluateDay(values, history);
+          const summary = composeTemplateSummary(evaluation.summary, profile.preferredLanguage);
+          setSummary.run(JSON.stringify(summary), checkInId, profile.id);
+
+          if (profile.story === "headache_vision") {
+            const flag = evaluation.redFlags.find((f) => f.rule === "HEADACHE_PLUS_VISION");
+            if (!flag) throw new Error("seed: Mira's last day must raise HEADACHE_PLUS_VISION");
+            const text: Bilingual = flag.text;
+            insertAlert.run(
+              `al-${checkInId}-HEADACHE_PLUS_VISION`,
+              profile.id,
+              checkInId,
+              new Date(confirmed.getTime() + 1_000).toISOString(),
+              "red",
+              "HEADACHE_PLUS_VISION",
+              JSON.stringify(text),
+            );
+            result.alerts += 1;
+          }
         }
+        history.push({ date: localDate, values });
       }
     }
     result.dates.sort();

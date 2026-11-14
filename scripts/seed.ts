@@ -43,6 +43,7 @@ async function main(): Promise<void> {
   const { listMeasurements } = await import("../src/server/db/repos/measurement");
   const { listAlerts } = await import("../src/server/db/repos/alert");
   const { getEnv } = await import("../src/server/env");
+  const { buildDashboardPayload } = await import("../src/server/dashboard/build");
 
   const db = getDb();
   const result = seedDatabase(db, { wipe: true });
@@ -69,6 +70,7 @@ async function main(): Promise<void> {
     ["vis", 4],
     ["load", 5],
     ["alerts", 6],
+    ["overall", 8],
   ] as const;
   console.log(columns.map(([name, w]) => cell(name, w)).join(" "));
   console.log(columns.map(([, w]) => "-".repeat(w)).join(" "));
@@ -97,6 +99,8 @@ async function main(): Promise<void> {
       v.vision_check,
       v.workload,
       listAlerts(crew.id).length,
+      // computed by src/lib/health from the seeded values (and the stored summary, if any)
+      buildDashboardPayload({ crewId: crew.id, viewer: "crew" })?.overall,
     ];
     console.log(row.map((x, i) => cell(x, columns[i][1])).join(" "));
   }

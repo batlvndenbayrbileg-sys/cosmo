@@ -47,7 +47,9 @@ export function parseEnv(source: Record<string, string | undefined>): Env {
     voiceIdMn: e.ELEVENLABS_VOICE_ID_MN,
     voiceIdEn: e.ELEVENLABS_VOICE_ID_EN,
     sttModel: e.ELEVENLABS_STT_MODEL ?? "scribe_v2",
-    ttsModelMn: e.ELEVENLABS_TTS_MODEL_MN ?? "eleven_v3",
+    // Live GET /v1/models (2026-11-14): only eleven_v4 and eleven_v4_turbo list Mongolian on this
+    // account; eleven_v3 does not. v4_turbo is the low-latency one.
+    ttsModelMn: e.ELEVENLABS_TTS_MODEL_MN ?? "eleven_v4_turbo",
     ttsModelEn: e.ELEVENLABS_TTS_MODEL_EN,
     dbPath: e.AEGIS_DB_PATH ?? "data/aegis.db",
     sessionSecret: e.SESSION_SECRET,

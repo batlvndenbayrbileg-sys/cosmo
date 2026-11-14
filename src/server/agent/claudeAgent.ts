@@ -1,0 +1,352 @@
+import "server-only";
+import Anthropic from "@anthropic-ai/sdk";
+import type { KpiKey, Lang, SummaryFindings, TurnRow } from "@/lib/types";
+import { KPI_DEFS, getQuestion } from "@/lib/kpi/registry";
+import { getEnv } from "@/server/env";
+import { LlmUnavailable, type Agent, type AgentArgs, type AgentDecision } from "./agent";
+import { buildDirective } from "./directive";
+import { interpretYesNo, type InterpretedRecord } from "./interpret";
+import { SYSTEM_PROMPT } from "./prompt";
+import { detectSkip, startAnswerFor } from "./scriptedAgent";
+import type { ClarifyReason } from "./templates";
+import { TOOL_DEFINITIONS, type ToolResult } from "./tools";
+
+/**
+ * The live agent: Claude through the Messages API with tool use (docs/PLAN.md sections 4.2 to 4.4).
+ *
+ * Request rules for the current model family, all asserted in tests/claude-agent.test.ts:
+ *  - model from getEnv().anthropicModel; streaming via client.messages.stream(...).finalMessage();
+ *  - tool_choice is "auto" only (forced "any"/"tool" is an HTTP 400); every tool is strict; the tool list is constant;
+ *  - output_config.effort "low"; no temperature, top_p, top_k; no assistant prefill; no thinking parameter;
+ *  - stop_reason "refusal" or "max_tokens" is checked BEFORE any tool runs and throws LlmUnavailable;
+ *  - the last 20 turns plus the running KPI JSON and a code-built directive follow the frozen system prompt;
+ *  - one model call per spoken turn on the happy path (reply text and tool calls in one assistant message); a second
+ *    call is made only when a tool call was rejected, or the model asked for data (get_baseline, compose_summary).
+ *
+ * The agent never writes: tool calls are VALIDATED with the pipeline's own validator (`args.validate`, a dry run of
+ * executeTool) and returned as records; turn.ts applies them through the same executeTool path as the scripted agent.
+ * Any API failure, timeout, refusal or missing key throws LlmUnavailable and the pipeline falls back for that turn.
+ */
+
+export const HISTORY_TURNS = 20;
+export const MAX_OUTPUT_TOKENS = 700;
+export const REQUEST_TIMEOUT_MS = 8000;
+
+/** the slice of the SDK this agent needs: injectable so tests can pass a fake */
+export interface LlmClient {
+  messages: {
+    stream(
+      body: Anthropic.MessageStreamParams,
+      options?: { signal?: AbortSignal },
+    ): { finalMessage(): Promise<Anthropic.Message> };
+  };
+}
+
+export interface ClaudeAgentOptions {
+  client?: LlmClient | null;
+  /** overrides getEnv().anthropicModel (tests) */
+  model?: string;
+  timeoutMs?: number;
+  /**
+   * Where the per-turn directive goes. "system" appends a mid-conversation system message after the latest user
+   * message (keeps the cached prefix); "user" puts it in the user turn, for a model that rejects system messages.
+   */
+  directiveRole?: "system" | "user";
+}
+
+const INFORMATIONAL_TOOLS = new Set(["get_baseline", "compose_summary"]);
+
+type ToolUse = { id: string; name: string; input: unknown };
+type Called = { use: ToolUse; result: ToolResult };
+
+function textOf(message: Anthropic.Message): string {
+  return message.content
+    .filter((b): b is Anthropic.TextBlock => b.type === "text")
+    .map((b) => b.text)
+    .join("")
+    .trim();
+}
+
+function toolUsesOf(message: Anthropic.Message): ToolUse[] {
+  return message.content
+    .filter((b): b is Anthropic.ToolUseBlock => b.type === "tool_use")
+    .map((b) => ({ id: b.id, name: b.name, input: b.input }));
+}
+
+/** the last HISTORY_TURNS turns as alternating user/assistant messages, ending with the current utterance */
+export function buildMessages(history: TurnRow[], utterance: string): Anthropic.MessageParam[] {
+  const turns = history.filter((t) => t.speaker !== "system").slice(-HISTORY_TURNS);
+  const out: Array<{ role: "user" | "assistant"; content: string }> = [];
+  const push = (role: "user" | "assistant", content: string) => {
+    const last = out[out.length - 1];
+    if (last && last.role === role) last.content = `${last.content}\n${content}`;
+    else out.push({ role, content });
+  };
+  for (const t of turns) push(t.speaker === "crew" ? "user" : "assistant", t.text);
+  if (out.length > 0 && out[0].role === "assistant") out.unshift({ role: "user", content: "(the check-in begins)" });
+  push("user", utterance);
+  return out;
+}
+
+/** a few words of plain agreement ("sounds right", "that's correct"): no question, no number */
+function isShortAffirmation(text: string): boolean {
+  const t = text.trim();
+  if (t.length === 0 || /[?\d]/u.test(t)) return false;
+  const words = t.split(/\s+/u).filter((w) => /\p{L}/u.test(w));
+  return words.length > 0 && words.length <= 4;
+}
+
+/**
+ * The read-back answer. The confirmation is irreversible (confirmed check-in, stored summary, alerts), so a model's
+ * "confirmed: true" is accepted only when the astronaut's own words agree:
+ *  - a rule-based "no" always wins; a model "no" (or a rule "yes" the model doubts) re-opens the read-back;
+ *  - "true" needs a rule-based "yes", or - when the rules read nothing - a short plain affirmation without a
+ *    question mark or a digit; anything else ("what does my blood pressure usually look like?") is `null`, which
+ *    repeats the read-back question.
+ */
+export function resolveConfirmation(text: string, lang: Lang, modelConfirmed: boolean | undefined): boolean | null {
+  const rule = interpretYesNo(text, lang);
+  if (rule === false) return false;
+  if (modelConfirmed === undefined) return rule;
+  if (modelConfirmed === false) return false;
+  if (rule === true) return true;
+  return isShortAffirmation(text) ? true : null;
+}
+
+function toClarifyReason(result: ToolResult): ClarifyReason {
+  if (!result.ok && result.reason) return result.reason;
+  return "unclear";
+}
+
+export class ClaudeAgent implements Agent {
+  readonly name = "claude" as const;
+  private readonly injected: LlmClient | null | undefined;
+  private readonly modelOverride: string | undefined;
+  private readonly timeoutMs: number;
+  private readonly directiveRole: "system" | "user";
+  private lazyClient: LlmClient | null | undefined;
+
+  constructor(options: ClaudeAgentOptions = {}) {
+    this.injected = options.client;
+    this.modelOverride = options.model;
+    this.timeoutMs = options.timeoutMs ?? REQUEST_TIMEOUT_MS;
+    this.directiveRole = options.directiveRole ?? "system";
+  }
+
+  private client(): LlmClient {
+    if (this.injected) return this.injected;
+    if (this.lazyClient === undefined) {
+      const apiKey = getEnv().anthropicApiKey;
+      this.lazyClient = apiKey
+        ? (new Anthropic({ apiKey, maxRetries: 1 }) as unknown as LlmClient)
+        : null;
+    }
+    if (!this.lazyClient) throw new LlmUnavailable("no ANTHROPIC_API_KEY");
+    return this.lazyClient;
+  }
+
+  private model(): string {
+    return this.modelOverride ?? getEnv().anthropicModel;
+  }
+
+  /** one streamed request, bounded in time; refusal and truncation are errors BEFORE anything is read from it */
+  private async call(messages: Anthropic.MessageParam[]): Promise<Anthropic.Message> {
+    const client = this.client();
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const deadline = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        controller.abort();
+        reject(new LlmUnavailable(`timeout after ${this.timeoutMs} ms`));
+      }, this.timeoutMs);
+    });
+    let message: Anthropic.Message;
+    try {
+      const body: Anthropic.MessageStreamParams = {
+        model: this.model(),
+        max_tokens: MAX_OUTPUT_TOKENS,
+        system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
+        tools: [...TOOL_DEFINITIONS],
+        tool_choice: { type: "auto" },
+        output_config: { effort: "low" },
+        messages,
+      };
+      const stream = client.messages.stream(body, { signal: controller.signal });
+      message = await Promise.race([stream.finalMessage(), deadline]);
+    } catch (err) {
+      if (err instanceof LlmUnavailable) throw err;
+      throw new LlmUnavailable("API call failed", { cause: err });
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+
+    const reason = message.stop_reason;
+    if (reason === "refusal") throw new LlmUnavailable("refusal");
+    if (reason === "max_tokens") throw new LlmUnavailable("max_tokens");
+    if (reason !== "end_turn" && reason !== "tool_use" && reason !== "stop_sequence") {
+      throw new LlmUnavailable(`unexpected stop_reason ${String(reason)}`);
+    }
+    return message;
+  }
+
+  private withDirective(base: Anthropic.MessageParam[], directive: string): Anthropic.MessageParam[] {
+    if (this.directiveRole === "system") return [...base, { role: "system", content: directive }];
+    // fold it into the FIRST user-visible part of the current user turn: the latest user message gets the block
+    const messages = base.map((m) => ({ ...m }));
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i];
+      if (m.role === "user" && typeof m.content === "string") {
+        messages[i] = { role: "user", content: [{ type: "text", text: directive }, { type: "text", text: m.content }] };
+        break;
+      }
+    }
+    return messages;
+  }
+
+  async decide(args: AgentArgs): Promise<AgentDecision> {
+    const started = Date.now();
+    const directive = buildDirective({
+      state: args.ctx.state,
+      lang: args.lang,
+      crewName: args.crew.name,
+      ctx: args.ctx,
+      expected: args.expected,
+      recorded: args.recorded,
+    });
+    const base = buildMessages(args.history, args.text);
+
+    const first = await this.call(this.withDirective(base, directive));
+    const firstCalls = this.validateAll(args, toolUsesOf(first));
+    let finalText = textOf(first);
+    let finalCalls = firstCalls;
+    let carried: Called[] = [];
+
+    const needsSecond = firstCalls.some((c) => !c.result.ok || INFORMATIONAL_TOOLS.has(c.use.name));
+    if (needsSecond) {
+      const withResults: Anthropic.MessageParam[] = [
+        ...base,
+        // the assistant message goes back exactly as received (thinking blocks included, if any)
+        { role: "assistant", content: first.content as Anthropic.ContentBlockParam[] },
+        {
+          role: "user",
+          content: firstCalls.map(
+            (c): Anthropic.ToolResultBlockParam => ({
+              type: "tool_result",
+              tool_use_id: c.use.id,
+              content: c.result.ok ? JSON.stringify(c.result.data) : c.result.error,
+              ...(c.result.ok ? {} : { is_error: true }),
+            }),
+          ),
+        },
+      ];
+      const second = await this.call(this.withDirective(withResults, directive));
+      finalCalls = this.validateAll(args, toolUsesOf(second));
+      // the first reply was never spoken: only the second one counts. Calls that passed in the first message stay.
+      carried = firstCalls;
+      finalText = textOf(second);
+    }
+
+    return this.toDecision(args, carried, finalCalls, finalText, Date.now() - started);
+  }
+
+  private validateAll(args: AgentArgs, uses: ToolUse[]): Called[] {
+    return uses.map((use) => ({ use, result: args.validate(use.name, use.input) }));
+  }
+
+  private toDecision(
+    args: AgentArgs,
+    carried: Called[],
+    final: Called[],
+    text: string,
+    llmMs: number,
+  ): AgentDecision {
+    const records = new Map<KpiKey, InterpretedRecord>();
+    const correction = new Map<KpiKey, InterpretedRecord>();
+    const clarifications = new Map<KpiKey, ClarifyReason>();
+    const rejected = new Map<KpiKey, ClarifyReason>();
+    const restated = new Set<KpiKey>();
+    let confirmed: boolean | undefined;
+
+    for (const { use, result } of [...carried, ...final]) {
+      if (!result.ok) {
+        const key = (use.input as { key?: unknown } | null)?.key;
+        if (typeof key === "string" && key in KPI_DEFS) {
+          // a value that is already recorded and was said again is a change of mind, not a failed answer
+          if (result.code === "already_recorded") restated.add(key as KpiKey);
+          // a tool that was simply not allowed in this state says nothing about what the astronaut said
+          else if (result.code !== "illegal_state") rejected.set(key as KpiKey, toClarifyReason(result));
+        }
+        continue;
+      }
+      const effect = result.effect;
+      if (!effect) continue;
+      if (effect.type === "measurement") {
+        const rec: InterpretedRecord = {
+          key: effect.key,
+          value: effect.value,
+          unit: effect.unit,
+          sourceText: effect.sourceText,
+          confidence: effect.confidence,
+        };
+        (effect.change === "corrected" ? correction : records).set(effect.key, rec);
+        rejected.delete(effect.key);
+      } else if (effect.type === "clarification") {
+        clarifications.set(effect.key, "unclear");
+      } else if (effect.type === "confirmation") {
+        confirmed = effect.confirmed;
+      }
+    }
+
+    const decision: AgentDecision = {
+      records: [...records.values()],
+      emotion: "neutral",
+      llmMs,
+      startAnswer: startAnswerFor(args.ctx, args.text, args.lang),
+    };
+    if (correction.size > 0) decision.correction = [...correction.values()];
+    if (clarifications.size > 0) {
+      decision.clarifications = [...clarifications].map(([key, reason]) => ({ key, reason }));
+    }
+    if (rejected.size > 0) decision.rejected = [...rejected].map(([key, reason]) => ({ key, reason }));
+
+    if (restated.size > 0) decision.restated = [...restated];
+
+    if (args.ctx.state === "CONFIRM") {
+      decision.yesNo = resolveConfirmation(args.text, args.lang, confirmed);
+    }
+    if (args.ctx.state === "KPI_CAPTURE" && args.expected !== null) {
+      const q = getQuestion(args.expected);
+      const answered = [...records.keys()].some((k) => q.keys.includes(k));
+      if (!answered && detectSkip(q, args.text, args.lang)) decision.skip = true;
+    }
+    if (text.length > 0) decision.replyText = text;
+    return decision;
+  }
+
+  async phraseSummary(args: { findings: SummaryFindings; lang: Lang; crew: { name: string } }): Promise<string | null> {
+    const { findings, lang } = args;
+    const facts = {
+      overall: findings.overall,
+      readiness: findings.readiness,
+      headline: findings.headline[lang],
+      findings: findings.findings.map((f) => f.text[lang]),
+      suggestions: findings.recommendations.map((r) => r.title[lang]),
+      alerts: findings.redFlags.map((r) => r.text[lang]),
+    };
+    const prompt = [
+      "DIRECTIVE (written by the system, not by the astronaut)",
+      "state: SUMMARY",
+      `reply_language: ${lang === "mn" ? "Mongolian (Cyrillic)" : "English"}`,
+      "instruction: Say the summary below to the astronaut in a warm, calm voice, at most four short sentences. Use only the numbers that appear in the facts; never add, change or compute any number. Do not diagnose. Do not call any tool.",
+      `facts: ${JSON.stringify(facts)}`,
+    ].join("\n");
+    try {
+      const message = await this.call([{ role: "user", content: prompt }]);
+      const out = textOf(message);
+      return out.length > 0 ? out : null;
+    } catch {
+      return null;
+    }
+  }
+}
+

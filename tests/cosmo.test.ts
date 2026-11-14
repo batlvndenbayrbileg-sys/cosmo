@@ -153,6 +153,10 @@ describe("variantFor", () => {
     expect(new Set(VARIANTS.map((v) => v.accent)).size).toBe(4);
     expect(new Set(VARIANTS.map((v) => v.detail)).size).toBe(4);
     for (let i = 0; i < 4; i++) expect(variantFor(i).index).toBe(i);
+    // ImageCosmo: four distinct neon hues, variant 0 keeps the render's own colours
+    expect(new Set(VARIANTS.map((v) => v.hueDeg)).size).toBe(4);
+    expect(VARIANTS[0].hueDeg).toBe(0);
+    for (const v of VARIANTS) expect(Math.abs(v.hueDeg)).toBeLessThan(180);
   });
 
   it("wraps past the end", () => {

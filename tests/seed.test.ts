@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { evaluateDay } from "@/lib/health";
 import { openDb } from "@/server/db/client";
 import { seedDatabase, SEED_CREW, SEED_KEYS } from "@/server/db/seed";
 import { localDateISO, shiftDate } from "@/server/db/shared";
@@ -299,13 +300,52 @@ describe("seed: stories", () => {
     expect(a.level).toBe("red");
     expect(a.rule).toBe("HEADACHE_PLUS_VISION");
     expect(a.acknowledgedAt).toBeNull();
+    // the alert text is the red flag wording produced by src/lib/health for her last day
+    const days = listHistoryDays("mira", { before: TODAY, days: 14 });
+    const flag = evaluateDay(days.at(-1)!.values, days.slice(0, -1)).redFlags.find(
+      (f) => f.rule === "HEADACHE_PLUS_VISION",
+    );
+    expect(flag).toBeDefined();
+    expect(a.text).toEqual(flag!.text);
     expect(a.text.en).toMatch(/alert/i);
-    expect(a.text.en.toLowerCase()).toContain("not a diagnosis");
+    expect(a.text.en.toLowerCase()).not.toContain("diagnos");
     expect(a.checkInId).toBe(latestConfirmedCheckIn("mira")!.id);
     for (const id of ["bat", "saraa", "alex"]) expect(listAlerts(id)).toHaveLength(0);
 
     const ground = groundListAlerts(new Date(TEST_TODAY).toISOString());
     expect(ground.map((g) => g.crewId)).toEqual(["mira"]);
+  });
+
+  it("Bat's latest seeded day (the demo user) evaluates green overall, and so does Saraa's", () => {
+    for (const id of ["bat", "saraa"]) {
+      const days = listHistoryDays(id, { before: TODAY, days: 14 });
+      const ev = evaluateDay(days.at(-1)!.values, days.slice(0, -1));
+      expect(ev.overall, id).toBe("green");
+      expect(ev.redFlags, id).toEqual([]);
+    }
+    // the cap only touches the last day: the rest of Bat's story (workload around 3) is unchanged
+    expect(series("bat", "workload").at(-1)!).toBeLessThanOrEqual(3);
+  });
+
+  it("stores a SummaryPayload (template spoken text in the crew language) on the LAST check-in of every crew member only", () => {
+    const db = freshSeededDb();
+    for (const crew of listCrewPublic()) {
+      const latest = latestConfirmedCheckIn(crew.id)!;
+      expect(latest.summaryJson, crew.id).not.toBeNull();
+      const summary = JSON.parse(latest.summaryJson!);
+      expect(summary.spoken.language).toBe(crew.preferredLanguage);
+      expect(summary.spoken.text.length).toBeGreaterThan(20);
+      expect(summary.audioTurnId).toBeNull();
+      expect(summary.disclaimer[crew.preferredLanguage]).toBeTruthy();
+      // Cyrillic for mn, Latin for en
+      expect(/[Ѐ-ӿ]/.test(summary.spoken.text)).toBe(crew.preferredLanguage === "mn");
+      const withSummary = db
+        .prepare("SELECT COUNT(*) AS n FROM check_in WHERE crew_id = ? AND summary_json IS NOT NULL")
+        .get(crew.id) as { n: number };
+      expect(withSummary.n).toBe(1);
+    }
+    expect(JSON.parse(latestConfirmedCheckIn("mira")!.summaryJson!).overall).toBe("red");
+    expect(JSON.parse(latestConfirmedCheckIn("bat")!.summaryJson!).overall).toBe("green");
   });
 
   it("every seeded measurement row is readable through listMeasurements with numeric values for numeric keys", () => {

@@ -2,11 +2,13 @@
 
 /**
  * /dev/cosmo: playground for the Cosmo mascot. Not linked from the product UI.
- * Controls: state, emotion, variant, amplitude, auto talk (simulated speech envelope), size, Rive on/off.
+ * Controls: state, emotion, variant, amplitude, auto talk (simulated speech envelope), size, pose,
+ * face overlay on/off, image / placeholder, measured-geometry debug view, Rive on/off.
  */
 import { useState } from "react";
 import { CosmoAvatar } from "@/components/cosmo/CosmoAvatar";
-import { CosmoConfigProvider } from "@/components/cosmo/CosmoConfig";
+import { CosmoConfigProvider, type MascotMode } from "@/components/cosmo/CosmoConfig";
+import type { MascotPoseChoice } from "@/components/cosmo/mascot-poses";
 import {
   COSMO_EMOTIONS,
   COSMO_STATES,
@@ -98,19 +100,24 @@ export default function CosmoPlaygroundPage() {
   const [autoTalk, setAutoTalk] = useState(false);
   const [size, setSize] = useState(260);
   const [useRive, setUseRive] = useState(false);
+  const [pose, setPose] = useState<MascotPoseChoice>("auto");
+  const [faceOverlay, setFaceOverlay] = useState(true);
+  const [mode, setMode] = useState<MascotMode>("image");
+  const [debug, setDebug] = useState(false);
 
   const simulated = useSimulatedAmplitude(autoTalk);
   const amplitude = autoTalk ? simulated : manualAmplitude;
 
   return (
-    <CosmoConfigProvider rive={useRive}>
+    <CosmoConfigProvider rive={useRive} mascotMode={mode} faceOverlay={faceOverlay}>
       <main className="min-h-screen bg-background text-foreground">
         <div className="mx-auto flex max-w-6xl flex-col gap-8 px-6 py-8">
           <header className="flex flex-col gap-1">
             <h1 className="text-2xl font-semibold">Cosmo playground</h1>
             <p className="text-muted-foreground">
-              Placeholder character. Drop <code>public/cosmo.riv</code> and switch Rive on to test the
-              designer file; if it fails to load the placeholder is used.
+              The team&apos;s Cosmo render with a drawn face (default). Switch to the SVG placeholder, or drop{" "}
+              <code>public/cosmo.riv</code> and switch Rive on to test the designer file; if the render or
+              Rive fails to load the next implementation is used.
             </p>
           </header>
 
@@ -125,6 +132,8 @@ export default function CosmoPlaygroundPage() {
                 emotion={emotion}
                 amplitude={amplitude}
                 size={size}
+                pose={pose}
+                debug={debug}
               />
             </section>
 
@@ -132,11 +141,23 @@ export default function CosmoPlaygroundPage() {
               <Segmented label="State" options={COSMO_STATES} value={state} onChange={setState} />
               <Segmented label="Emotion" options={COSMO_EMOTIONS} value={emotion} onChange={setEmotion} />
               <Segmented
+                label="Pose"
+                options={["auto", "front", "three-quarter"] as const}
+                value={pose}
+                onChange={setPose}
+              />
+              <Segmented
+                label="Implementation"
+                options={["image", "placeholder"] as const}
+                value={mode}
+                onChange={setMode}
+              />
+              <Segmented
                 label="Variant"
                 options={[0, 1, 2, 3] as const}
                 value={variant}
                 onChange={setVariant}
-                render={(i) => `${i} ${VARIANTS[i].name}`}
+                render={(i) => `${i} ${VARIANTS[i].neon}`}
               />
               <Range
                 label="Amplitude"
@@ -177,6 +198,24 @@ export default function CosmoPlaygroundPage() {
                 <input
                   type="checkbox"
                   className="size-4 accent-primary"
+                  checked={faceOverlay}
+                  onChange={(event) => setFaceOverlay(event.target.checked)}
+                />
+                Face overlay (off = the render as it is)
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="size-4 accent-primary"
+                  checked={debug}
+                  onChange={(event) => setDebug(event.target.checked)}
+                />
+                Show measured geometry
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="size-4 accent-primary"
                   checked={useRive}
                   onChange={(event) => setUseRive(event.target.checked)}
                 />
@@ -199,9 +238,10 @@ export default function CosmoPlaygroundPage() {
                     emotion={emotion}
                     amplitude={amplitude}
                     size={150}
+                    pose={pose}
                   />
                   <figcaption className="text-sm text-muted-foreground">
-                    {v.index} {v.name}, {v.detail}
+                    {v.index} {v.neon} (hue {v.hueDeg > 0 ? "+" : ""}{v.hueDeg})
                   </figcaption>
                 </figure>
               ))}

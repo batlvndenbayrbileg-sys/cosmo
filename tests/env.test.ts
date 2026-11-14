@@ -7,7 +7,7 @@ describe("env", () => {
     const env = parseEnv({ DEMO_MODE: "scripted" });
     expect(env.demoMode).toBe("scripted");
     expect(env.anthropicModel).toBe("claude-opus-5-5");
-    expect(env.ttsModelMn).toBe("eleven_v3");
+    expect(env.ttsModelMn).toBe("eleven_v4_turbo");
     expect(liveReadiness(env)).toEqual({ llm: false, stt: false, ttsMn: false, ttsEn: false });
   });
 
