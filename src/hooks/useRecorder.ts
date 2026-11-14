@@ -21,6 +21,7 @@ import {
   rmsFromSamples,
   stepVad,
   voicingFromSpectrum,
+  BARGE_IN_VAD,
   type VadConfig,
   type VadState,
 } from "@/components/checkin/vad";
@@ -40,12 +41,19 @@ export interface UseRecorderOptions {
   onNoSpeech?: () => void;
   /** fired when recording starts or stops, in the same tick as `onUtterance` for a finished one */
   onRecordingChange?: (recording: boolean) => void;
+  /** the person started speaking (VAD speech_start); in a barge-in recording this is the moment to stop Cosmo */
+  onSpeechStart?: (info: { bargeIn: boolean }) => void;
   vad?: Partial<VadConfig>;
 }
 
 export interface StartOptions {
   /** true (default): the utterance ends by itself after silence. false: push-to-talk, call stop(). */
   vad?: boolean;
+  /**
+   * Listen while Cosmo is speaking so the person can interrupt (BARGE_IN_VAD: Cosmo's echo is learned as the room and
+   * the person must be clearly louder). When speech starts the recording restarts, so Cosmo's own words are not in it.
+   */
+  bargeIn?: boolean;
 }
 
 /** Tiny external store so the 20 Hz mic level re-renders only the component that draws it. */
@@ -256,7 +264,8 @@ export function useRecorder(options: UseRecorderOptions): RecorderApi {
       try {
         const useVad = startOptions?.vad !== false;
         const mimeType = pickRecorderMimeType((t) => MediaRecorder.isTypeSupported(t));
-        const config: VadConfig = { ...DEFAULT_VAD_CONFIG, ...optionsRef.current.vad };
+        const bargeIn = useVad && startOptions?.bargeIn === true;
+        const config: VadConfig = { ...DEFAULT_VAD_CONFIG, ...optionsRef.current.vad, ...(bargeIn ? BARGE_IN_VAD : {}) };
 
         // analysis graph: source -> analyser only (never to the speakers, that would echo)
         let context: AudioContext | null = null;
@@ -324,6 +333,23 @@ export function useRecorder(options: UseRecorderOptions): RecorderApi {
           const step = stepVad(s.vad, { rms, dtMs, voiced }, config);
           s.vad = step.state;
           switch (step.signal) {
+            case "speech_start": {
+              if (bargeIn) {
+                // start the audio at the person's voice: what came before is Cosmo's echo, not an answer
+                const old = s.recorder;
+                old.ondataavailable = null;
+                old.onstop = null;
+                try {
+                  if (old.state !== "inactive") old.stop();
+                } catch {
+                  // already stopped
+                }
+                s.recorder = createRecorder({ stream, mimeType }, () => holder.current);
+                s.recorder.start(TIMESLICE_MS);
+              }
+              optionsRef.current.onSpeechStart?.({ bargeIn });
+              break;
+            }
             case "utterance_end":
             case "max_length":
               finish(s, true);

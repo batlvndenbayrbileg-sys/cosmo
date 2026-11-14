@@ -1,7 +1,10 @@
 import { z } from "zod";
-import type { Lang, TurnEvent } from "@/lib/types";
+import type { Lang, QuestionId, TurnEvent } from "@/lib/types";
 import { normalizeLanguageCode } from "@/lib/language";
+import { cursorQuestion } from "@/server/agent/machine";
 import { MAX_UTTERANCE_CHARS, runTurn, type TurnInput } from "@/server/agent/turn";
+import { loadMachineCtx } from "@/server/checkin/service";
+import { sttKeyterms } from "@/server/speech/keyterms";
 import { getCheckIn } from "@/server/db/repos/checkin";
 import { handle, HttpError } from "@/server/http";
 import { requireCrewSession } from "@/server/session";
@@ -32,7 +35,7 @@ function frame(event: TurnEvent): Uint8Array {
  * hint when the client sends none: an explicit hint matters for Mongolian, which Scribe can otherwise mistake for a
  * neighbouring language (Mongolian is in Scribe's "moderate" accuracy tier, see docs/sources.md).
  */
-async function readInput(request: Request, fallbackHint: Lang | null): Promise<TurnInput> {
+async function readInput(request: Request, fallbackHint: Lang | null, expected: QuestionId | null): Promise<TurnInput> {
   const contentType = request.headers.get("content-type") ?? "";
 
   if (contentType.includes("multipart/form-data")) {
@@ -50,7 +53,8 @@ async function readInput(request: Request, fallbackHint: Lang | null): Promise<T
     const rawHint = form.get("language");
     const hint: Lang | null = (typeof rawHint === "string" ? normalizeLanguageCode(rawHint) : null) ?? fallbackHint;
     // throws HttpError(502, STT_FAILED) when speech recognition is unavailable: the client keeps the text box usable
-    const heard = await transcribeAudio(audio, { languageHint: hint });
+    // hint words for the question Cosmo is waiting for (short Mongolian answers need them, see keyterms.ts)
+    const heard = await transcribeAudio(audio, { languageHint: hint, keyterms: sttKeyterms(hint ?? "en", expected) });
     if (heard.text.trim().length === 0) throw new HttpError(502, "STT_FAILED", "No speech was recognised");
     return { kind: "voice", text: heard.text, languageHint: heard.language ?? hint, sttMs: heard.ms };
   }
@@ -78,7 +82,9 @@ export function POST(request: Request, context: { params: Promise<{ id: string }
     const { id } = await context.params;
     // 404 for another crew member's check-in, before anything is read or transcribed
     const checkIn = await getCheckIn(crewId, id);
-    const input = await readInput(request, normalizeLanguageCode(checkIn.language));
+    const ctx = await loadMachineCtx(checkIn);
+    const expected = ctx.state === "KPI_CAPTURE" ? cursorQuestion(ctx) : null;
+    const input = await readInput(request, normalizeLanguageCode(checkIn.language), expected);
 
     const iterator = runTurn({ crewId, checkInId: id, input })[Symbol.asyncIterator]();
     const stream = new ReadableStream<Uint8Array>({

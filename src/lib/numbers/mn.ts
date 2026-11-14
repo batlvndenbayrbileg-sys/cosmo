@@ -78,13 +78,24 @@ const VOCAB: ReadonlyArray<readonly [string, string | null, number, Word["kind"]
   ["зуу", "зуун", 100, "hundred"],
 ];
 
-const WORDS: ReadonlyMap<string, Word> = new Map(
-  VOCAB.flatMap(([bare, attr, value, kind]) => {
+/**
+ * How the speech recogniser sometimes writes a short, spoken number word (measured 2026-11-15 on ElevenLabs Scribe v3
+ * with the app's Mongolian voice: "Гурав." came back as "Гороо." or "горов."). Read as the number, never shown.
+ */
+const MISHEARD: ReadonlyArray<readonly [string, number, Word["kind"]]> = [
+  ["гороо", 3, "unit"],
+  ["горов", 3, "unit"],
+  ["гурв", 3, "unit"],
+];
+
+const WORDS: ReadonlyMap<string, Word> = new Map([
+  ...VOCAB.flatMap(([bare, attr, value, kind]) => {
     const entries: Array<[string, Word]> = [[bare, { kind, value }]];
     if (attr) entries.push([attr, { kind, value }]);
     return entries;
   }),
-);
+  ...MISHEARD.map(([word, value, kind]): [string, Word] => [word, { kind, value }]),
+]);
 
 const WORD_HALF = "хагас";
 const WORD_POINT = "цэг";

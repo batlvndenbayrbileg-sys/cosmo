@@ -1194,9 +1194,33 @@ function interpretDayNote(text: string): InterpretResult {
  * rejectedKeys with reason "out_of_range" / "type". `unclear` is true exactly when there is nothing to record, except
  * for the optional day_note question answered with "nothing" (unclear false, no records).
  */
+/**
+ * The words of an answer that can belong to `question`: when the astronaut names ANOTHER measurement ("өө миний даралт
+ * 120 дээр 80 байна" while blood sugar is asked), that keyword and the numbers after it (up to the next keyword) belong
+ * to that measurement and are removed, so they are never read as the answer to the open question. The other value is
+ * still picked up by interpretOpportunistic. Symptoms and the day note keep the whole text.
+ * (Team feedback 2026-11-15: answers in any order; before this, "даралт 120 дээр 80" also stored blood sugar = 120.)
+ */
+function ownPart(question: QuestionDef, text: string): string {
+  if (question.id === "symptoms" || question.id === "day_note") return text;
+  const others = OPPORTUNISTIC.filter((o) => o.id !== question.id).map(({ id }) => [KW[id], id] as const);
+  const hits = resolveHits(text, [...others, [KW[question.id], question.id] as const]);
+  if (!hits.some((h) => h.value !== question.id)) return text;
+  let out = "";
+  let cursor = 0;
+  hits.forEach((hit, i) => {
+    if (hit.value === question.id) return;
+    const next = i + 1 < hits.length ? hits[i + 1].start : text.length;
+    out += text.slice(cursor, hit.start);
+    cursor = Math.max(cursor, Math.min(next, hit.end + 60));
+  });
+  out += text.slice(cursor);
+  return out.trim();
+}
+
 export function interpretAnswer(question: QuestionDef, text: string, lang: Lang): InterpretResult {
   void lang; // both vocabularies are always active
-  const t = text.trim();
+  const t = ownPart(question, text.trim());
   if (t.length === 0) return unclearResult("no_value");
   switch (question.id) {
     case "sleep":

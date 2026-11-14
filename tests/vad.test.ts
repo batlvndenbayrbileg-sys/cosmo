@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  BARGE_IN_VAD,
   DEFAULT_VAD_CONFIG,
   createVadState,
   effectiveThreshold,
@@ -305,6 +306,37 @@ describe("stepVad: background noise is not speech (voicing)", () => {
   it("soft voiced sound does not count as room noise (the threshold must not climb over the speaker)", () => {
     const s = runV(calibrated(0.01), 0.012, true, 3000).state; // voiced but below the threshold
     expect(s.noiseFloor).toBeCloseTo(0.01, 6);
+  });
+});
+
+describe("stepVad: barge-in listening while Cosmo speaks (BARGE_IN_VAD)", () => {
+  const config = { ...DEFAULT_VAD_CONFIG, ...BARGE_IN_VAD };
+  function runB(start: VadState, rms: number, voiced: boolean, ms: number) {
+    let state = start;
+    const signals: VadSignal[] = [];
+    for (let t = 0; t < ms; t += FRAME_MS) {
+      const step = stepVad(state, { rms, dtMs: FRAME_MS, voiced }, config);
+      state = step.state;
+      if (step.signal !== "none") signals.push(step.signal);
+    }
+    return { state, signals };
+  }
+
+  it("Cosmo's own voice leaking back (steady, voiced) is learned as the room and never interrupts her", () => {
+    const { signals, state } = runB(createVadState(), 0.05, true, 15_000);
+    expect(signals).toEqual([]);
+    expect(state.noiseFloor).toBeGreaterThan(0.03);
+  });
+
+  it("a person clearly louder than the echo interrupts after 250 ms", () => {
+    const echo = runB(createVadState(), 0.05, true, 3000).state;
+    expect(runB(echo, 0.08, true, 1000).signals).toEqual([]); // not clearly louder: ignored
+    const loud = runB(echo, 0.3, true, 250);
+    expect(loud.signals).toEqual(["speech_start"]);
+  });
+
+  it("Cosmo's first loud syllable is not taken for the person (no calibration override)", () => {
+    expect(runB(createVadState(), 0.5, true, 100).signals).toEqual([]);
   });
 });
 

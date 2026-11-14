@@ -57,7 +57,28 @@ export interface VadConfig {
   calibrationMs: number;
   /** a frame above this RMS is speech even inside the calibration window */
   calibrationSpeechRms: number;
+  /**
+   * Barge-in listening (while Cosmo is speaking): Cosmo's own voice leaking back from the speakers IS voice, so while
+   * waiting, voiced frames that are not loud enough count as the room too. The person then has to be clearly louder
+   * than Cosmo's echo to interrupt. Off for normal listening.
+   */
+  roomIncludesVoice?: boolean;
 }
+
+/**
+ * Listening WHILE Cosmo speaks, so the person can interrupt her (team feedback 2026-11-15). The floor learns the level
+ * of Cosmo's echo (roomIncludesVoice), speech must be 3x louder than it for 250 ms, and the calibration override is off
+ * (Cosmo's first syllable must never count as the person).
+ */
+export const BARGE_IN_VAD: Partial<VadConfig> = {
+  roomIncludesVoice: true,
+  voicedMultiplier: 3,
+  noiseMultiplier: 3,
+  onsetMs: 250,
+  calibrationMs: 400,
+  calibrationSpeechRms: 1,
+  noSpeechTimeoutMs: 120_000,
+};
 
 
 
@@ -317,7 +338,7 @@ export function stepVad(
     // (a LOUD non-voice frame, e.g. a door or a keyboard burst, is learned 4x slower: a steady fan still becomes the room
     // within a couple of seconds, a short clatter does not lift the threshold above the next words)
     const noiseFloor =
-      voiced && frame.voiced !== undefined
+      voiced && frame.voiced !== undefined && !config.roomIncludesVoice
         ? state.noiseFloor
         : adaptFloor(state.noiseFloor, rms, loud ? { ...config, noiseAlpha: config.noiseAlpha / 4 } : config);
     if (waitedMs >= config.noSpeechTimeoutMs) {
