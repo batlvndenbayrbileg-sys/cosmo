@@ -12,6 +12,7 @@ import {
 } from "./interpret";
 import type { MachineCtx, StartAnswer } from "./machine";
 import type { ClarifyReason } from "./templates";
+import { detectAskedQuestion } from "./questions";
 
 /**
  * The deterministic agent: the rule-based interpreter of interpret.ts, no network, no model. It powers
@@ -80,9 +81,15 @@ export class ScriptedAgent implements Agent {
             // failed answer to the open question
             decision.restated = restated;
           } else {
-            const reason = clarifyReasonOf(result);
-            const keys = result.rejectedKeys.length > 0 ? result.rejectedKeys : [question.keys[0]];
-            decision.clarifications = keys.map((key) => ({ key, reason }));
+            // a question back ("what should it be?", "why?", "say it again") is answered, not treated as a failed answer
+            const asked = result.rejectedKeys.length === 0 ? detectAskedQuestion(text, lang) : null;
+            if (asked) {
+              decision.asked = { kind: asked };
+            } else {
+              const reason = clarifyReasonOf(result);
+              const keys = result.rejectedKeys.length > 0 ? result.rejectedKeys : [question.keys[0]];
+              decision.clarifications = keys.map((key) => ({ key, reason }));
+            }
           }
         }
         return decision;

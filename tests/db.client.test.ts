@@ -4,6 +4,19 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { openDb, resolveDbPath, tmpDbPath } from "@/server/db/client";
 import { seedIfEmpty } from "@/server/db/seed";
+import { hasWords } from "@/server/speech/stt";
+
+describe("speech: hasWords (noise and filler are not an answer)", () => {
+  it.each(["", "   ", "...", "(noise)", "[music] (laughter)", "Хм.", "ммм", "аан...", "uh, hmm", "Ээ"])(
+    "no words: %j",
+    (text) => {
+      expect(hasWords(text)).toBe(false);
+    },
+  );
+  it.each(["68", "Тийм", "хм, 68 байна", "uh, sixty eight", "Тод байна", "no"])("words: %j", (text) => {
+    expect(hasWords(text)).toBe(true);
+  });
+});
 
 describe("db client: where the database file goes", () => {
   it("keeps :memory: in memory", () => {

@@ -18,6 +18,7 @@ import {
   ApiClientError,
   createCheckIn as apiCreateCheckIn,
   fetchSnapshot,
+  postLanguage as apiPostLanguage,
   postTurnAudio,
   postTurnText,
 } from "@/components/checkin/api";
@@ -72,6 +73,11 @@ export interface UseCheckIn {
   setTyping: (text: string | null) => void;
   dismissError: () => void;
   dismissClarification: () => void;
+  /**
+   * The crew member switched EN/MN on the screen: the open check-in continues in that language (Cosmo says so and
+   * repeats where it stands, through `onAssistant`). Resolves false when nothing changed or the request failed.
+   */
+  setLanguage: (language: Lang) => Promise<boolean>;
 }
 
 function toError(error: unknown): CheckInError {
@@ -184,6 +190,10 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckIn {
       } catch (error) {
         if (controller.signal.aborted) {
           dispatch({ type: "TURN_END" });
+        } else if (error instanceof ApiClientError && error.code === "STT_FAILED" && error.status === 422) {
+          // no words in the recording (noise, a cough, "hmm"): nothing to answer and nothing to apologise for. The turn
+          // ends quietly and hands-free listening simply starts again.
+          dispatch({ type: "TURN_END" });
         } else {
           const failure = toError(error);
           dispatch({ type: "TURN_FAILED", error: failure });
@@ -218,6 +228,30 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckIn {
   const dismissError = useCallback(() => dispatch({ type: "DISMISS_ERROR" }), []);
   const dismissClarification = useCallback(() => dispatch({ type: "DISMISS_CLARIFICATION" }), []);
 
+  const setLanguage = useCallback(async (language: Lang): Promise<boolean> => {
+    const id = checkInId.current;
+    if (!id) return false;
+    try {
+      const res = await apiPostLanguage(id, language);
+      if (!mounted.current) return false;
+      dispatch({ type: "LANGUAGE", language: res.language, turn: res.turn });
+      if (res.turn) {
+        optionsRef.current.onAssistant?.({
+          checkInId: id,
+          turnId: res.turn.turnId,
+          text: res.turn.text,
+          language: res.language,
+          emotion: "neutral",
+        });
+      }
+      return res.turn !== null;
+    } catch (error) {
+      const failure = toError(error);
+      if (failure.code === "NO_SESSION") optionsRef.current.onNoSession?.();
+      return false;
+    }
+  }, []);
+
   return {
     state,
     createCheckIn,
@@ -228,5 +262,6 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckIn {
     setTyping,
     dismissError,
     dismissClarification,
+    setLanguage,
   };
 }

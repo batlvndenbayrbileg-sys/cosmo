@@ -254,7 +254,18 @@ export function CheckInExperience() {
   useEffect(() => {
     transcriptLengthRef.current = state.transcript.length;
   }, [state.transcript.length]);
-  const { setSpeech, setRecording, sendAudio, sendText, setTyping, createCheckIn } = checkIn;
+  const { setSpeech, setRecording, sendAudio, sendText, setTyping, createCheckIn, setLanguage: setConversationLanguage } = checkIn;
+
+  // EN/MN pressed on this screen: the conversation follows, and Cosmo says where the check-in stands in the new
+  // language. Only a change of the screen language counts (at mount it is the crew member's own, set by the crew
+  // screen); before the check-in exists, or when it already speaks that language, nothing is sent.
+  const lastUiLang = useRef(lang);
+  useEffect(() => {
+    if (lang === lastUiLang.current) return;
+    lastUiLang.current = lang;
+    if (!state.checkInId || state.status !== "ready" || state.language === lang) return;
+    void setConversationLanguage(lang);
+  }, [lang, state.checkInId, state.status, state.language, setConversationLanguage]);
 
   const player = useSpeechPlayer({ onStatusChange: setSpeech });
   const recorder = useRecorder({

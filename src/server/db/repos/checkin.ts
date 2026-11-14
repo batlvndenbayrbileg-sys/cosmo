@@ -104,6 +104,18 @@ export async function setCheckInState(
 }
 
 /**
+ * The conversation language of an open check-in (the crew member switched EN/MN on the check-in screen). From the next
+ * turn on Cosmo replies, and speech recognition listens, in this language.
+ */
+export async function setCheckInLanguage(crewId: string, id: string, language: Lang): Promise<CheckInRecord> {
+  if (!isLang(language)) throw new HttpError(400, "BAD_INPUT", "Invalid language");
+  const db = await getDb();
+  const res = await db.run("UPDATE check_in SET language = ? WHERE id = ? AND crew_id = ?", language, id, crewId);
+  if (res.changes === 0) throw new NotFoundError("Check-in not found");
+  return getCheckIn(crewId, id);
+}
+
+/**
  * Marks the check-in confirmed (once). `confirmed_at` is the clock the Earth link delay is measured
  * against, so a second confirmation is refused (409 WRONG_STATE) instead of moving it.
  */

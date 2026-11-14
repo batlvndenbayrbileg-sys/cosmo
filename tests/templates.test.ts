@@ -158,7 +158,8 @@ describe("askQuestion", () => {
     const next = QUESTIONS[2];
     expect(askQuestion(next, "en", [rec("mood", 4)])).toContain("4 out of 5");
     expect(askQuestion(next, "mn", [rec("mood", 4)])).toContain("5-аас 4");
-    expect(askQuestion(QUESTIONS[11], "en", [rec("vision_check", 1)])).toContain("Slightly blurred");
+    // lower case inside the sentence: "Got it, slightly blurred."
+    expect(askQuestion(QUESTIONS[11], "en", [rec("vision_check", 1)])).toContain("Got it, slightly blurred.");
   });
 
   it("every acknowledgement and question is clean text in both languages", () => {

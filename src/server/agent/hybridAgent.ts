@@ -40,6 +40,8 @@ export function fastPathVerdict(args: Pick<AgentArgs, "ctx" | "expected">, rules
 
     case "KPI_CAPTURE": {
       if (args.expected === null) return { fast: false, reason: "no expected question" };
+      // "what should it be / why / how / say it again": the registry answers instantly; anything else goes to the model
+      if (rules.asked && rules.asked.kind !== "other") return { fast: true, reason: "question back with a known answer" };
       if (rules.clarifications?.length || rules.rejected?.length || rules.restated?.length) {
         return { fast: false, reason: "unclear or rejected" };
       }

@@ -83,8 +83,26 @@ export async function transcribeAudio(
     | null;
   const text = typeof body?.text === "string" ? body.text.trim() : "";
   const language = normalizeLanguageCode(typeof body?.language_code === "string" ? body.language_code : null);
-  if (!text) {
+  if (!hasWords(text)) {
+    // noise, a cough or "hmm": not an answer. 422 tells the client to listen again quietly (no "sorry" from Cosmo)
     throw new HttpError(422, "STT_FAILED", "I could not hear any words. Please try again.");
   }
   return { text, language, ms };
+}
+
+/** filler sounds that are not an answer on their own (English and Mongolian) */
+const FILLER_ONLY = /^(?:u+h+|u+m+|h+m+|m+|a+h+|e+h+|o+h+|е+|э+|аа+н*|ээ+|мм+|хм+|өө+|за+)$/iu;
+
+/**
+ * Whether a transcript holds words worth answering: not empty, not only punctuation, audio-event tags like
+ * "(noise)" / "[music]", or filler ("hmm", "аан").
+ */
+export function hasWords(text: string): boolean {
+  const stripped = text
+    .replace(/\([^)]*\)|\[[^\]]*\]/gu, " ")
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .trim();
+  if (!stripped) return false;
+  const words = stripped.split(/\s+/u);
+  return !words.every((w) => FILLER_ONLY.test(w));
 }

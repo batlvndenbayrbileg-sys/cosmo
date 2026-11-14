@@ -58,6 +58,7 @@ describe("answerAskedQuestion", () => {
   it("answers the same in English, and says it is not a medical judgement", () => {
     const a = answerAskedQuestion("normal", "glucose", "en", baselines);
     expect(a).toMatch(/70-140/);
+    expect(a).not.toMatch(/·/); // no card-only "· demo parameter" suffix inside the sentence
     expect(a).toContain("96");
     expect(a).toMatch(/not a medical judgement/i);
   });

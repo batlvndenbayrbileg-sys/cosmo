@@ -105,7 +105,7 @@ const notFound = (fn: () => Promise<unknown>) => expect(fn()).rejects.toThrow(No
 const REGISTRY: Record<string, readonly string[]> = {
   crew: ["listCrewPublic", "getCrewPublic"],
   checkin: [
-    "createCheckIn", "getCheckIn", "getOpenCheckInForDate", "setCheckInState", "confirmCheckIn",
+    "createCheckIn", "getCheckIn", "getOpenCheckInForDate", "setCheckInState", "setCheckInLanguage", "confirmCheckIn",
     "latestConfirmedCheckIn", "listHistoryDays",
   ],
   measurement: ["upsertMeasurement", "listMeasurements"],
@@ -165,6 +165,12 @@ const cases: Record<string, () => Promise<void>> = {
     });
     // state_json is kept when omitted
     expect((await checkinRepo.setCheckInState(B, w.bOpen, "CONFIRM")).stateJson).toBe('{"x":1}');
+  },
+  "checkin.setCheckInLanguage": async () => {
+    await notFound(() => checkinRepo.setCheckInLanguage(A, w.bOpen, "mn"));
+    expect((await checkinRepo.getCheckIn(B, w.bOpen)).language).toBe("en");
+    // the owner can
+    expect((await checkinRepo.setCheckInLanguage(B, w.bOpen, "mn")).language).toBe("mn");
   },
   "checkin.confirmCheckIn": async () => {
     await notFound(() => checkinRepo.confirmCheckIn(A, w.bOpen, { confirmedAt: at(13), summaryJson: "{}" }));

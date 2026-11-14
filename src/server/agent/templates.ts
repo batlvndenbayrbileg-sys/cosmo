@@ -70,8 +70,9 @@ function spokenValue(key: KpiKey, value: MeasurementValue, lang: Lang): string {
     return lang === "mn" ? `${max}-аас ${formatNumber(n, 1)}` : `${formatNumber(n, 1)} out of ${max}`;
   }
   const formatted = formatValue(key, value, lang);
+  // inside a sentence ("Got it, clear." / "Ойлголоо, тод.") the display label loses its capital
+  if (def.type === "category" || def.type === "boolean") return formatted.charAt(0).toLowerCase() + formatted.slice(1);
   if (lang === "mn") {
-    if (def.type === "category" || def.type === "boolean") return formatted.charAt(0).toLowerCase() + formatted.slice(1);
     for (const [suffix, speak] of Object.entries(MN_SPOKEN_UNITS)) {
       if (formatted.endsWith(` ${suffix}`)) return speak(formatted.slice(0, formatted.length - suffix.length - 1));
     }

@@ -12,6 +12,7 @@ import type { MachineCtx, StartAnswer } from "./machine";
 import type { ClarifyReason } from "./templates";
 import type { ToolResult } from "./tools";
 import type { ResultsFacts } from "./resultsFacts";
+import type { AskedKind } from "./questions";
 
 /**
  * The seam between the conversation and whoever understands the astronaut's words.
@@ -49,6 +50,11 @@ export interface AgentArgs {
   history: TurnRow[];
   /** validate a tool call exactly as the pipeline will, without writing anything */
   validate: (name: string, input: unknown) => Promise<ToolResult>;
+  /**
+   * KPI_CAPTURE: what Cosmo may say if the astronaut asks about the open question instead of answering it (the
+   * demo-parameter range, the personal 14-day baseline, why it is asked, how to measure it). See questions.ts.
+   */
+  questionFacts?: string;
 }
 
 export interface AgentDecision {
@@ -67,6 +73,12 @@ export interface AgentDecision {
   restated?: KpiKey[];
   /** the astronaut asked to skip the question, or answered an optional one with "nothing" */
   skip?: boolean;
+  /**
+   * KPI_CAPTURE: the astronaut asked a question back instead of answering ("what should it be?", "why?", "say it
+   * again"). Cosmo answers (the model's `answer` when it passes the checks in turn.ts, else the template for `kind`) and
+   * asks the open question again; it is never counted as a failed answer.
+   */
+  asked?: { kind: AskedKind; answer?: string };
   /** at the read-back: yes / no / not clear (null) */
   yesNo?: boolean | null;
   /** in small talk: did the astronaut agree to start the measurements */

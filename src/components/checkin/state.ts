@@ -96,7 +96,9 @@ export type CheckInAction =
   | { type: "TURN_END" }
   | { type: "TURN_FAILED"; error: CheckInError }
   | { type: "DISMISS_ERROR" }
-  | { type: "DISMISS_CLARIFICATION" };
+  | { type: "DISMISS_CLARIFICATION" }
+  /** the conversation switched language (EN/MN on the check-in screen); `turn` is what Cosmo says about it */
+  | { type: "LANGUAGE"; language: Lang; turn: { turnId: string; text: string } | null };
 
 export function deriveCosmoState(input: {
   recording: boolean;
@@ -319,5 +321,12 @@ export function checkInReducer(state: CheckInState, action: CheckInAction): Chec
 
     case "DISMISS_CLARIFICATION":
       return { ...state, clarification: null };
+
+    case "LANGUAGE": {
+      const switched = { ...state, language: action.language, clarification: null };
+      return action.turn
+        ? pushLine(switched, { id: action.turn.turnId, speaker: "cosmo", text: action.turn.text, language: action.language })
+        : switched;
+    }
   }
 }

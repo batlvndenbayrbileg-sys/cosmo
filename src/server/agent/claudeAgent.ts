@@ -8,6 +8,7 @@ import { buildDirective } from "./directive";
 import { interpretYesNo, type InterpretedRecord } from "./interpret";
 import { SYSTEM_PROMPT } from "./prompt";
 import { detectSkip, startAnswerFor } from "./scriptedAgent";
+import { detectAskedQuestion } from "./questions";
 import type { ClarifyReason } from "./templates";
 import { TOOL_DEFINITIONS, type ToolResult } from "./tools";
 import type { ResultsFacts } from "./resultsFacts";
@@ -213,6 +214,7 @@ export class ClaudeAgent implements Agent {
       ctx: args.ctx,
       expected: args.expected,
       recorded: args.recorded,
+      questionFacts: args.questionFacts,
     });
     const base = buildMessages(args.history, args.text);
 
@@ -322,6 +324,15 @@ export class ClaudeAgent implements Agent {
       const q = getQuestion(args.expected);
       const answered = [...records.keys()].some((k) => q.keys.includes(k));
       if (!answered && detectSkip(q, args.text, args.lang)) decision.skip = true;
+      // a question back: the model answered it in its text (turn.ts checks the wording and re-asks the question).
+      // A model that asked for clarification anyway is overruled when the words are clearly a question.
+      const askedKind = detectAskedQuestion(args.text, args.lang);
+      if (!answered && !decision.skip && records.size === 0 && rejected.size === 0 && (clarifications.size === 0 || askedKind)) {
+        if (askedKind || (clarifications.size === 0 && text.length > 0)) {
+          decision.asked = { kind: askedKind ?? "other", ...(text.length > 0 ? { answer: text } : {}) };
+          delete decision.clarifications;
+        }
+      }
     }
     if (text.length > 0) decision.replyText = text;
     return decision;

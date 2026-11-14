@@ -1,6 +1,7 @@
 import type { KpiKey, Lang, QuestionId } from "@/lib/types";
 import type { Baseline } from "@/lib/health/baseline";
 import { KPI_DEFS, formatValue, getQuestion, rangeText } from "@/lib/kpi/registry";
+// (rangeText is the dashboard card's "Normal ... · demo parameter" text; bareRange below drops the card suffix)
 
 /**
  * "Ask back" during the check-in (team feedback 2026-11-15: "it should answer anything I ask, like Jarvis"):
@@ -132,12 +133,20 @@ function join(parts: Array<string | null | undefined>): string {
   return parts.filter((p): p is string => Boolean(p && p.trim())).join(" ");
 }
 
+/** the card text "Normal 70-140 mg/dL · demo parameter" without its card-only suffix (the sentence says "demo" itself) */
+function bareRange(key: KpiKey): { en: string; mn: string } | null {
+  const r = rangeText(key);
+  if (!r) return null;
+  const strip = (s: string) => s.replace(/\s*·\s*(?:demo parameter|демо параметр)\s*$/iu, "");
+  return { en: strip(r.en), mn: strip(r.mn) };
+}
+
 /** "Normal 70-140 mg/dL" -> "the demo range is 70-140 mg/dL" style sentence for the question's keys */
 function normalSentence(id: QuestionId, lang: Lang): string | null {
   const q = getQuestion(id);
   const ranges = q.keys
-    .map((k) => ({ k, r: rangeText(k) }))
-    .filter((x): x is { k: KpiKey; r: NonNullable<ReturnType<typeof rangeText>> } => x.r !== null);
+    .map((k) => ({ k, r: bareRange(k) }))
+    .filter((x): x is { k: KpiKey; r: { en: string; mn: string } } => x.r !== null);
   if (ranges.length === 0) return null;
   if (id === "blood_pressure" && ranges.length === 2) {
     const [s, d] = ranges;

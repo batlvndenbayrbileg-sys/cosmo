@@ -15,6 +15,8 @@ export interface DirectiveInput {
   ctx: Pick<MachineCtx, "smallTalkTurns" | "proposed" | "filled">;
   expected: QuestionId | null;
   recorded: Partial<Record<KpiKey, MeasurementValue>>;
+  /** KPI_CAPTURE: facts about the open question the reply may use when the astronaut asks about it (questions.ts) */
+  questionFacts?: string;
 }
 
 const LANGUAGE_NAME: Record<Lang, string> = { en: "English", mn: "Mongolian (Cyrillic)" };
@@ -46,7 +48,7 @@ function instructionFor(input: DirectiveInput): string {
       const ask = q
         ? `Then ask about "${q.id}" unless the astronaut just answered it: "${q.prompts[lang]}"`
         : "Then ask the next missing question.";
-      return `Record every value the astronaut just said (any key in missing_keys) with record_measurement. Acknowledge in a few words. ${ask} If the answer is unclear or has no number, call request_clarification for that key and ask again briefly. Do not call correct_measurement.`;
+      return `Record every value the astronaut just said (any key in missing_keys) with record_measurement. Acknowledge in a few words. ${ask} If the astronaut asks YOU something instead of answering (what is normal, why you ask, how to measure it, or anything else), do NOT call request_clarification: answer the question in one or two short sentences, using only numbers from question_facts, then ask the expected question again. Never diagnose. Only if the answer is unclear or has no number and is not a question, call request_clarification for that key and ask again briefly. Do not call correct_measurement.`;
     }
     case "CONFIRM":
       return "The system has read the recorded values back and asked whether everything is correct. If the astronaut confirms, call finish_confirmation with confirmed true. If they say a value is wrong and give the new value, call correct_measurement. If they say no without a value, call finish_confirmation with confirmed false and ask what to change. Do not read the values back yourself.";
@@ -68,6 +70,7 @@ export function buildDirective(input: DirectiveInput): string {
     `expected_question: ${expectedText}`,
     `missing_keys: ${JSON.stringify(missing)}`,
     `recorded: ${recordedJson(input.recorded)}`,
+    ...(input.state === "KPI_CAPTURE" && input.questionFacts ? [`question_facts: ${input.questionFacts}`] : []),
     `instruction: ${instructionFor(input)}`,
   ].join("\n");
 }

@@ -160,6 +160,20 @@ export async function postTour(
   return readJson<{ language: Lang; steps: TourStep[] }>(res);
 }
 
+/** POST /api/checkins/:id/language - switch the conversation language (EN/MN on the check-in screen). */
+export async function postLanguage(
+  checkInId: string,
+  language: Lang,
+  fetchImpl?: FetchLike,
+): Promise<{ language: Lang; turn: { turnId: string; text: string } | null }> {
+  const res = await send(fetchImpl, `/api/checkins/${encodeURIComponent(checkInId)}/language`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ language }),
+  });
+  return readJson<{ language: Lang; turn: { turnId: string; text: string } | null }>(res);
+}
+
 export async function fetchSnapshot(checkInId: string, fetchImpl?: FetchLike): Promise<CheckInSnapshot> {
   const res = await send(fetchImpl, `/api/checkins/${encodeURIComponent(checkInId)}`);
   return readJson<CheckInSnapshot>(res);

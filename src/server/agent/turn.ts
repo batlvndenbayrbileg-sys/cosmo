@@ -38,6 +38,8 @@ import {
 } from "./machine";
 import { ScriptedAgent } from "./scriptedAgent";
 import { HybridAgent } from "./hybridAgent";
+import { answerAskedQuestion, detectAskedQuestion, questionFacts, type AskedKind } from "./questions";
+import type { Baseline } from "@/lib/health/baseline";
 import { buildResultsFacts, numeralsAreGrounded, type ResultsFacts } from "./resultsFacts";
 
 /** without the model: today's headline, the first suggestion, and an invitation to ask about any part */
@@ -177,6 +179,49 @@ export function isSaneReply(
   if (FORBIDDEN_REPLY.test(t)) return false;
   const allowed = allowedNumerals(ctx.userText, ctx.recorded, ctx.question);
   return numeralsOf(t).every((n) => allowed.has(n));
+}
+
+const MAX_ASKED_ANSWER_CHARS = 360;
+const MAX_ASKED_ANSWER_SENTENCES = 3;
+
+/**
+ * A model's answer to a question asked back (before the re-asked question): short, no emojis, no diagnosis or
+ * treatment words, and every number from the question facts (demo range, the personal baseline), the astronaut's own
+ * words or the question prompt.
+ */
+export function isSaneAskedAnswer(text: string, facts: string, userText: string, prompt: string): boolean {
+  const t = text.trim();
+  if (t.length === 0 || t.length > MAX_ASKED_ANSWER_CHARS) return false;
+  if (sentenceCount(t) > MAX_ASKED_ANSWER_SENTENCES) return false;
+  if (/\p{Extended_Pictographic}/u.test(t)) return false;
+  if (FORBIDDEN_REPLY.test(t)) return false;
+  const allowed = new Set([...numeralsOf(facts), ...numeralsOf(userText), ...numeralsOf(prompt)]);
+  return numeralsOf(t).every((n) => allowed.has(n));
+}
+
+/**
+ * Cosmo's reply to a question asked back while a value is expected: the model's answer when it passes the checks,
+ * otherwise the registry's answer for that kind of question, then the open question again. Null when there is
+ * nothing to answer (the model wrote only a re-ask and the words are not a question): the caller then treats the turn
+ * as an unclear answer.
+ */
+export function askedQuestionReply(
+  asked: { kind: AskedKind; answer?: string },
+  detected: AskedKind | null,
+  expected: QuestionId,
+  lang: Lang,
+  baselines: Partial<Record<KpiKey, Baseline>>,
+  userText: string,
+): string | null {
+  const prompt = getQuestion(expected).prompts[lang];
+  if (asked.answer && asked.kind !== "repeat") {
+    const lead = leadingStatements(asked.answer);
+    if (lead.length > 0 && isSaneAskedAnswer(lead, questionFacts(expected, lang, baselines), userText, prompt)) {
+      return join(lead, prompt);
+    }
+  }
+  if (asked.kind === "other" && !detected) return null;
+  return join(answerAskedQuestion(asked.kind, expected, lang, baselines), prompt);
 }
 
 /** model-phrased summary: every numeral must appear in the code-computed findings */
@@ -383,6 +428,10 @@ async function* runTurnInner(args: RunTurnArgs, started: number): AsyncGenerator
 
   const out: TurnEvent[] = [];
 
+  // the personal history (baselines) is needed both to answer a question asked back and to judge new values
+  const history14 = await loadHistory(crewId, checkIn.localDate);
+  const baselines = computeBaselines(history14);
+
   /* ── 1. the agent proposes what it heard ── */
   const primary = args.agent ?? defaultAgent();
   const agentArgs = {
@@ -395,6 +444,7 @@ async function* runTurnInner(args: RunTurnArgs, started: number): AsyncGenerator
     history,
     validate: (name: string, toolInput: unknown) =>
       executeTool(toolContext(true, ctx0.state, new Set(ctx0.filled)), name, toolInput),
+    questionFacts: expected ? questionFacts(expected, lang, baselines) : undefined,
   };
   const decideStarted = performance.now();
   let used: Agent = primary;
@@ -403,6 +453,12 @@ async function* runTurnInner(args: RunTurnArgs, started: number): AsyncGenerator
     decision = await primary.decide(agentArgs);
   } catch (err) {
     if (!(err instanceof LlmUnavailable)) throw err;
+    // the reason only (timeout, HTTP status, refusal...), never the key: so a deployment's logs say why Claude was not used
+    const cause = err.cause as { status?: unknown; name?: unknown; message?: unknown } | undefined;
+    console.warn(
+      `[aegis] Claude unavailable for this turn: ${err.reason}` +
+        (cause ? ` (${String(cause.name ?? "")} ${String(cause.status ?? "")} ${String(cause.message ?? "").slice(0, 160)})` : ""),
+    );
     out.push({ type: "error", code: "LLM_FAILED", message: "The assistant is unavailable; using the offline helper.", recoverable: true });
     used = args.fallback ?? scriptedAgent();
     decision = await used.decide(agentArgs);
@@ -410,8 +466,6 @@ async function* runTurnInner(args: RunTurnArgs, started: number): AsyncGenerator
   let llmMs = decision.llmMs ?? Math.round(performance.now() - decideStarted);
 
   /* ── 2. proposals -> executeTool -> events ── */
-  const history14 = await loadHistory(crewId, checkIn.localDate);
-  const baselines = computeBaselines(history14);
   const filledNow = new Set<KpiKey>(ctx0.filled);
   const acknowledged: InterpretedRecord[] = [];
   const failures: Array<{ key: KpiKey; reason: "range" | "type" | "unclear"; text: string }> = [];
@@ -463,6 +517,8 @@ async function* runTurnInner(args: RunTurnArgs, started: number): AsyncGenerator
 
   let ctx: MachineCtx = ctx0;
   const effects: Effect[] = [];
+  /** KPI_CAPTURE: the astronaut asked a question back; Cosmo answers it and asks the open question again */
+  let askedReply: string | null = null;
   const send = (event: MachineEvent): void => {
     const result = transition(ctx, event);
     ctx = result.ctx;
@@ -484,8 +540,16 @@ async function* runTurnInner(args: RunTurnArgs, started: number): AsyncGenerator
       } else if (expected !== null) {
         const restated = [...alreadyRecorded, ...(decision.restated ?? [])];
         const modelAsked = (decision.clarifications?.length ?? 0) > 0 || (decision.rejected?.length ?? 0) > 0;
+        // a question back ("what should it be?", "why?", "say it again"): the agent's reading, or the words themselves
+        const detected = detectAskedQuestion(text, lang);
+        const asked =
+          decision.asked ?? (detected && failures.length === 0 && !(decision.rejected?.length) ? { kind: detected } : undefined);
+        const reply = !decision.skip && failures.length === 0 && asked ? askedQuestionReply(asked, detected, expected, lang, baselines, text) : null;
         if (decision.skip) {
           send({ type: "SKIP", question: expected });
+        } else if (reply) {
+          // answered and asked again: the machine stays on the same question and nothing counts as a failed attempt
+          askedReply = reply;
         } else if (restated.length > 0 && failures.length === 0 && !modelAsked) {
           // "actually I slept 8 hours" while mood is open: noted for the read-back, the open question is asked
           // again and nothing is counted against it
@@ -595,7 +659,7 @@ async function* runTurnInner(args: RunTurnArgs, started: number): AsyncGenerator
     out.push({ type: "summary", summary: summaryPayload });
   } else {
     const effect: ReplyEffect = replyEffect ?? { type: "reply", kind: "closing" };
-    let template = renderTemplate(effect, lang, ctx, text, valuesNow, acknowledged);
+    let template = askedReply ?? renderTemplate(effect, lang, ctx, text, valuesNow, acknowledged);
     // a read-back correction was taken and another one was not: say both
     if (ctx0.state === "CONFIRM" && effect.kind === "clarify" && correctedNow.size > 0) {
       template = join(TEMPLATES_EXTRA.updated[lang], template);
@@ -622,6 +686,7 @@ async function* runTurnInner(args: RunTurnArgs, started: number): AsyncGenerator
     // just skipped (the template carries the "add it at the confirmation" notice), never at the read-back
     const modelMayWord =
       !afterCheckIn &&
+      askedReply === null &&
       decision.replyText !== undefined &&
       MODEL_WORDING_KINDS.has(effect.kind) &&
       effect.skippedQuestion === undefined &&
