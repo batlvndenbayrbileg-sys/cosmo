@@ -10,6 +10,7 @@
  *  - iterateTurnEvents: ReadableStream<Uint8Array> -> async iterator of TurnEvent.
  */
 import { normalizeLanguageCode } from "@/lib/language";
+import { parseShowPanels } from "@/lib/show";
 import {
   KPI_KEYS,
   QUESTION_IDS,
@@ -225,6 +226,10 @@ function validateTurnEvent(type: string, raw: Rec): TurnEvent | null {
       // Trust boundary: the server builds SummaryPayload from typed code; we only guard the fields
       // this screen reads (spoken.text, overall). The dashboard payload is fetched separately.
       return { type, summary: summary as unknown as SummaryPayload };
+    }
+    case "show": {
+      const panels = parseShowPanels(raw.panels);
+      return panels.length > 0 ? { type, panels } : null;
     }
     case "timing": {
       return {

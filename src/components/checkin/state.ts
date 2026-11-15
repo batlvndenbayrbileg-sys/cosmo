@@ -22,6 +22,7 @@ import type {
   SummaryPayload,
   TurnEvent,
 } from "@/lib/types";
+import type { ShowPanel } from "@/lib/show";
 
 export type SpeechStatus = "idle" | "loading" | "playing";
 
@@ -79,6 +80,8 @@ export interface CheckInState {
   speech: SpeechStatus;
   cosmoState: CosmoState;
   summary: SummaryPayload | null;
+  /** the small panels Cosmo shows beside her (a "show" event); `seq` changes with every new set */
+  show: { seq: number; panels: ShowPanel[] } | null;
   timing: { sttMs: number; llmMs: number; totalMs: number } | null;
   error: CheckInError | null;
   /** counter for ids of lines that arrive without a server turn id */
@@ -99,6 +102,7 @@ export type CheckInAction =
   | { type: "TURN_FAILED"; error: CheckInError }
   | { type: "DISMISS_ERROR" }
   | { type: "DISMISS_CLARIFICATION" }
+  | { type: "DISMISS_SHOW" }
   /** the conversation switched language (EN/MN on the check-in screen); `turn` is what Cosmo says about it */
   | { type: "LANGUAGE"; language: Lang; turn: { turnId: string; text: string } | null };
 
@@ -131,6 +135,7 @@ export function initialCheckInState(): CheckInState {
     speech: "idle",
     cosmoState: "idle",
     summary: null,
+    show: null,
     timing: null,
     error: null,
     localSeq: 0,
@@ -212,6 +217,8 @@ function applyEvent(state: CheckInState, event: TurnEvent): CheckInState {
     }
     case "summary":
       return { ...state, summary: event.summary };
+    case "show":
+      return { ...state, show: { seq: (state.show?.seq ?? state.localSeq) + 1, panels: event.panels } };
     case "timing":
       return { ...state, timing: { sttMs: event.sttMs, llmMs: event.llmMs, totalMs: event.totalMs } };
     case "error":
@@ -304,6 +311,8 @@ export function checkInReducer(state: CheckInState, action: CheckInAction): Chec
         busy: true,
         error: null,
         clarification: null,
+        // the panels of the last answer go away when the next question starts
+        show: null,
         pendingCrew: text ? { text, source: "text" } : { text: "", source: "voice" },
       });
     }
@@ -324,6 +333,9 @@ export function checkInReducer(state: CheckInState, action: CheckInAction): Chec
 
     case "DISMISS_CLARIFICATION":
       return { ...state, clarification: null };
+
+    case "DISMISS_SHOW":
+      return state.show ? { ...state, show: null } : state;
 
     case "LANGUAGE": {
       const switched = { ...state, language: action.language, clarification: null };

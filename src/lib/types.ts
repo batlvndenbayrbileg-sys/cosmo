@@ -3,6 +3,7 @@
  * Imported by server code, client code and tests. Do NOT import server-only modules here.
  * Source of truth for the question set and the dashboard: docs/DASHBOARD_PLAN.md
  */
+import type { ShowPanel } from "./show";
 
 export type Lang = "mn" | "en";
 export type Bilingual = Record<Lang, string>;
@@ -369,6 +370,8 @@ export type TurnEvent =
       emotion: "neutral" | "happy" | "concerned";
     }
   | { type: "summary"; summary: SummaryPayload }
+  /** small panels Cosmo shows on screen beside her (decided by code from the words and the data; src/lib/show.ts) */
+  | { type: "show"; panels: ShowPanel[] }
   | { type: "timing"; sttMs: number; llmMs: number; totalMs: number }
   | { type: "error"; code: ApiErrorCode; message: string; recoverable: boolean }
   | { type: "done" };

@@ -57,6 +57,7 @@ import { answerAskedQuestion, detectAskedQuestion, isHealthTopic, questionFacts,
 import type { Baseline } from "@/lib/health/baseline";
 import { buildResultsFacts, numeralsAreGrounded, type ResultsFacts } from "./resultsFacts";
 import { answerSignatureQuestion, insertBeforeDisclaimer, panelClockDay, signatureFollowUp } from "./signature";
+import { showEvent } from "./show";
 
 /** without the model: today's headline, the first suggestion, and an invitation to ask about any part */
 export function offlineResultsAnswer(facts: ResultsFacts, lang: Lang): string {
@@ -1041,6 +1042,18 @@ async function* runTurnInner(args: RunTurnArgs, started: number): AsyncGenerator
     });
     out.push({ type: "assistant", turnId: cosmoTurn.id, text: assistantText, language: lang, emotion });
   }
+
+  // the small panels Cosmo shows beside her (show.ts): chosen by code from the words and the stored values
+  const show = showEvent({
+    text,
+    lang,
+    state: ctx0.state,
+    recorded: acknowledged.map((a) => a.key),
+    values: valuesNow,
+    history: history14,
+    summary: summaryRequested,
+  });
+  if (show) out.push(show);
 
   out.push({
     type: "timing",

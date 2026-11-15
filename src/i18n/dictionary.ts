@@ -8,19 +8,27 @@ import { earthStrings } from "./strings/earth";
 import { emergencyStrings } from "./strings/emergency";
 import { signatureStrings } from "./strings/signature";
 import { labsStrings } from "./strings/labs";
+import { showArea } from "./strings/show";
+
+const showCheckin = showArea("checkin.");
+const showDashboard = showArea("dashboard.");
 
 export type { Dict, AreaDicts };
 
 /** One entry per UI area; every key inside an area starts with "<area>.". */
 export const areaDictionaries = {
   shell: shellStrings,
-  checkin: checkinStrings,
+  // the panels Cosmo shows on screen ("checkin.show.*") live in the check-in area
+  checkin: {
+    en: { ...checkinStrings.en, ...showCheckin.en },
+    mn: { ...checkinStrings.mn, ...showCheckin.mn },
+  },
   crew: crewStrings,
   // Signature Triage keys ("dashboard.signature.*") and the Labs tab keys ("dashboard.labs.*") live in the dashboard area
   // (no extra area)
   dashboard: {
-    en: { ...dashboardStrings.en, ...signatureStrings.en, ...labsStrings.en },
-    mn: { ...dashboardStrings.mn, ...signatureStrings.mn, ...labsStrings.mn },
+    en: { ...dashboardStrings.en, ...signatureStrings.en, ...labsStrings.en, ...showDashboard.en },
+    mn: { ...dashboardStrings.mn, ...signatureStrings.mn, ...labsStrings.mn, ...showDashboard.mn },
   },
   earth: earthStrings,
   emergency: emergencyStrings,

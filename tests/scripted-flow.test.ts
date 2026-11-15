@@ -50,7 +50,7 @@ describe.each<Lang>(["en", "mn"])("scripted demo flow (%s)", (lang) => {
     expect(first).toMatchObject({ value: lang === "en" ? 5.5 : 5.5, change: "recorded" });
   });
 
-  it("emits transcript, measurement|clarification, state, assistant, summary?, timing, done in order on every turn", async () => {
+  it("emits transcript, measurement|clarification, state, assistant, summary?, show?, timing, done in order on every turn", async () => {
     const { turns } = await runScript(lang);
     const rank: Record<TurnEvent["type"], number> = {
       transcript: 0,
@@ -60,8 +60,10 @@ describe.each<Lang>(["en", "mn"])("scripted demo flow (%s)", (lang) => {
       state: 3,
       assistant: 4,
       summary: 5,
-      timing: 6,
-      done: 7,
+      // the panels Cosmo shows on screen (show.ts) come after her words
+      show: 6,
+      timing: 7,
+      done: 8,
     };
     for (const events of turns) {
       expect(events[0].type).toBe("transcript");

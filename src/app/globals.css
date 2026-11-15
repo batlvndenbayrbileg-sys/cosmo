@@ -409,3 +409,22 @@
 @media (prefers-reduced-motion: reduce) {
   .aegis-compress, .aegis-beat { animation: none; }
 }
+
+/* ───────────── "Cosmo shows it on screen" panels and the body map (src/components/show) ───────────── */
+
+/* the synthetic ECG trace scrolls left by one copy of itself (the path holds two copies side by side) */
+@keyframes aegis-ecg-scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+/* the bright head of the trace, a soft sweep over the figure */
+@keyframes aegis-sweep {
+  0% { transform: translateY(-55%); opacity: 0; }
+  12% { opacity: 1; }
+  88% { opacity: 1; }
+  100% { transform: translateY(55%); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .aegis-ecg-scroll,
+  .aegis-sweep { animation: none !important; }
+}
