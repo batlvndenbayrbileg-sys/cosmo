@@ -109,6 +109,13 @@ describe("matchSosRequest: what counts as asking to alert Earth", () => {
     "S.O.S.!",
     "mayday mayday",
     "can you tell Earth I hit my head",
+    // the "not" / "don't" belongs to another clause (or is not about the request): still a request
+    "I'm not okay, call Earth",
+    "I don't feel well, tell Earth",
+    "I don't feel well tell earth",
+    "it won't stop bleeding call earth",
+    "oh no call Earth",
+    "Hey Cosmo, could you please notify ground control?",
   ])("en yes: %s", (text) => {
     expect(matchSosRequest(text)).not.toBeNull();
   });
@@ -124,6 +131,10 @@ describe("matchSosRequest: what counts as asking to alert Earth", () => {
     "надад туслаач, дэлхийд хэлнэ үү",
     "яаралтай дохио өг",
     "мэдэгдээрэй дэлхийд",
+    "дэлхийд толгой өвдөж байна гэж хэлээрэй",
+    "дэлхийд мэдэгдэж өгөөрэй",
+    "Дэлхий рүү мэдэгдэж өгнө үү",
+    "битгий сандар, дэлхий рүү мэдэгд",
   ])("mn yes: %s", (text) => {
     const hit = matchSosRequest(text);
     expect(hit, text).not.toBeNull();
@@ -140,6 +151,14 @@ describe("matchSosRequest: what counts as asking to alert Earth", () => {
     "I slept seven hours",
     "the earth is round",
     "I've sent an urgent alert to Earth", // Cosmo's own line, if it is ever heard back
+    // general questions Cosmo should answer, not alerts
+    "Is it possible to contact Earth from the station?",
+    "How long does it take to message Earth from here?",
+    "Can astronauts call Earth whenever they want?",
+    "What happens if I call Earth?",
+    "you don't need to call Earth",
+    "I'd rather not tell Earth",
+    "I wanted to call Houston yesterday",
   ])("en no: %s", (text) => {
     expect(matchSosRequest(text)).toBeNull();
   });
@@ -154,6 +173,14 @@ describe("matchSosRequest: what counts as asking to alert Earth", () => {
     "дэлхийтэй холбоотой асуулт байна",
     "дэлхийд хэлбэл яах вэ",
     "өнөөдөр 7 цаг унтсан",
+    // general questions and facts about the world ("дэлхий"), not alerts
+    "Дэлхий рүү яаж холбогдох вэ?",
+    "Дэлхийд хамгийн их ярьдаг хэл юу вэ?",
+    "Англи хэл дэлхийд хамгийн их тархсан хэл",
+    "Сансрын нисэгчид дэлхийтэй холбогддог уу?",
+    "Бид өдөр бүр дэлхийтэй холбогддог",
+    "дэлхийтэй холбогдож байна",
+    "дэлхийд хэлэх үү?",
   ])("mn no: %s", (text) => {
     expect(matchSosRequest(text)).toBeNull();
   });
@@ -420,7 +447,7 @@ describe("SOS by voice, in a conversation turn", () => {
 
   it("never without the words: ordinary answers and 'don't tell Earth' raise nothing", async () => {
     const checkInId = await startCheckIn("bat", "en");
-    for (const text of ["I slept seven hours", "don't tell Earth about this"]) {
+    for (const text of ["I slept seven hours", "don't tell Earth about this", "How long does it take to message Earth from here?"]) {
       const events = await playTurn("bat", checkInId, text);
       expect(eventsOf(events, "sos")).toEqual([]);
     }
