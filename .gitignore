@@ -41,6 +41,8 @@ yarn-error.log*
 /data/*
 # NASA OSDR source files for Signature Triage (read-only, must reach CI and the Vercel bundle)
 !/data/nasa/
+# urine panel workbook for the dashboard's Labs tab (source of src/data/urine_panel.json, scripts/urine_xlsx_to_json.py)
+!/data/urine/
 
 # vercel
 .vercel

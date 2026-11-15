@@ -7,6 +7,7 @@ import { dashboardStrings } from "./strings/dashboard";
 import { earthStrings } from "./strings/earth";
 import { emergencyStrings } from "./strings/emergency";
 import { signatureStrings } from "./strings/signature";
+import { labsStrings } from "./strings/labs";
 
 export type { Dict, AreaDicts };
 
@@ -15,10 +16,11 @@ export const areaDictionaries = {
   shell: shellStrings,
   checkin: checkinStrings,
   crew: crewStrings,
-  // Signature Triage keys are "dashboard.signature.*" and live in the dashboard area (no extra area)
+  // Signature Triage keys ("dashboard.signature.*") and the Labs tab keys ("dashboard.labs.*") live in the dashboard area
+  // (no extra area)
   dashboard: {
-    en: { ...dashboardStrings.en, ...signatureStrings.en },
-    mn: { ...dashboardStrings.mn, ...signatureStrings.mn },
+    en: { ...dashboardStrings.en, ...signatureStrings.en, ...labsStrings.en },
+    mn: { ...dashboardStrings.mn, ...signatureStrings.mn, ...labsStrings.mn },
   },
   earth: earthStrings,
   emergency: emergencyStrings,

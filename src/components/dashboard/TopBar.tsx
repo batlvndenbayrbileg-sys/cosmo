@@ -2,7 +2,7 @@
 
 import type { KeyboardEvent } from "react";
 import Link from "next/link";
-import { Activity, Bell, CalendarDays, LayoutGrid, LifeBuoy, ListChecks, Satellite, type LucideIcon } from "lucide-react";
+import { Activity, Bell, CalendarDays, FlaskConical, LayoutGrid, LifeBuoy, ListChecks, Satellite, type LucideIcon } from "lucide-react";
 import { TestTubeDiagonal } from "lucide-react";
 import type { DashboardPayload } from "@/lib/types";
 import { APP_CREW_REFERENCE_PANELS, REFERENCE_CREW } from "@/lib/signature/config";
@@ -13,13 +13,14 @@ import { AlertsStrip } from "./AlertsStrip";
 import type { Viewer } from "./logic";
 import { MascotPicture } from "./parts";
 
-export type NavSection = "overview" | "vitals" | "plan" | "trends" | "earth" | "guide";
+export type NavSection = "overview" | "vitals" | "plan" | "trends" | "labs" | "earth" | "guide";
 
 export const NAV_ITEMS: ReadonlyArray<{ id: NavSection; icon: LucideIcon }> = [
   { id: "overview", icon: LayoutGrid },
   { id: "vitals", icon: Activity },
   { id: "plan", icon: ListChecks },
   { id: "trends", icon: CalendarDays },
+  { id: "labs", icon: FlaskConical },
   { id: "earth", icon: Satellite },
   { id: "guide", icon: LifeBuoy },
 ];
@@ -102,7 +103,7 @@ export function TopBar({
               onClick={() => onNavigate(id)}
               onKeyDown={onTabKey}
               className={cn(
-                "inline-flex h-10 shrink-0 items-center gap-2 rounded-full px-3.5 text-[15px] whitespace-nowrap text-[var(--aegis-label)] outline-none transition-[background-color,color,box-shadow] duration-200 focus-visible:ring-3 focus-visible:ring-ring/60 lg:h-[clamp(34px,4.4vh,40px)] lg:px-[clamp(12px,1.1vw,16px)] lg:text-[clamp(13px,1.6vh,15px)]",
+                "inline-flex h-10 shrink-0 items-center gap-2 rounded-full px-3.5 text-[15px] whitespace-nowrap text-[var(--aegis-label)] outline-none transition-[background-color,color,box-shadow] duration-200 focus-visible:ring-3 focus-visible:ring-ring/60 lg:h-[clamp(34px,4.4vh,40px)] lg:px-[clamp(10px,0.95vw,16px)] lg:text-[clamp(13px,1.6vh,15px)]",
                 current
                   ? "bg-white font-medium text-[var(--aegis-ink)] shadow-[0_4px_12px_-6px_rgba(40,80,160,0.35)]"
                   : "hover:bg-white/60 hover:text-[var(--aegis-ink)]",
