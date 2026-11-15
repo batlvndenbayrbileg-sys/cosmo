@@ -140,6 +140,25 @@ describe("which words show which panels", () => {
     expect(showTopics("цусны шинжилгээ")).toEqual(["signature"]);
   });
 
+  it("does not take heartburn for the heart", () => {
+    expect(showTopics("I have heartburn")).toEqual([]);
+    expect(decideShow(input("I have heartburn", { state: "DONE" }))).toEqual([]);
+    expect(showTopics("my heart beat fast")).toEqual(["heart"]);
+  });
+
+  it("the Signature card opens the crew member's own linked reference panel", () => {
+    expect(decideShow(input("what does my blood panel say?", { crewId: "bat" }))).toEqual([
+      { kind: "signature", id: "signature", reference: "C001" },
+    ]);
+    expect(decideShow(input("what does my blood panel say?", { crewId: "mira" }))[0]).toMatchObject({ reference: "C004" });
+    // a crew member without a linked panel: no reference, the page picks its default
+    expect(decideShow(input("what does my blood panel say?", { crewId: "someone-else" }))).toEqual([{ kind: "signature", id: "signature" }]);
+    expect(parseShowPanels([{ kind: "signature", id: "signature", reference: "C002" }])).toEqual([
+      { kind: "signature", id: "signature", reference: "C002" },
+    ]);
+    expect(parseShowPanels([{ kind: "signature", id: "signature", reference: "../x" }])).toEqual([{ kind: "signature", id: "signature" }]);
+  });
+
   it("recognises asking and 'show' in both languages", () => {
     expect(asksToSee("show my pulse", "en")).toBe(true);
     expect(asksToSee("пульсаа харуул", "mn")).toBe(true);
@@ -292,6 +311,13 @@ describe("the turn pipeline emits the show event", () => {
     expect(trend.panels[0]).toMatchObject({ kind: "trend", vital: { key: "sleep_hours", value: 6.5 } });
     if (trend.panels[0].kind !== "trend") throw new Error("expected a trend");
     expect(trend.panels[0].vital.history.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("a blood-panel question links to the crew member's own reference panel", async () => {
+    const id = await startCheckIn("bat", "en");
+    for (const line of START.en) await playTurn("bat", id, line);
+    const [shown] = eventsOf(await playTurn("bat", id, "what does my blood panel say?"), "show");
+    expect(shown.panels).toContainEqual({ kind: "signature", id: "signature", reference: "C001" });
   });
 
   it("small talk without a value shows nothing", async () => {

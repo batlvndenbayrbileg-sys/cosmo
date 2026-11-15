@@ -88,9 +88,21 @@ describe("panel server render", () => {
     expect(render(createElement(ShowPanelView, { panel: trend }), "mn")).toContain("Хувийн суурь түвшний муж");
   });
 
+  it("vital card: a scale value reads '4/5' once, never '4/5 /5' (en + mn)", () => {
+    const [mood] = panels("how is my mood?", [], "DONE");
+    const en = strip(render(createElement(ShowPanelView, { panel: mood })));
+    expect(en).toContain("4/5");
+    expect(en).not.toMatch(/\/5\s*\/5/);
+    const mn = strip(render(createElement(ShowPanelView, { panel: mood }), "mn"));
+    expect(mn).not.toMatch(/\/5\s*\/5/);
+  });
+
   it("link cards: Signature Triage opens its page, labs say where they are", () => {
     const sig = render(createElement(ShowPanelView, { panel: { kind: "signature", id: "signature" }, checkInId: "c1" }));
     expect(sig).toContain('href="/signature?checkInId=c1"');
+    // the crew member's own linked reference panel, like the dashboard's Signature link
+    const own = render(createElement(ShowPanelView, { panel: { kind: "signature", id: "signature", reference: "C001" }, checkInId: "c1" }));
+    expect(own).toContain('href="/signature?crew=C001&amp;checkInId=c1"');
     expect(sig).toContain("Signature Triage");
     const labs = render(createElement(ShowPanelView, { panel: { kind: "labs", id: "labs" } }));
     expect(labs).toContain("It is in the Labs tab of your dashboard.");
@@ -117,6 +129,18 @@ describe("panel server render", () => {
     expect(mn).toContain("Концепцийн үзүүлэн");
     expect(render(createElement(ShowStage, { show: null, hold: false, onDismiss: () => {}, placement: "wide" }))).toBe("");
   });
+
+  it("on the check-in stage the panels stay under the clarification bubble (z-10) and the vision card (z-40)", () => {
+    const shown = panels("how is my heart rate?");
+    const z = (placement: "wide" | "narrow" | "dashboard") => {
+      const html = render(createElement(ShowStage, { show: { seq: 1, panels: shown }, hold: true, onDismiss: () => {}, placement, top: 10 }));
+      const cls = /data-slot="show-stage"[^>]*class="([^"]+)"/.exec(html)?.[1] ?? /class="([^"]+)"[^>]*data-slot="show-stage"/.exec(html)?.[1] ?? "";
+      return cls.split(/\s+/).filter((c) => /^z-/.test(c));
+    };
+    expect(z("wide")).toEqual(["z-[5]"]);
+    expect(z("narrow")).toEqual(["z-[5]"]);
+    expect(z("dashboard")).toEqual(["z-40"]);
+  });
 });
 
 describe("body map server render", () => {
@@ -130,11 +154,14 @@ describe("body map server render", () => {
     expect(text).toContain("124/80");
     expect(text).toContain("36.8 °C");
     expect(text).toContain("SpO2 not measured");
+    // a scale value carries its name (the "4/5" alone would not say what it is)
+    expect(text).toContain("Mood 4/5");
     expect(html.match(/data-site=/g)).toHaveLength(7);
     const mn = strip(render(createElement(BodyMap, { vitals: body.vitals, animate: false }), "mn"));
     expect(mn).toContain("Зүрх");
     expect(mn).toContain("72 удаа/мин");
     expect(mn).toContain("SpO2 хэмжээгүй");
+    expect(mn).toContain("Сэтгэл 4/5");
   });
 
   it("says 'not recorded' at a part with no value today", () => {

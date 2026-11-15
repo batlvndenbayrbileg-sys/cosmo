@@ -9,6 +9,7 @@
  */
 import { KPI_KEYS, type Bilingual, type KpiKey, type KpiStat, type MeasurementValue, type Status } from "./types";
 import { KPI_DEFS } from "./kpi/registry";
+import { REFERENCE_CREW, type ReferenceCrewId } from "./signature/config";
 
 export type ShowPanelKind = "vital" | "ecg" | "ring" | "trend" | "body" | "signature" | "labs";
 
@@ -79,7 +80,15 @@ export type ShowPanel =
       second?: ShowVital;
     }
   | { kind: "body"; id: string; vitals: ShowVital[] }
-  | { kind: "signature"; id: string }
+  | {
+      kind: "signature";
+      id: string;
+      /**
+       * the Inspiration4 reference panel linked to this crew member (APP_CREW_REFERENCE_PANELS), the same one Cosmo's
+       * Signature answer and the dashboard's Signature link use; absent when the crew member has no linked panel
+       */
+      reference?: ReferenceCrewId;
+    }
   | { kind: "labs"; id: string };
 
 /** at most this many panels at once: small and readable, never a second dashboard */
@@ -161,9 +170,13 @@ export function parseShowPanels(raw: unknown): ShowPanel[] {
         });
         break;
       }
-      case "signature":
+      case "signature": {
+        const reference = (REFERENCE_CREW as readonly unknown[]).includes(p.reference) ? (p.reference as ReferenceCrewId) : null;
+        out.push({ kind: "signature", id, ...(reference ? { reference } : {}) });
+        break;
+      }
       case "labs":
-        out.push({ kind: p.kind as "signature" | "labs", id });
+        out.push({ kind: "labs", id });
         break;
     }
   }

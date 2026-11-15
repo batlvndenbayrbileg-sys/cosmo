@@ -51,6 +51,7 @@ export const showStrings: AreaDicts = {
     "dashboard.bodyMap.site.legs": "Legs",
     "dashboard.bodyMap.spo2": "SpO2 not measured",
     "dashboard.bodyMap.none": "Not recorded",
+    "dashboard.bodyMap.name.mood": "Mood",
   },
   mn: {
     "checkin.show.region": "Космогийн харуулж буй мэдээлэл",
@@ -98,6 +99,7 @@ export const showStrings: AreaDicts = {
     "dashboard.bodyMap.site.legs": "Хөл",
     "dashboard.bodyMap.spo2": "SpO2 хэмжээгүй",
     "dashboard.bodyMap.none": "Бүртгэгдээгүй",
+    "dashboard.bodyMap.name.mood": "Сэтгэл",
   },
 };
 

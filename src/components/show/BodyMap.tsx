@@ -4,6 +4,7 @@ import type { CSSProperties } from "react";
 import { motion } from "framer-motion";
 import type { KpiKey, Lang, Status } from "@/lib/types";
 import { BODY_CALLOUTS, worstShowStatus, type BodyCallout, type ShowVital } from "@/lib/show";
+import { KPI_DEFS } from "@/lib/kpi/registry";
 import { StatusGlyph } from "@/components/status";
 import { useI18n } from "@/i18n/I18nProvider";
 import { cn } from "@/lib/utils";
@@ -23,8 +24,16 @@ export interface BodyLine {
   status: Status;
 }
 
-/** the value lines of one site: blood pressure as one "118/76 mmHg" line, keys without a value left out */
-export function calloutLines(callout: BodyCallout, byKey: ReadonlyMap<KpiKey, ShowVital>, lang: Lang): BodyLine[] {
+/**
+ * The value lines of one site: blood pressure as one "118/76 mmHg" line, keys without a value left out. A scale value
+ * ("4/5") has no unit to say what it is, so it carries a short name (`name`, default the indicator's label): "Mood 4/5".
+ */
+export function calloutLines(
+  callout: BodyCallout,
+  byKey: ReadonlyMap<KpiKey, ShowVital>,
+  lang: Lang,
+  name: (key: KpiKey) => string = (key) => KPI_DEFS[key].labels[lang],
+): BodyLine[] {
   const lines: BodyLine[] = [];
   const keys = callout.keys;
   for (const key of keys) {
@@ -42,7 +51,8 @@ export function calloutLines(callout: BodyCallout, byKey: ReadonlyMap<KpiKey, Sh
     }
     const v = byKey.get(key);
     if (!v || v.value === null) continue;
-    lines.push({ key, text: valueText(key, v.value, lang, true), status: v.status });
+    const text = valueText(key, v.value, lang, true);
+    lines.push({ key, text: KPI_DEFS[key].type === "scale" ? `${name(key)} ${text}` : text, status: v.status });
   }
   return lines;
 }
@@ -71,6 +81,8 @@ export function BodyMap({
 }) {
   const { t, lang } = useI18n();
   const byKey = new Map(vitals.map((v) => [v.key, v]));
+  // the short name a scale value carries on the figure ("Mood 4/5"), short enough for a phone
+  const shortName = (key: KpiKey) => (key === "mood" ? t("dashboard.bodyMap.name.mood") : KPI_DEFS[key].labels[lang]);
   const small = size === "panel";
   // the figure: as tall as the box, but never wider than about half of it (the labels need the rest)
   const boxStyle = {
@@ -197,7 +209,7 @@ export function BodyMap({
         {/* the labels */}
         {BODY_CALLOUTS.map((c, i) => {
           const left = c.side === "left";
-          const lines = calloutLines(c, byKey, lang);
+          const lines = calloutLines(c, byKey, lang, shortName);
           const empty = c.keys.length > 0 && lines.length === 0;
           return (
             <motion.div

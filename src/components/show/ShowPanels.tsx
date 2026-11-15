@@ -256,7 +256,8 @@ function VitalCard({ panel }: { panel: Extract<ShowPanel, { kind: "vital" }> }) 
       ? null
       : valueText(first.key, first.value, lang, false);
   const def = KPI_DEFS[first.key];
-  const unit = def.type === "number" || def.type === "integer" ? unitLabel(def.unit, lang) : def.type === "scale" ? `/${def.max ?? 5}` : "";
+  // a scale value already reads "4/5" (formatValue), so it takes no unit of its own
+  const unit = def.type === "number" || def.type === "integer" ? unitLabel(def.unit, lang) : "";
   const status = worstShowStatus(panel.vitals.map((v) => v.status));
   const chartVital = sys ?? first;
   return (
@@ -479,6 +480,12 @@ function LinkCard({
 }) {
   const { t } = useI18n();
   const sig = panel.kind === "signature";
+  // the same page the dashboard's Signature link opens: this crew member's linked reference panel, and back to the check-in
+  const query = new URLSearchParams();
+  if (panel.kind === "signature" && panel.reference) query.set("crew", panel.reference);
+  if (checkInId) query.set("checkInId", checkInId);
+  const qs = query.toString();
+  const sigHref = `/signature${qs ? `?${qs}` : ""}`;
   const action = "inline-flex items-center gap-1 self-start rounded-full bg-[var(--aegis-ink)] px-3 py-1.5 text-[12px] font-medium text-white outline-none hover:opacity-90 focus-visible:ring-3 focus-visible:ring-ring/60";
   return (
     <div className={CARD} data-panel={panel.kind}>
@@ -489,7 +496,7 @@ function LinkCard({
       <div className="mt-2">
         {sig ? (
           <a
-            href={`/signature${checkInId ? `?checkInId=${encodeURIComponent(checkInId)}` : ""}`}
+            href={sigHref}
             target="_blank"
             rel="noopener noreferrer"
             className={action}
@@ -549,14 +556,21 @@ const ITEM: Variants = {
 
 export type ShowPlacement = "wide" | "narrow" | "dashboard";
 
+/**
+ * On the check-in stage the panels sit just above the captured-value bubbles (z auto) and BELOW everything the
+ * astronaut must be able to read or press: the clarification bubble (z-10), the corner controls (z-20), the notices
+ * (z-30) and the vision self-check card (z-40), which can reach into the panels' column on a 1280 px screen.
+ */
 const PLACEMENT: Record<ShowPlacement, string> = {
   // beside Cosmo, under the top-right corner controls
-  wide: "fixed top-[4.25rem] right-4 w-[min(22rem,calc(100vw-2rem))] max-h-[calc(100dvh-13.5rem)]",
-  // phones: stacked under Cosmo, in the stage's flow position given by `top`
-  narrow: "absolute inset-x-3",
+  wide: "fixed z-[5] top-[4.25rem] right-4 w-[min(22rem,calc(100vw-2rem))] max-h-[calc(100dvh-13.5rem)] overflow-y-auto overscroll-contain",
+  // phones: stacked under Cosmo, in the stage's flow position given by `top`; the page scrolls (not the panel), and an
+  // empty strip under it (::after) lets its last card scroll clear of the fixed answer bar and demo row at the bottom
+  narrow:
+    "absolute z-[5] inset-x-3 after:pointer-events-none after:absolute after:top-full after:left-0 after:h-52 after:w-px after:content-['']",
   // the dashboard: above Cosmo's dock and the conversation bar
   dashboard:
-    "fixed right-3 bottom-[8.5rem] left-3 max-h-[calc(100dvh-11rem)] md:left-auto md:right-[max(1.25rem,calc((100vw-1800px)/2+1.5rem))] md:w-[22rem]",
+    "fixed z-40 right-3 bottom-[8.5rem] left-3 max-h-[calc(100dvh-11rem)] overflow-y-auto overscroll-contain md:left-auto md:right-[max(1.25rem,calc((100vw-1800px)/2+1.5rem))] md:w-[22rem]",
 };
 
 /**
@@ -608,7 +622,7 @@ export function ShowStage({
           aria-live="polite"
           className={cn(
             PLACEMENT[placement],
-            "z-40 flex flex-col gap-2 overflow-y-auto overscroll-contain rounded-[26px] border border-white/80 bg-white/55 p-2.5 shadow-[0_30px_70px_-30px_rgba(40,80,160,0.55)] backdrop-blur-xl backdrop-saturate-150",
+            "flex flex-col gap-2 rounded-[26px] border border-white/80 bg-white/55 p-2.5 shadow-[0_30px_70px_-30px_rgba(40,80,160,0.55)] backdrop-blur-xl backdrop-saturate-150",
           )}
           style={placement === "narrow" && top !== undefined ? { top } : undefined}
           initial={{ opacity: 0, x: placement === "wide" ? 28 : 0, y: placement === "wide" ? 0 : 16, scale: 0.98 }}

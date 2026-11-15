@@ -3,6 +3,7 @@ import type { ConversationState, KpiKey, Lang, MeasurementValue, TurnEvent } fro
 import { buildKpiStats, evaluateDay, isReadinessAvailable, type HistoryDay } from "@/lib/health";
 import { KPI_DEFS, asNumber } from "@/lib/kpi/registry";
 import { BODY_KEYS, MAX_SHOW_PANELS, showVitalFromStat, type ShowPanel, type ShowVital } from "@/lib/show";
+import { APP_CREW_REFERENCE_PANELS } from "@/lib/signature/config";
 import { detectAskedQuestion } from "./questions";
 
 /**
@@ -32,6 +33,8 @@ export interface ShowInput {
   history: HistoryDay[];
   /** this turn computes the daily summary (the dashboard is about to open) */
   summary: boolean;
+  /** the crew member: the Signature link card opens their linked reference panel (APP_CREW_REFERENCE_PANELS) */
+  crewId?: string;
 }
 
 /* ───────────── what the words are about ───────────── */
@@ -62,7 +65,7 @@ const TOPIC_PATTERNS: ReadonlyArray<{ topic: ShowTopic; re: RegExp }> = [
   { topic: "labs", re: /urine|\blabs?\b|lab\s+results?|шээс|лаборатор/iu },
   { topic: "bp", re: /blood\s+pressure|\bbp\b|systolic|diastolic|даралт/iu },
   { topic: "glucose", re: /glucose|blood\s+sugar|\bsugar\b|сахар|глюкоз/iu },
-  { topic: "heart", re: /heart|pulse|\bbpm\b|зүрх|пульс|лугшилт/iu },
+  { topic: "heart", re: /heart(?!\s*burn)|pulse|\bbpm\b|зүрх|пульс|лугшилт/iu },
   { topic: "temperature", re: /temperature|\btemp\b|fever|температур|халуу|биеийн\s+хэм/iu },
   { topic: "sleep", re: /\bsleep|\bslept|\bnap\b|нойр|унт/iu },
   { topic: "mood", re: /\bmood|сэтгэл/iu },
@@ -203,11 +206,13 @@ function recordedPanels(b: Built, keys: readonly KpiKey[]): ShowPanel[] {
 }
 
 /** the panels for one topic the astronaut asked about */
-function topicPanels(b: Built, topic: ShowTopic, trend: boolean, state: ConversationState): ShowPanel[] {
+function topicPanels(b: Built, topic: ShowTopic, trend: boolean, state: ConversationState, crewId?: string): ShowPanel[] {
   const one = (p: ShowPanel | null): ShowPanel[] => (p ? [p] : []);
   switch (topic) {
-    case "signature":
-      return [{ kind: "signature", id: "signature" }];
+    case "signature": {
+      const reference = crewId ? APP_CREW_REFERENCE_PANELS[crewId] : undefined;
+      return [{ kind: "signature", id: "signature", ...(reference ? { reference } : {}) }];
+    }
     case "labs":
       return [{ kind: "labs", id: "labs" }];
     case "oxygen":
@@ -276,7 +281,7 @@ export function decideShow(input: ShowInput): ShowPanel[] {
   if (recorded.length > 0) push(recordedPanels(b, recorded));
   if (asked) {
     const trend = TREND_WORDS.test(text);
-    for (const topic of topics) push(topicPanels(b, topic, trend, input.state));
+    for (const topic of topics) push(topicPanels(b, topic, trend, input.state, input.crewId));
   }
   return out.slice(0, MAX_SHOW_PANELS);
 }

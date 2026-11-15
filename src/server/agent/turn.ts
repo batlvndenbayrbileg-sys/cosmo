@@ -1052,6 +1052,7 @@ async function* runTurnInner(args: RunTurnArgs, started: number): AsyncGenerator
     values: valuesNow,
     history: history14,
     summary: summaryRequested,
+    crewId,
   });
   if (show) out.push(show);
 
