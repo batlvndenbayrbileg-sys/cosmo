@@ -11,6 +11,7 @@ import { useI18n } from "@/i18n/I18nProvider";
 import { AlertsFeed } from "./AlertsFeed";
 import { CrewCard } from "./CrewCard";
 import { DelaySelector } from "./DelaySelector";
+import { SosAlertsPanel } from "./SosAlertsPanel";
 import { EarthTitle } from "./EarthTitle";
 import { ErrorNotice } from "./ErrorNotice";
 import { delayMsFor, parseDelayId, type DelayId } from "./delay";
@@ -52,6 +53,9 @@ export function EarthConsole({ initialDelay }: { initialDelay?: string }) {
     <MotionConfig reducedMotion="user">
       <PageFrame data-slot="earth-console">
         <TopBar center={<EarthTitle />} />
+
+        {/* SOS from the crew: always first, live (polled), with photo, alarm and "seen" */}
+        <SosAlertsPanel delayMs={delayMs} delayId={delayId} />
 
         {/* heading + delay */}
         <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">

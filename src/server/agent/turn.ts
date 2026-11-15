@@ -26,6 +26,7 @@ import { appendTurn, listTurns } from "@/server/db/repos/turn";
 import { ALERT_SPOKEN_NOTICE, createAlertsForCheckIn, raiseCrisisAlert } from "@/server/alerts";
 import { loadHistory, loadMachineCtx, loadTodayValues, saveMachineCtx } from "@/server/checkin/service";
 import { composeTemplateSummary } from "@/server/dashboard/template";
+import { sosTurn } from "@/server/sos";
 import { LlmUnavailable, type Agent, type AgentDecision, type Emotion } from "./agent";
 import { ClaudeAgent, HISTORY_TURNS } from "./claudeAgent";
 import { interpretAnswer, interpretCorrection, interpretStart, interpretYesNo, type InterpretedRecord } from "./interpret";
@@ -605,6 +606,15 @@ async function* runTurnInner(args: RunTurnArgs, started: number): AsyncGenerator
 
   const crewTurn = await appendTurn(crewId, checkInId, { speaker: "crew", text, language: lang, createdAt: now() });
   yield { type: "transcript", turnId: crewTurn.id, text, language: lang };
+
+  /* ── SOS: "tell Earth" raises one urgent alert for the ground console, in any state (src/server/sos.ts) ── */
+  const sos = await sosTurn({ crewId, checkInId, text, lang, talking: ctx0.companion });
+  if (sos) {
+    yield* sos;
+    yield { type: "timing", sttMs: Math.max(0, Math.round(input.sttMs ?? 0)), llmMs: 0, totalMs: Math.round(performance.now() - started) };
+    yield { type: "done" };
+    return;
+  }
 
   const env = getEnv();
   const source: MeasurementSource = input.kind === "voice" ? "voice" : env.demoMode === "scripted" ? "simulated" : "typed";

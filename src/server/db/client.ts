@@ -224,7 +224,7 @@ export async function getDb(): Promise<Db> {
     if (db && db.open) {
       if (slot.wipeNext) {
         slot.wipeNext = false;
-        await db.exec("TRUNCATE alert, turn, measurement, check_in, crew_member RESTART IDENTITY CASCADE");
+        await db.exec("TRUNCATE sos_alert, alert, turn, measurement, check_in, crew_member RESTART IDENTITY CASCADE");
       }
       return db;
     }

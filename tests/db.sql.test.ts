@@ -157,7 +157,7 @@ describe("preparePostgres", () => {
   });
 
   it("creates a missing schema once, then skips the schema script (no table locks) on every later cold start", async () => {
-    expect(PG_SCHEMA_TABLES).toEqual(["crew_member", "check_in", "measurement", "turn", "alert"]);
+    expect(PG_SCHEMA_TABLES).toEqual(["crew_member", "check_in", "measurement", "turn", "alert", "sos_alert"]);
     expect(PG_SCHEMA_INDEXES.length).toBeGreaterThanOrEqual(8);
     expect(await pgSchemaReady(pg)).toBe(false);
 

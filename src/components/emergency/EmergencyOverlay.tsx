@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import { ShieldAlert, X } from "lucide-react";
 import type { EmergencyScenario } from "@/lib/emergency";
@@ -22,7 +22,10 @@ export function EmergencyOverlay({
   onSelect,
   onClose,
   onCallHelp,
+  banner,
 }: {
+  /** shown under the header, e.g. the SOS-to-Earth status (src/components/sos) */
+  banner?: ReactNode;
   scenarios: EmergencyScenario[];
   /** null = the grid: let the person choose */
   activeId: string | null;
@@ -114,6 +117,7 @@ export function EmergencyOverlay({
             <X className="size-5" aria-hidden />
           </button>
         </div>
+        {banner ? <div className="border-b border-[rgba(15,27,45,0.06)] px-4 py-3 sm:px-6">{banner}</div> : null}
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6">
           {active ? (

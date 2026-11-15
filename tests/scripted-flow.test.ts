@@ -58,6 +58,8 @@ describe.each<Lang>(["en", "mn"])("scripted demo flow (%s)", (lang) => {
       measurement: 2,
       clarification: 2,
       state: 3,
+      // an SOS turn ("tell Earth") sends `sos` before Cosmo's line
+      sos: 3,
       assistant: 4,
       summary: 5,
       timing: 6,

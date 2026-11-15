@@ -6,6 +6,7 @@ import { crewStrings } from "./strings/crew";
 import { dashboardStrings } from "./strings/dashboard";
 import { earthStrings } from "./strings/earth";
 import { emergencyStrings } from "./strings/emergency";
+import { sosStrings } from "./strings/sos";
 import { signatureStrings } from "./strings/signature";
 import { labsStrings } from "./strings/labs";
 
@@ -23,7 +24,11 @@ export const areaDictionaries = {
     mn: { ...dashboardStrings.mn, ...signatureStrings.mn, ...labsStrings.mn },
   },
   earth: earthStrings,
-  emergency: emergencyStrings,
+  // SOS to Earth keys ("emergency.sos.*") live in the emergency area
+  emergency: {
+    en: { ...emergencyStrings.en, ...sosStrings.en },
+    mn: { ...emergencyStrings.mn, ...sosStrings.mn },
+  },
 } as const satisfies Record<string, AreaDicts>;
 
 export type AreaName = keyof typeof areaDictionaries;

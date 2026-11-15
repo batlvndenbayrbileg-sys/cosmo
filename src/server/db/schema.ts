@@ -12,6 +12,11 @@ import "server-only";
  * Timestamps are ISO-8601 UTC strings produced by `Date#toISOString()` (fixed width, so string
  * comparison equals time comparison). `check_in.local_date` is the server-local calendar date
  * (YYYY-MM-DD) of `started_at`; it groups history by day.
+ *
+ * `sos_alert` (SOS to Earth, src/server/sos.ts) is added on top, additively: an SOS can be raised outside any check-in,
+ * so its `check_in_id` is nullable (the composite foreign key applies only when it is set) and `crew_id` references the
+ * crew member directly. The face still is a base64 JPEG (at most SOS_PHOTO_MAX_BYTES) in `photo_jpeg`, read only by
+ * the ground photo route.
  */
 export const SCHEMA_VERSION = 1;
 
@@ -86,6 +91,24 @@ CREATE TABLE IF NOT EXISTS alert (
 );
 CREATE INDEX IF NOT EXISTS idx_alert_crew_time ON alert (crew_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_alert_checkin ON alert (check_in_id);
+
+CREATE TABLE IF NOT EXISTS sos_alert (
+  id            TEXT PRIMARY KEY,
+  crew_id       TEXT NOT NULL REFERENCES crew_member(id),
+  check_in_id   TEXT,
+  created_at    TEXT NOT NULL,
+  reason        TEXT NOT NULL CHECK (reason IN ('button','voice')),
+  phrase        TEXT,
+  photo_status  TEXT NOT NULL DEFAULT 'pending'
+                CHECK (photo_status IN ('pending','attached','denied','unavailable')),
+  photo_jpeg    TEXT,
+  photo_bytes   INTEGER,
+  photo_at      TEXT,
+  seen_at       TEXT,
+  FOREIGN KEY (check_in_id, crew_id) REFERENCES check_in (id, crew_id)
+);
+CREATE INDEX IF NOT EXISTS idx_sos_crew_time ON sos_alert (crew_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_sos_time ON sos_alert (created_at);
 `;
 
 /**
@@ -173,11 +196,31 @@ CREATE TABLE IF NOT EXISTS alert (
 CREATE INDEX IF NOT EXISTS idx_alert_crew_time ON alert (crew_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_alert_checkin ON alert (check_in_id);
 
+CREATE TABLE IF NOT EXISTS sos_alert (
+  id            TEXT PRIMARY KEY,
+  seq           BIGINT GENERATED ALWAYS AS IDENTITY,
+  crew_id       TEXT NOT NULL REFERENCES crew_member(id),
+  check_in_id   TEXT,
+  created_at    TEXT NOT NULL,
+  reason        TEXT NOT NULL CHECK (reason IN ('button','voice')),
+  phrase        TEXT,
+  photo_status  TEXT NOT NULL DEFAULT 'pending'
+                CHECK (photo_status IN ('pending','attached','denied','unavailable')),
+  photo_jpeg    TEXT,
+  photo_bytes   INTEGER,
+  photo_at      TEXT,
+  seen_at       TEXT,
+  FOREIGN KEY (check_in_id, crew_id) REFERENCES check_in (id, crew_id)
+);
+CREATE INDEX IF NOT EXISTS idx_sos_crew_time ON sos_alert (crew_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_sos_time ON sos_alert (created_at);
+
 ALTER TABLE crew_member ENABLE ROW LEVEL SECURITY;
 ALTER TABLE check_in ENABLE ROW LEVEL SECURITY;
 ALTER TABLE measurement ENABLE ROW LEVEL SECURITY;
 ALTER TABLE turn ENABLE ROW LEVEL SECURITY;
 ALTER TABLE alert ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sos_alert ENABLE ROW LEVEL SECURITY;
 `;
 
 /** the tables and indexes PG_SCHEMA_SQL creates (read from it, so the two cannot drift apart); see pgSchemaReady */
