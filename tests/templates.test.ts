@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { KPI_DEFS, QUESTIONS, formatValue } from "@/lib/kpi/registry";
+import { KPI_DEFS, QUESTIONS, formatValue, getQuestion } from "@/lib/kpi/registry";
 import { evaluateDay, DISCLAIMER } from "@/lib/health";
 import type {
   CrewPublic,
@@ -133,20 +133,20 @@ describe("askQuestion", () => {
   });
 
   it("acknowledges a recorded value and then asks the next question", () => {
-    const mood = QUESTIONS[1];
+    const mood = getQuestion("mood");
     expect(askQuestion(mood, "en", [rec("sleep_hours", 7)])).toBe(`Got it, 7 hours. ${mood.prompts.en}`);
     expect(askQuestion(mood, "mn", [rec("sleep_hours", 7)])).toBe(`Ойлголоо, 7 цаг. ${mood.prompts.mn}`);
   });
 
   it("acknowledges blood pressure as one phrase", () => {
-    const hr = QUESTIONS[4];
+    const hr = getQuestion("heart_rate");
     const text = askQuestion(hr, "en", [rec("bp_systolic", 124), rec("bp_diastolic", 82)]);
     expect(text).toBe(`Got it, 124 over 82. ${hr.prompts.en}`);
     expect(askQuestion(hr, "mn", [rec("bp_systolic", 124), rec("bp_diastolic", 82)])).toContain("124 дээр 82");
   });
 
   it("acknowledges symptoms in a calm way", () => {
-    const bp = QUESTIONS[3];
+    const bp = getQuestion("blood_pressure");
     const none = [rec("symptom_headache", 0), rec("symptom_dizziness", 0), rec("symptom_nausea", 0)];
     expect(askQuestion(bp, "en", none)).toBe(`No symptoms, noted. ${bp.prompts.en}`);
     const some = [rec("symptom_headache", 1), rec("symptom_dizziness", 0), rec("symptom_nausea", 1)];
@@ -155,11 +155,11 @@ describe("askQuestion", () => {
   });
 
   it("speaks scales and categories as words", () => {
-    const next = QUESTIONS[2];
+    const next = getQuestion("symptoms");
     expect(askQuestion(next, "en", [rec("mood", 4)])).toContain("4 out of 5");
     expect(askQuestion(next, "mn", [rec("mood", 4)])).toContain("5-аас 4");
     // lower case inside the sentence: "Got it, slightly blurred."
-    expect(askQuestion(QUESTIONS[11], "en", [rec("vision_check", 1)])).toContain("Got it, slightly blurred.");
+    expect(askQuestion(getQuestion("day_note"), "en", [rec("vision_check", 1)])).toContain("Got it, slightly blurred.");
   });
 
   it("every acknowledgement and question is clean text in both languages", () => {
@@ -184,20 +184,20 @@ describe("clarify", () => {
   });
 
   it("re-asks the registry question on the first attempts", () => {
-    const sleep = QUESTIONS[0];
+    const sleep = getQuestion("sleep");
     expect(clarify(sleep, "en", "unclear", 0)).toContain(sleep.prompts.en);
     expect(clarify(sleep, "mn", "type", 0)).toContain(sleep.prompts.mn);
     expect(clarify(sleep, "en", "unclear", 1)).toContain(sleep.prompts.en);
   });
 
   it("names the allowed range for a range problem", () => {
-    const sleep = QUESTIONS[0];
+    const sleep = getQuestion("sleep");
     expect(clarify(sleep, "en", "range", 0)).toContain("between 0 and 14 hours");
     expect(clarify(sleep, "mn", "range", 0)).toContain("0-14");
   });
 
   it("offers to skip on the second attempt and moves on after that", () => {
-    const sleep = QUESTIONS[0];
+    const sleep = getQuestion("sleep");
     expect(clarify(sleep, "en", "unclear", 1).toLowerCase()).toContain("skip");
     const moveOn = clarify(sleep, "en", "unclear", 2);
     expect(moveOn).toContain("when we confirm");
@@ -206,7 +206,7 @@ describe("clarify", () => {
   });
 
   it("different attempts say different things", () => {
-    const q = QUESTIONS[4];
+    const q = getQuestion("heart_rate");
     expect(clarify(q, "en", "unclear", 0)).not.toBe(clarify(q, "en", "unclear", 1));
   });
 });
@@ -218,11 +218,32 @@ describe("readBack", () => {
 
   it.each(LANGS)("contains every stored value, formatted by the registry (%s)", (lang) => {
     const text = readBack(values, lang);
+    // the symptom answer is one phrase ("no symptoms"), the clear vision check is part of it
+    const phrase = new Set<string>(["symptom_headache", "symptom_dizziness", "symptom_nausea", "vision_check"]);
     for (const key of KPI_KEYS) {
       const v = values[key];
-      if (v === undefined) continue;
+      if (v === undefined || phrase.has(key)) continue;
       expect(text).toContain(formatValue(key, v, lang));
     }
+    expect(text).toContain(lang === "en" ? "no symptoms" : "шинж тэмдэг алга");
+  });
+
+  it("names the symptoms that are present, and a blurred vision check", () => {
+    const text = readBack({ ...values, symptom_headache: 1, vision_check: 1 }, "en");
+    expect(text).toContain("a headache");
+    expect(text).toContain("vision check Slightly blurred");
+    expect(text).not.toContain("no symptoms");
+  });
+
+  it("with sources, reads back only what the astronaut said and says the sensor readings are saved too", () => {
+    const sources = { sleep_hours: "sensor", bp_systolic: "sensor", bp_diastolic: "sensor", heart_rate: "sensor" } as const;
+    const en = readBack(values, "en", sources);
+    expect(en).toMatch(/^Here is what you told me: mood 4\/5, no symptoms/u);
+    expect(en).not.toContain("124 mmHg");
+    expect(en).not.toContain("68 bpm");
+    expect(en).toMatch(/Your sensor readings are saved too\. Is everything correct\?$/u);
+    expect(readBack(values, "mn", sources)).toMatch(/Мэдрэгчийн үзүүлэлтүүд ч хадгалагдсан\. Бүгд зөв үү\?$/u);
+    expect(readBack({ heart_rate: 70 }, "en", { heart_rate: "sensor" })).toBe("Your sensor readings are saved too. Is everything correct?");
   });
 
   it("ends with the confirmation question", () => {
@@ -233,7 +254,8 @@ describe("readBack", () => {
   it("reads blood pressure as one phrase and keeps the question order", () => {
     const text = readBack(values, "en");
     expect(text).toContain("blood pressure 124 mmHg over 82 mmHg");
-    expect(text.indexOf("sleep")).toBeLessThan(text.indexOf("mood"));
+    // the spoken answers come first (question order), then the measurement values
+    expect(text.indexOf("mood")).toBeLessThan(text.indexOf("sleep"));
     expect(text.indexOf("heart rate")).toBeLessThan(text.indexOf("body temperature"));
     expect(readBack(values, "mn")).toContain("цусны даралт 124 mmHg дээр 82 mmHg");
   });

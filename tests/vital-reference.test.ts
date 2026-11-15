@@ -11,7 +11,8 @@ import {
 import { answerReferenceQuestion, questionFacts, referenceQuestionTopic } from "@/server/agent/questions";
 import { buildResultsFacts, numeralsAreGrounded } from "@/server/agent/resultsFacts";
 import { setClockForTests } from "@/server/clock";
-import { assistantText, ctxOf, eventsOf, playTurn, startCheckIn } from "./helpers/agent";
+import { setSensorFeedForTests } from "@/server/checkin/sensors";
+import { SPOKEN_ANSWERS, assistantText, ctxOf, eventsOf, playTurn, startCheckIn } from "./helpers/agent";
 import { TEST_TODAY, freshSeededDb } from "./helpers/db";
 
 /**
@@ -175,14 +176,19 @@ describe("answerReferenceQuestion", () => {
 /* ───────────── through the turn pipeline (rule-based agent, in-memory database) ───────────── */
 
 beforeEach(async () => {
+  // these walk to a measurement question, asked only without a sensor feed (a crew member without a wearable)
+  setSensorFeedForTests(false);
   setClockForTests(TEST_TODAY);
   await freshSeededDb();
 });
-afterEach(() => setClockForTests(null));
+afterEach(() => {
+  setClockForTests(null);
+  setSensorFeedForTests(null);
+});
 
 const FLOW: Record<Lang, string[]> = {
-  en: ["Hi Cosmo", "let's start", "6.5 hours", "4", "no headache, no dizziness, no nausea", "124 over 82", "68", "36.7", "98", "1500 ml", "40 minutes", "clear", "3", "nothing", "yes"],
-  mn: ["Сайн уу", "эхэлье", "6 цаг хагас", "дөрөв", "толгой өвдөхгүй, эргэхгүй, дотор муухайрахгүй", "124 дээр 82", "68", "36.7", "98", "1500 мл", "40 минут", "тод", "3", "үгүй", "тийм"],
+  en: ["Hi Cosmo", "let's start", ...SPOKEN_ANSWERS.en, "6.5 hours", "124 over 82", "68", "36.7", "98", "1500 ml", "40 minutes", "yes"],
+  mn: ["Сайн уу", "эхэлье", ...SPOKEN_ANSWERS.mn, "6 цаг хагас", "124 дээр 82", "68", "36.7", "98", "1500 мл", "40 минут", "тийм"],
 };
 
 describe("asked at any point", () => {
@@ -195,7 +201,7 @@ describe("asked at any point", () => {
 
   it("mid check-in, about a vital the check-in does not ask (oxygen): answered, then the open question again", async () => {
     const id = await startCheckIn("bat", "mn");
-    for (const line of FLOW.mn.slice(0, 2)) await playTurn("bat", id, line);
+    for (const line of FLOW.mn.slice(0, 8)) await playTurn("bat", id, line);
     const events = await playTurn("bat", id, "Хүчилтөрөгч хэд байх ёстой вэ?");
     const text = assistantText(events);
     expect(text).toMatch(/95-100%/);
@@ -206,7 +212,7 @@ describe("asked at any point", () => {
 
   it("mid check-in, about the open question: the general range and the demo band, then the question", async () => {
     const id = await startCheckIn("bat", "en");
-    for (const line of FLOW.en.slice(0, 6)) await playTurn("bat", id, line);
+    for (const line of FLOW.en.slice(0, 10)) await playTurn("bat", id, line);
     const text = assistantText(await playTurn("bat", id, "what's a normal pulse?"));
     expect(text).toMatch(/60-100 beats per minute/);
     expect(text).toMatch(/demo parameter band is 50-90 bpm/);
@@ -215,7 +221,7 @@ describe("asked at any point", () => {
 
   it("'is 85 a good pulse?' while the pulse is asked: recorded, and the question answered before the next one", async () => {
     const id = await startCheckIn("bat", "en");
-    for (const line of FLOW.en.slice(0, 6)) await playTurn("bat", id, line);
+    for (const line of FLOW.en.slice(0, 10)) await playTurn("bat", id, line);
     const events = await playTurn("bat", id, "is 85 a good pulse?");
     expect(eventsOf(events, "measurement").map((e) => [e.key, e.value])).toEqual([["heart_rate", 85]]);
     expect(assistantText(events)).toMatch(
@@ -225,7 +231,7 @@ describe("asked at any point", () => {
 
   it("an age in a pulse question is neither recorded nor judged as a pulse", async () => {
     const id = await startCheckIn("bat", "en");
-    for (const line of FLOW.en.slice(0, 6)) await playTurn("bat", id, line);
+    for (const line of FLOW.en.slice(0, 10)) await playTurn("bat", id, line);
     const events = await playTurn("bat", id, "what's a normal heart rate for a 30 year old?");
     expect(eventsOf(events, "measurement")).toEqual([]);
     const text = assistantText(events);
@@ -279,7 +285,7 @@ describe("asked at any point", () => {
 describe("loose answers through the pipeline", () => {
   it("'3 glasses' at the water question is recorded as 750 ml and said out loud", async () => {
     const id = await startCheckIn("bat", "en");
-    for (const line of FLOW.en.slice(0, 9)) await playTurn("bat", id, line);
+    for (const line of FLOW.en.slice(0, 13)) await playTurn("bat", id, line);
     const events = await playTurn("bat", id, "3 glasses");
     expect(eventsOf(events, "measurement").map((e) => [e.key, e.value])).toEqual([["water_ml", 750]]);
     expect(assistantText(events)).toMatch(/^Got it, about 750 millilitres, counting a glass as 250 ml\. Tell me if that's not right\. How many minutes/u);
@@ -287,7 +293,7 @@ describe("loose answers through the pipeline", () => {
 
   it("'литр' at the water question is one litre", async () => {
     const id = await startCheckIn("bat", "mn");
-    for (const line of FLOW.mn.slice(0, 9)) await playTurn("bat", id, line);
+    for (const line of FLOW.mn.slice(0, 13)) await playTurn("bat", id, line);
     const events = await playTurn("bat", id, "литр");
     expect(eventsOf(events, "measurement").map((e) => [e.key, e.value])).toEqual([["water_ml", 1000]]);
     expect(eventsOf(events, "clarification")).toEqual([]);
@@ -295,7 +301,7 @@ describe("loose answers through the pipeline", () => {
 
   it("'6-7 цаг' at the sleep question is 6.5 hours, said out loud", async () => {
     const id = await startCheckIn("bat", "mn");
-    for (const line of FLOW.mn.slice(0, 2)) await playTurn("bat", id, line);
+    for (const line of FLOW.mn.slice(0, 8)) await playTurn("bat", id, line);
     const events = await playTurn("bat", id, "6-7 цаг");
     expect(eventsOf(events, "measurement").map((e) => [e.key, e.value])).toEqual([["sleep_hours", 6.5]]);
     expect(assistantText(events)).toMatch(/6-7 цаг гэснийг дунджаар 6\.5 цаг гэж авлаа\. Буруу бол хэлээрэй\./u);

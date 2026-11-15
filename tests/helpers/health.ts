@@ -97,6 +97,9 @@ export function batDemoToday(): DayValues {
   };
 }
 
+/** the answers to the wellbeing check (docs/research/checkin-nasa.md), all in a good place */
+export const CALM_WELLBEING: DayValues = { sleep_quality: 4, energy: 4, stress: 2, connection: 4 };
+
 /** a plain stable history for a "normal" person: a little variation around normalToday() */
 export function steadyHistory(): HistoryDay[] {
   return historyFromSeries({

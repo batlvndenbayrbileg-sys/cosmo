@@ -30,6 +30,11 @@ const MN_BY_QUESTION: Record<QuestionId, string[]> = {
   vision: ["тод", "тод байна", "бага зэрэг бүдэг", "бүдэг", "хоёр нүд"],
   workload: ["ачаалал", "хөнгөн", "хүнд", "дунд зэрэг"],
   day_note: ["нэмэх зүйл алга", "юу ч үгүй", "тэмдэглэл"],
+  sensor_check: ["дасгал хийсэн", "стресстэй", "биеэ тавгүй", "мэдэхгүй"],
+  sleep_quality: ["сайн унтсан", "муу унтсан", "тайван", "дунд зэрэг"],
+  energy: ["эрч хүчтэй", "ядарсан", "туйлдсан", "дунд зэрэг"],
+  stress: ["стресс", "тайван", "бага зэрэг", "маш их"],
+  connection: ["ойр", "ганцаардаж", "гэрээ санаж", "дунд зэрэг"],
 };
 
 const EN_COMMON = ["yes", "no", "skip", "nothing", "over"];
@@ -47,6 +52,11 @@ const EN_BY_QUESTION: Record<QuestionId, string[]> = {
   vision: ["clear", "slightly blurred", "blurred", "sharp"],
   workload: ["light", "heavy", "medium"],
   day_note: ["nothing to add"],
+  sensor_check: ["exercise", "stressed", "unwell"],
+  sleep_quality: ["out of five", "restless", "well"],
+  energy: ["out of five", "tired", "worn out"],
+  stress: ["out of five", "calm", "stressed"],
+  connection: ["out of five", "connected", "lonely"],
 };
 
 /** hint words for one recording: the language's common words plus those of the question Cosmo is waiting for */

@@ -131,7 +131,12 @@ describe("GET /api/checkins/[id]", () => {
     const snapshot = (await res.json()) as CheckInSnapshot;
     expect(snapshot.checkIn).toMatchObject({ id: checkInId, state: "SMALL_TALK", language: "en", confirmedAt: null });
     expect(snapshot.turns.map((t) => t.speaker)).toEqual(["cosmo", "crew", "cosmo"]);
-    expect(snapshot.measurements).toEqual([]);
+    // the first turn reads the day's (simulated) sensor feed: only sensor readings, nothing the astronaut said
+    expect(snapshot.measurements.length).toBeGreaterThan(0);
+    expect(snapshot.measurements.every((m) => m.source === "sensor")).toBe(true);
+    expect(snapshot.measurements.map((m) => m.key).sort()).toEqual(
+      ["bp_diastolic", "bp_systolic", "exercise_min", "glucose_mgdl", "heart_rate", "sleep_hours", "temperature_c", "water_ml"],
+    );
   });
 
   it("is a 404 for another crew member's check-in, indistinguishable from a missing one", async () => {
@@ -190,7 +195,12 @@ describe("POST /api/checkins/[id]/turn", () => {
         expect(e.type).not.toBe("error");
       }
     }
-    expect(keys.size).toBe(14);
+    // what Bat says: the sensor note, mood, three symptoms with the vision check, and the four wellbeing answers
+    // (the sensor readings are stored from the feed, not heard)
+    expect([...keys].sort()).toEqual([
+      "connection", "energy", "mood", "sensor_note", "sleep_quality", "stress",
+      "symptom_dizziness", "symptom_headache", "symptom_nausea", "vision_check",
+    ]);
     expect(summaryEvent?.summary.overall).toBe("yellow");
 
     const dash = await getDashboard(new Request(`http://localhost/api/dashboard?checkInId=${checkInId}`));
@@ -320,7 +330,9 @@ describe("GET /api/demo/script", () => {
       const body = (await res.json()) as { language: string; lines: Array<{ say: string }>; values: Record<string, number> };
       expect(body.language).toBe(lang);
       expect(body.lines).toEqual(DEMO_SCRIPTS[lang].lines);
-      expect(body.values.sleep_hours).toBe(6);
+      // the scripted demo day's sensor sleep, and the energy Bat changes at the read-back
+      expect(body.values.sleep_hours).toBe(7.5);
+      expect(body.values.energy).toBe(2);
     }
   });
 

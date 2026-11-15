@@ -246,18 +246,103 @@ export const KPI_DEFS: Record<KpiKey, KpiDef> = {
     hazards: [],
     axis: null,
   },
+  /* ── the short wellbeing check (docs/research/checkin-nasa.md): self-report 1-5, adapted from the visual analog
+     items of NASA's Reaction Self Test and the Spaceflight Standard Measures questionnaires. Not a clinical scale:
+     a low answer is never more than a yellow "watch" here (mood keeps its own rules). ── */
+  sleep_quality: {
+    key: "sleep_quality",
+    question: "sleep_quality",
+    slot: "morning",
+    type: "scale",
+    unit: null,
+    min: 1,
+    max: 5,
+    labels: { en: "Sleep quality", mn: "Нойрны чанар" },
+    hazards: ["isolation_confinement"],
+    axis: "sleep",
+    thresholds: { low: { yellow: 3, red: 2 } },
+    maxLevel: "yellow",
+    sdFloor: 0.4,
+  },
+  energy: {
+    key: "energy",
+    question: "energy",
+    slot: "morning",
+    type: "scale",
+    unit: null,
+    min: 1,
+    max: 5,
+    labels: { en: "Energy", mn: "Эрч хүч" },
+    hazards: ["isolation_confinement"],
+    axis: "sleep",
+    thresholds: { low: { yellow: 3, red: 2 } },
+    maxLevel: "yellow",
+    sdFloor: 0.4,
+  },
+  stress: {
+    key: "stress",
+    question: "stress",
+    slot: "evening",
+    type: "scale",
+    unit: null,
+    min: 1,
+    max: 5,
+    labels: { en: "Stress", mn: "Стресс" },
+    hazards: ["isolation_confinement"],
+    axis: "behavioral",
+    thresholds: { high: { yellow: 3, red: 4 } },
+    maxLevel: "yellow",
+    sdFloor: 0.4,
+  },
+  connection: {
+    key: "connection",
+    question: "connection",
+    slot: "evening",
+    type: "scale",
+    unit: null,
+    min: 1,
+    max: 5,
+    labels: { en: "Feeling connected", mn: "Ойр дотно байдал" },
+    hazards: ["isolation_confinement"],
+    axis: "behavioral",
+    thresholds: { low: { yellow: 3, red: 2 } },
+    maxLevel: "yellow",
+    sdFloor: 0.4,
+  },
+  sensor_note: {
+    key: "sensor_note",
+    question: "sensor_check",
+    slot: "morning",
+    type: "text",
+    unit: null,
+    labels: { en: "Sensor note", mn: "Мэдрэгчийн тэмдэглэл" },
+    hazards: [],
+    axis: null,
+  },
 };
 
 /* ───────────── question list (section 1) ───────────── */
 
+/**
+ * The daily check-in (redesigned 2026-11-15 from docs/research/checkin-nasa.md). What a wearable or a station device
+ * records (sleep duration, heart rate, blood pressure, temperature, glucose, water, exercise) is filled from the day's
+ * sensor feed and never asked one by one; Cosmo asks only what no sensor can know: how the person feels, symptoms and
+ * a short wellbeing check. Six spoken questions, plus "sensor_check" only when a sensor reading looks unusual.
+ * The array order is the spoken order; sensor questions come last and are asked only when the feed has no value.
+ */
 export const QUESTIONS: QuestionDef[] = [
   {
-    id: "sleep",
+    id: "sensor_check",
     order: 1,
     slot: "morning",
-    keys: ["sleep_hours"],
-    optional: false,
-    prompts: { en: "How many hours did you sleep?", mn: "Хэдэн цаг унтсан бэ?" },
+    keys: ["sensor_note"],
+    optional: true,
+    capture: "ask",
+    // the sentence before it (built by code from the feed) says which reading looked unusual
+    prompts: {
+      en: "Did you exercise, or are you feeling stressed or unwell?",
+      mn: "Дасгал хийсэн үү, эсвэл стресстэй юм уу биеэ тавгүй байна уу?",
+    },
   },
   {
     id: "mood",
@@ -265,9 +350,11 @@ export const QUESTIONS: QuestionDef[] = [
     slot: "morning",
     keys: ["mood"],
     optional: false,
+    capture: "ask",
+    wellbeing: true,
     prompts: {
-      en: "How is your mood, from 1 to 5?",
-      mn: "Сэтгэл санаа ямар байна, 1-ээс 5 хүртэл?",
+      en: "Overall, how are you feeling today, from 1 to 5?",
+      mn: "Ерөнхийдөө өнөөдөр ямар байна, 1-ээс 5 хүртэл?",
     },
   },
   {
@@ -276,41 +363,108 @@ export const QUESTIONS: QuestionDef[] = [
     slot: "morning",
     keys: ["symptom_headache", "symptom_dizziness", "symptom_nausea", "symptom_note"],
     optional: false,
+    capture: "ask",
     prompts: {
-      en: "Any headache, dizziness or nausea?",
-      mn: "Толгой өвдөх, толгой эргэх, дотор муухайрах зүйл байна уу?",
+      en: "Any headache, dizziness, nausea or blurry vision?",
+      mn: "Толгой өвдөх, толгой эргэх, дотор муухайрах эсвэл хараа бүдгэрэх зүйл байна уу?",
     },
   },
   {
-    id: "blood_pressure",
+    id: "sleep_quality",
     order: 4,
+    slot: "morning",
+    keys: ["sleep_quality"],
+    optional: false,
+    capture: "ask",
+    wellbeing: true,
+    prompts: {
+      en: "How well did you sleep, from 1, very badly, to 5, very well?",
+      mn: "Хэр сайн унтсан бэ? 1 бол маш муу, 5 бол маш сайн.",
+    },
+  },
+  {
+    id: "energy",
+    order: 5,
+    slot: "morning",
+    keys: ["energy"],
+    optional: false,
+    capture: "ask",
+    wellbeing: true,
+    prompts: {
+      en: "How is your energy right now, from 1, worn out, to 5, full of energy?",
+      mn: "Одоо эрч хүч тань ямар байна? 1 бол туйлдсан, 5 бол эрч хүчтэй.",
+    },
+  },
+  {
+    id: "stress",
+    order: 6,
+    slot: "evening",
+    keys: ["stress"],
+    optional: false,
+    capture: "ask",
+    wellbeing: true,
+    prompts: {
+      en: "How stressed do you feel today, from 1, calm, to 5, very stressed?",
+      mn: "Өнөөдөр хэр их стресстэй байна? 1 бол тайван, 5 бол маш их стресстэй.",
+    },
+  },
+  {
+    id: "connection",
+    order: 7,
+    slot: "evening",
+    keys: ["connection"],
+    optional: false,
+    capture: "ask",
+    wellbeing: true,
+    prompts: {
+      en: "How connected do you feel to your crew and to people at home, from 1 to 5?",
+      mn: "Багийнхан болон гэрийнхэнтэйгээ хэр ойр байгаа мэт санагдаж байна, 1-ээс 5 хүртэл?",
+    },
+  },
+  /* ── filled from the sensor feed; asked only when it has no value (the old wording, kept for that case) ── */
+  {
+    id: "sleep",
+    order: 8,
+    slot: "morning",
+    keys: ["sleep_hours"],
+    optional: false,
+    capture: "sensor",
+    prompts: { en: "How many hours did you sleep?", mn: "Хэдэн цаг унтсан бэ?" },
+  },
+  {
+    id: "blood_pressure",
+    order: 9,
     slot: "morning",
     keys: ["bp_systolic", "bp_diastolic"],
     optional: false,
+    capture: "sensor",
     prompts: { en: "What is your blood pressure?", mn: "Цусны даралт хэд байна?" },
   },
   {
     id: "heart_rate",
-    order: 5,
+    order: 10,
     slot: "morning",
     keys: ["heart_rate"],
     optional: false,
+    capture: "sensor",
     prompts: { en: "What is your pulse?", mn: "Пульс хэд байна?" },
   },
   {
     id: "temperature",
-    order: 6,
+    order: 11,
     slot: "morning",
     keys: ["temperature_c"],
     optional: false,
+    capture: "sensor",
     prompts: { en: "What is your body temperature?", mn: "Биеийн температур хэд байна?" },
   },
   {
     id: "glucose",
-    order: 7,
+    order: 12,
     slot: "midday",
     keys: ["glucose_mgdl"],
     optional: false,
+    capture: "sensor",
     prompts: {
       en: "What is your blood glucose, in mg/dL?",
       mn: "Цусны сахар хэд байна (mg/dL)?",
@@ -318,10 +472,11 @@ export const QUESTIONS: QuestionDef[] = [
   },
   {
     id: "water",
-    order: 8,
+    order: 13,
     slot: "midday",
     keys: ["water_ml"],
     optional: false,
+    capture: "sensor",
     prompts: {
       en: "How much water have you had today, in millilitres?",
       mn: "Өнөөдөр хэдэн мл ус уусан бэ?",
@@ -329,21 +484,25 @@ export const QUESTIONS: QuestionDef[] = [
   },
   {
     id: "exercise",
-    order: 9,
+    order: 14,
     slot: "afternoon",
     keys: ["exercise_min"],
     optional: false,
+    capture: "sensor",
     prompts: {
       en: "How many minutes did you exercise?",
       mn: "Хэдэн минут дасгал хийсэн бэ?",
     },
   },
+  /* ── never asked daily, taken when said: vision is screened periodically on the station (and "blurry vision" is
+     part of the symptom question), workload has its own NASA tools, the day note is free ── */
   {
     id: "vision",
-    order: 10,
+    order: 15,
     slot: "afternoon",
     keys: ["vision_check"],
-    optional: false,
+    optional: true,
+    capture: "volunteer",
     prompts: {
       en: "Quick vision check: cover one eye, then the other, and read a line of text. Is it sharp, slightly blurred or clearly blurred?",
       mn: "Хараа шалгая: нэг нүдээ, дараа нь нөгөөгөө таглаад нэг мөр бичвэр уншаарай. Тод уу, бага зэрэг бүдэг үү, эсвэл бүдэг үү?",
@@ -351,10 +510,11 @@ export const QUESTIONS: QuestionDef[] = [
   },
   {
     id: "workload",
-    order: 11,
+    order: 16,
     slot: "evening",
     keys: ["workload"],
-    optional: false,
+    optional: true,
+    capture: "volunteer",
     prompts: {
       en: "How heavy was today's workload, from 1 to 5?",
       mn: "Өнөөдрийн ажлын ачаалал хэр байсан, 1-ээс 5?",
@@ -362,10 +522,11 @@ export const QUESTIONS: QuestionDef[] = [
   },
   {
     id: "day_note",
-    order: 12,
+    order: 17,
     slot: "evening",
     keys: ["day_note"],
     optional: true,
+    capture: "volunteer",
     prompts: {
       en: "Anything else you want to note about today?",
       mn: "Өнөөдрийн талаар нэмж тэмдэглэх зүйл байна уу?",
@@ -373,18 +534,27 @@ export const QUESTIONS: QuestionDef[] = [
   },
 ];
 
+/** the questions Cosmo actually speaks in a check-in (not the sensor-filled or volunteered ones) */
+export const SPOKEN_QUESTIONS: readonly QuestionDef[] = QUESTIONS.filter((q) => (q.capture ?? "ask") === "ask");
+
+/** the keys a wearable or station device provides (filled from the sensor feed) */
+export const SENSOR_KEYS: readonly KpiKey[] = QUESTIONS.filter((q) => q.capture === "sensor").flatMap((q) => q.keys);
+
+/** the wellbeing (mental-health) check keys, in question order */
+export const WELLBEING_KEYS: readonly KpiKey[] = QUESTIONS.filter((q) => q.wellbeing).flatMap((q) => q.keys);
+
 /* ───────────── key groups ───────────── */
 
-/** the two free-text keys */
+/** the free-text keys (symptom note, day note, sensor note) */
 export const TEXT_KEYS: KpiKey[] = KPI_KEYS.filter((k) => KPI_DEFS[k].type === "text");
 
 /** keys that may stay empty without blocking a question or a slot */
-export const OPTIONAL_KEYS: ReadonlySet<KpiKey> = new Set<KpiKey>(["symptom_note", "day_note"]);
+export const OPTIONAL_KEYS: ReadonlySet<KpiKey> = new Set<KpiKey>(["symptom_note", "day_note", "sensor_note"]);
 
-/** every key except the two text keys (14) */
+/** every key except the free-text keys */
 export const NUMERIC_KEYS: KpiKey[] = KPI_KEYS.filter((k) => KPI_DEFS[k].type !== "text");
 
-/** the 14 non-text keys used by the "overall green needs >= 10 values" rule */
+/** the non-text keys used by the "overall green needs >= 10 values" rule */
 export const CHECKIN_TARGET_KEYS: KpiKey[] = [...NUMERIC_KEYS];
 
 export function getKpi(key: KpiKey): KpiDef {
@@ -586,14 +756,16 @@ export function questionFilled(question: QuestionDef, filled: ReadonlySet<KpiKey
 }
 
 /**
- * First question, in order, that is not fully filled and not skipped.
- * Optional questions (day_note) are still offered but can be skipped with a single answer, so they never block.
+ * First question, in order, that is not fully filled and not skipped. Volunteered-only questions (vision, workload,
+ * day note) are never asked; sensor questions are asked only when the feed left them empty.
+ * Optional questions (sensor_check) can be skipped with a single answer, so they never block.
  */
 export function nextQuestion(
   filled: ReadonlySet<KpiKey>,
   skipped: ReadonlySet<QuestionId>,
 ): QuestionDef | null {
   for (const q of QUESTIONS) {
+    if (q.capture === "volunteer") continue;
     if (skipped.has(q.id)) continue;
     if (questionFilled(q, filled)) continue;
     return q;

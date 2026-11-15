@@ -10,24 +10,30 @@ import { ScriptedAgent } from "@/server/agent/scriptedAgent";
 import { TOOL_DEFINITIONS, executeTool } from "@/server/agent/tools";
 import { isSaneReply, isSaneSummaryText } from "@/server/agent/turn";
 import { setClockForTests } from "@/server/clock";
+import { setSensorFeedForTests } from "@/server/checkin/sensors";
 import { getEnv } from "@/server/env";
 import { getCrewPublic } from "@/server/db/repos/crew";
 import { listAlerts } from "@/server/db/repos/alert";
 import { getCheckIn } from "@/server/db/repos/checkin";
 import { listMeasurements } from "@/server/db/repos/measurement";
-import { assistantText, ctxOf, eventsOf, playTurn, startCheckIn, toolContext } from "./helpers/agent";
+import { SPOKEN_ANSWERS, assistantText, ctxOf, eventsOf, playTurn, startCheckIn, toolContext } from "./helpers/agent";
 import { TEST_TODAY, freshSeededDb } from "./helpers/db";
 
 let checkInId: string;
 let crew: CrewPublic;
 
+// these tests are about the model's words on measurement questions, asked only without a sensor feed
 beforeEach(async () => {
   setClockForTests(TEST_TODAY);
+  setSensorFeedForTests(false);
   await freshSeededDb();
   checkInId = await startCheckIn("bat", "en");
   crew = await getCrewPublic("bat");
 });
-afterEach(() => setClockForTests(null));
+afterEach(() => {
+  setClockForTests(null);
+  setSensorFeedForTests(null);
+});
 
 /* ───────────── fakes ───────────── */
 
@@ -340,7 +346,7 @@ describe("ClaudeAgent tool use", () => {
 
   it("in the pipeline a model 'confirmed' to an unrelated question does not confirm the check-in", async () => {
     const id = checkInId;
-    for (const say of ["hello", "I'm fine", "let's start", "6 hours", "4", "no", "120 over 80", "70", "36.6", "95", "2300 ml", "45 minutes", "sharp", "3", "nothing"]) {
+    for (const say of ["hello", "I'm fine", "let's start", ...SPOKEN_ANSWERS.en, "6 hours", "120 over 80", "70", "36.6", "95", "2300 ml", "45 minutes"]) {
       await playTurn("bat", id, say);
     }
     expect((await ctxOf("bat", id)).state).toBe("CONFIRM");
@@ -480,25 +486,25 @@ describe("turn pipeline with a live agent", () => {
 
   it("model wording for a question is only the acknowledgement: the question asked is always the one the machine expects", async () => {
     await toCapture(checkInId);
-    // sleep and mood are both recorded; the machine now expects symptoms, the model asks about mood again
-    const events = await playTurn("bat", checkInId, "6 hours and mood 4", {
+    // mood and stress are both recorded; the machine now expects symptoms, the model asks about mood again
+    const events = await playTurn("bat", checkInId, "mood 4, stress 2", {
       agent: withReply("Thanks. And how is your mood today?"),
     });
-    expect(eventsOf(events, "measurement").map((m) => m.key)).toEqual(["sleep_hours", "mood"]);
+    expect(eventsOf(events, "measurement").map((m) => m.key)).toEqual(["mood", "stress"]);
     expect(eventsOf(events, "state")[0].expectedQuestion).toBe("symptoms");
     const said = assistantText(events);
-    expect(said).toBe("Thanks. Any headache, dizziness or nausea?");
+    expect(said).toBe("Thanks. Any headache, dizziness, nausea or blurry vision?");
     expect(said).not.toMatch(/mood/i);
 
     // an acknowledgement without a question is kept, followed by the expected question
     const next = await playTurn("bat", checkInId, "no", { agent: withReply("Good to know, thank you.") });
-    expect(eventsOf(next, "state")[0].expectedQuestion).toBe("blood_pressure");
-    expect(assistantText(next)).toBe("Good to know, thank you. What is your blood pressure?");
+    expect(eventsOf(next, "state")[0].expectedQuestion).toBe("sleep_quality");
+    expect(assistantText(next)).toBe("Good to know, thank you. How well did you sleep, from 1, very badly, to 5, very well?");
 
     // a reply that is nothing but a (wrong) question falls back to the template, which asks the expected one
-    const wrong = await playTurn("bat", checkInId, "120 over 80", { agent: withReply("What is your mood?") });
-    expect(eventsOf(wrong, "state")[0].expectedQuestion).toBe("heart_rate");
-    expect(assistantText(wrong)).toBe("Got it, 120 over 80. What is your pulse?");
+    const wrong = await playTurn("bat", checkInId, "4", { agent: withReply("What is your mood?") });
+    expect(eventsOf(wrong, "state")[0].expectedQuestion).toBe("energy");
+    expect(assistantText(wrong)).toBe("Got it, 4 out of 5. How is your energy right now, from 1, worn out, to 5, full of energy?");
   });
 
   it("a skipped question keeps the 'add it when we confirm' notice even when the model supplies wording", async () => {
@@ -512,14 +518,15 @@ describe("turn pipeline with a live agent", () => {
     const second = await playTurn("bat", checkInId, "I really don't know", { agent });
     expect(assistantText(second)).toMatch(/didn't catch that/i);
     const third = await playTurn("bat", checkInId, "still no idea", { agent });
-    expect(eventsOf(third, "state")[0].expectedQuestion).toBe("mood");
+    expect(eventsOf(third, "state")[0].expectedQuestion).toBe("symptoms");
     expect(assistantText(third)).toMatch(/add it when we confirm/i);
     expect(assistantText(third)).not.toContain("No worries");
-    expect((await ctxOf("bat", checkInId)).skipped).toEqual(["sleep"]);
+    expect((await ctxOf("bat", checkInId)).skipped).toEqual(["sensor_check", "mood"]);
   });
 
   it("a model reply cannot replace the clarification of an unusable answer (it could ask for another value)", async () => {
     await toCapture(checkInId);
+    for (const say of SPOKEN_ANSWERS.en) await playTurn("bat", checkInId, say);
     const events = await playTurn("bat", checkInId, "I slept 20 hours", { agent: withReply("Great, what is your mood?") });
     // changed 2026-11-15: the range re-ask names what was heard (valueChecks.rangeReply)
     expect(assistantText(events)).toMatch(/I heard 20 hours, which is too high for sleep/i);
@@ -560,7 +567,7 @@ describe("turn pipeline with a live agent", () => {
       const id = await startCheckInFresh();
       const agent = withReply(undefined, { phraseSummary: async () => phrase });
       for (const say of ["hello", "I'm fine thanks", "let's start"]) await playTurn("bat", id, say);
-      for (const say of ["6 hours", "4", "no", "120 over 80", "70", "36.6", "95", "2300 ml", "45 minutes", "sharp", "3", "nothing", "yes"]) {
+      for (const say of [...SPOKEN_ANSWERS.en, "6 hours", "120 over 80", "70", "36.6", "95", "2300 ml", "45 minutes", "yes"]) {
         const events = await playTurn("bat", id, say, { agent });
         const summary = eventsOf(events, "summary")[0]?.summary;
         if (summary) return summary;
@@ -580,6 +587,7 @@ describe("turn pipeline with a live agent", () => {
 async function startCheckInFresh(): Promise<string> {
   await freshSeededDb();
   setClockForTests(TEST_TODAY);
+  setSensorFeedForTests(false);
   return startCheckIn("bat", "en");
 }
 

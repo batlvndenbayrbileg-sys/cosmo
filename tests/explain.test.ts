@@ -30,6 +30,7 @@ import { I18nProvider } from "@/i18n/I18nProvider";
 import { GET as getAudio } from "@/app/api/checkins/[id]/turns/[turnId]/audio/route";
 import { DEMO_SCRIPTS } from "@/server/agent/scripts";
 import { setClockForTests } from "@/server/clock";
+import { setSensorFeedForTests } from "@/server/checkin/sensors";
 import { listTurns } from "@/server/db/repos/turn";
 import { setSessionCookie } from "@/server/session";
 import { demoAudioFileName } from "@/server/speech/tts";
@@ -505,7 +506,10 @@ describe("the turn pipeline", () => {
     await freshSeededDb();
     mocks.jar.clear();
   });
-  afterEach(() => setClockForTests(null));
+  afterEach(() => {
+    setClockForTests(null);
+    setSensorFeedForTests(null);
+  });
 
   it.each<Lang>(["en", "mn"])("after the summary the walkthrough is sent, stored as one Cosmo turn (%s)", async (lang) => {
     const id = await startCheckIn("bat", lang);
@@ -533,6 +537,8 @@ describe("the turn pipeline", () => {
     ["mn", "Миний бие өнөөдөр ямар байна?"],
     ["en", "How am I today?"],
   ])("'how am I today?' before anything is recorded today walks through the recent days (%s)", async (lang, said) => {
+    // with a sensor feed the day always has readings; without one (no wearable) nothing is recorded yet
+    setSensorFeedForTests(false);
     const id = await startCheckIn("bat", lang);
     await playTurn("bat", id, lang === "mn" ? "Сайн байна" : "Fine, thanks");
     const events = await playTurn("bat", id, said);

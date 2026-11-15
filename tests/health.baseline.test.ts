@@ -57,9 +57,10 @@ describe("baseline: computeBaseline", () => {
     expect(JSON.stringify(h)).toBe(snapshot);
   });
 
-  it("computes baselines for the 14 non-text keys only", () => {
+  it("computes baselines for the 18 non-text keys only", () => {
     const b = computeBaselines(constantHistory({ heart_rate: 66, symptom_note: "x" }));
-    expect(Object.keys(b)).toHaveLength(14);
+    expect(Object.keys(b)).toHaveLength(18);
+    expect(b.sensor_note).toBeUndefined();
     expect(b.symptom_note).toBeUndefined();
     expect(b.day_note).toBeUndefined();
     expect(b.heart_rate).toEqual({ mean: 66, sd: 0, n: 14 });

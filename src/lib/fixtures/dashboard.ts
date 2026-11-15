@@ -189,6 +189,10 @@ const BAT_SERIES: Series = {
   exercise_min: [45, 50, 40, 45, 50, 45, 40, 50, 45, 45, 40, 50, 45, 45],
   vision_check: cycle([0]),
   workload: [3, 2, 3, 3, 2, 3, 3, 2, 3, 3, 2, 3, 3, 3],
+  sleep_quality: [4, 4, 4, 3, 4, 4, 4, 5, 4, 4, 4, 3, 4, 4],
+  energy: [4, 4, 4, 3, 4, 4, 4, 4, 4, 4, 4, 3, 4, 4],
+  stress: [2, 2, 3, 2, 2, 2, 3, 2, 2, 2, 2, 3, 2, 2],
+  connection: [4, 4, 4, 4, 4, 5, 4, 4, 4, 4, 4, 4, 4, 4],
 };
 
 const BAT_ROWS: Rows = {
@@ -208,10 +212,15 @@ const BAT_ROWS: Rows = {
   vision_check: { value: 0, status: "green" },
   workload: { value: 3, status: "green" },
   day_note: NO_VALUE,
+  sleep_quality: { value: 4, status: "green" },
+  energy: { value: 4, status: "green" },
+  stress: { value: 2, status: "green" },
+  connection: { value: 4, status: "green" },
+  sensor_note: NO_VALUE,
 };
 
 const BAT_AXES: AxisScore[] = [
-  { axis: "sleep", score: 60, baseline: 94.3, status: "yellow" },
+  { axis: "sleep", score: 86.7, baseline: 98.1, status: "yellow" },
   { axis: "cardio", score: 100, baseline: 100, status: "green" },
   { axis: "metabolic", score: 90, baseline: 100, status: "yellow" },
   { axis: "neuro_ocular", score: 100, baseline: 100, status: "green" },
@@ -261,10 +270,10 @@ const BAT_TASKS: Task[] = [
 
 const BAT_SUMMARY: SummaryPayload = {
   overall: "yellow",
-  readiness: 85,
+  readiness: 89,
   headline: bi(
-    "A few things to keep an eye on today. Readiness 85.",
-    "Өнөөдөр анхаарах хэд хэдэн зүйл байна. Бэлэн байдал 85.",
+    "A few things to keep an eye on today. Readiness 89.",
+    "Өнөөдөр анхаарах хэд хэдэн зүйл байна. Бэлэн байдал 89.",
   ),
   findings: [
     {
@@ -318,7 +327,7 @@ export const batYellow: DashboardPayload = {
   missionDay: 12,
   checkIn: { id: "chk-bat-demo", confirmedAt: "2026-11-14T08:42:00.000Z", language: "mn" },
   overall: "yellow",
-  readiness: 85,
+  readiness: 89,
   readinessBaseline: 97.6,
   kpis: kpis(BAT_ROWS, BAT_SERIES, "simulated"),
   axes: BAT_AXES,
@@ -342,12 +351,14 @@ export const batYellow: DashboardPayload = {
         "bp_diastolic",
         "heart_rate",
         "temperature_c",
+        "sleep_quality",
+        "energy",
       ],
       [],
     ),
     slot("midday", ["glucose_mgdl", "water_ml"], []),
     slot("afternoon", ["exercise_min", "vision_check"], []),
-    slot("evening", ["workload"], []),
+    slot("evening", ["stress", "connection", "workload"], []),
   ],
   tasks: BAT_TASKS,
   alerts: [],
@@ -373,6 +384,10 @@ const SARAA_SERIES: Series = {
   exercise_min: cycle([55, 60, 50, 55, 60, 55, 50]),
   vision_check: cycle([0]),
   workload: cycle([2, 3, 2, 2, 3, 2, 2]),
+  sleep_quality: cycle([4, 4, 5, 4, 4, 4, 4]),
+  energy: cycle([4, 4, 4, 5, 4, 4, 4]),
+  stress: cycle([2, 2, 1, 2, 2, 2, 2]),
+  connection: cycle([4, 5, 4, 4, 4, 5, 4]),
 };
 
 const SARAA_ROWS: Rows = {
@@ -392,6 +407,11 @@ const SARAA_ROWS: Rows = {
   vision_check: { value: 0, status: "green" },
   workload: NO_VALUE,
   day_note: NO_VALUE,
+  sleep_quality: { value: 4, status: "green" },
+  energy: { value: 4, status: "green" },
+  stress: NO_VALUE,
+  connection: NO_VALUE,
+  sensor_note: NO_VALUE,
 };
 
 const SARAA_TASKS: Task[] = [TASK_DEFAULT_HYDRATION, TASK_DEFAULT_LIGHT, TASK_DEFAULT_STRETCH];
@@ -439,12 +459,14 @@ export const saraaGreen: DashboardPayload = {
         "bp_diastolic",
         "heart_rate",
         "temperature_c",
+        "sleep_quality",
+        "energy",
       ],
       [],
     ),
     slot("midday", ["glucose_mgdl", "water_ml"], []),
     slot("afternoon", ["exercise_min", "vision_check"], []),
-    slot("evening", [], ["workload"]),
+    slot("evening", [], ["stress", "connection"]),
   ],
   tasks: SARAA_TASKS,
   alerts: [],
@@ -486,6 +508,10 @@ const MIRA_SERIES: Series = {
   exercise_min: cycle([50, 55, 45, 50, 55, 50, 45]),
   vision_check: cycle([0]),
   workload: cycle([2, 3, 2, 2, 3, 2, 3]),
+  sleep_quality: cycle([4, 4, 4, 3, 4, 4, 4]),
+  energy: cycle([4, 4, 3, 4, 4, 4, 4]),
+  stress: cycle([2, 3, 2, 2, 3, 2, 2]),
+  connection: cycle([4, 4, 4, 5, 4, 4, 4]),
 };
 
 const MIRA_ROWS: Rows = {
@@ -506,6 +532,11 @@ const MIRA_ROWS: Rows = {
   vision_check: { value: 1, status: "yellow" },
   workload: { value: 4, status: "yellow" },
   day_note: { value: "Long day in the lab. Eyes felt tired by the afternoon.", status: "green" },
+  sleep_quality: { value: 4, status: "green" },
+  energy: { value: 4, status: "green" },
+  stress: { value: 3, status: "green" },
+  connection: { value: 4, status: "green" },
+  sensor_note: NO_VALUE,
 };
 
 const MIRA_TASKS: Task[] = [
@@ -590,11 +621,11 @@ export const miraRed: DashboardPayload = {
   readinessBaseline: 100,
   kpis: kpis(MIRA_ROWS, MIRA_SERIES, "voice"),
   axes: [
-    { axis: "sleep", score: 60, baseline: 100, status: "yellow" },
+    { axis: "sleep", score: 86.7, baseline: 100, status: "yellow" },
     { axis: "cardio", score: 100, baseline: 100, status: "green" },
     { axis: "metabolic", score: 90, baseline: 100, status: "yellow" },
     { axis: "neuro_ocular", score: 73.3, baseline: 100, status: "yellow" },
-    { axis: "behavioral", score: 80, baseline: 100, status: "yellow" },
+    { axis: "behavioral", score: 90, baseline: 100, status: "yellow" },
     { axis: "musculoskeletal", score: 60, baseline: 100, status: "yellow" },
   ],
   hazards: [
@@ -618,12 +649,14 @@ export const miraRed: DashboardPayload = {
         "bp_diastolic",
         "heart_rate",
         "temperature_c",
+        "sleep_quality",
+        "energy",
       ],
       [],
     ),
     slot("midday", ["glucose_mgdl", "water_ml"], []),
     slot("afternoon", ["exercise_min", "vision_check"], []),
-    slot("evening", ["workload", "day_note"], []),
+    slot("evening", ["stress", "connection", "workload", "day_note"], []),
   ],
   tasks: MIRA_TASKS,
   alerts: [MIRA_ALERT],
@@ -722,10 +755,13 @@ export const alexNoData: DashboardPayload = {
       "bp_diastolic",
       "heart_rate",
       "temperature_c",
+      "sleep_quality",
+      "energy",
     ]),
     slot("midday", [], ["glucose_mgdl", "water_ml"]),
-    slot("afternoon", [], ["exercise_min", "vision_check"]),
-    slot("evening", [], ["workload"]),
+    // vision and workload are only taken when volunteered: never "missing"
+    slot("afternoon", [], ["exercise_min"]),
+    slot("evening", [], ["stress", "connection"]),
   ],
   tasks: ALEX_TASKS,
   alerts: [],

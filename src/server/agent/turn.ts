@@ -25,6 +25,7 @@ import { getCrewPublic } from "@/server/db/repos/crew";
 import { appendTurn, listTurns } from "@/server/db/repos/turn";
 import { ALERT_SPOKEN_NOTICE, createAlertsForCheckIn, raiseCrisisAlert } from "@/server/alerts";
 import { loadHistory, loadMachineCtx, loadTodayValues, saveMachineCtx } from "@/server/checkin/service";
+import { syncSensorFeed } from "@/server/checkin/sensors";
 import { composeTemplateSummary } from "@/server/dashboard/template";
 import { sosTurn } from "@/server/sos";
 import { painTurn } from "@/server/pain";
@@ -402,14 +403,21 @@ export function leadingStatements(text: string): string {
 function renderTemplate(
   effect: ReplyEffect,
   lang: Lang,
-  ctx: { smallTalkTurns: number; skipped: readonly QuestionId[]; filled: readonly KpiKey[] },
+  ctx: { smallTalkTurns: number; skipped: readonly QuestionId[]; filled: readonly KpiKey[]; sensor?: MachineCtx["sensor"] },
   userText: string,
   values: Partial<Record<KpiKey, MeasurementValue>>,
   acknowledged: InterpretedRecord[],
+  sources?: Partial<Record<KpiKey, MeasurementSource>>,
 ): string {
   const skipNotice = effect.skippedQuestion
     ? T.clarify(getQuestion(effect.skippedQuestion), lang, "unclear", 2)
     : "";
+  // the first question says what the sensors logged; the sensor follow-up always says which reading it is about
+  const sensorLead = effect.intro
+    ? T.sensorIntro(ctx.sensor ?? null, values, lang)
+    : effect.question === "sensor_check"
+      ? T.sensorCheckLead(ctx.sensor ?? null, values, lang)
+      : "";
   switch (effect.kind) {
     case "smallTalk":
       return T.smallTalkReply(lang, Math.max(0, ctx.smallTalkTurns - 1), userText);
@@ -417,20 +425,26 @@ function renderTemplate(
       return join(T.smallTalkReply(lang, Math.max(0, ctx.smallTalkTurns - 1), userText), T.proposeMeasurements(lang));
     case "proposeAgain":
       return TEMPLATES_EXTRA.proposeAgain[lang];
-    case "ask":
-      return join(skipNotice, T.askQuestion(getQuestion(effect.question as QuestionId), lang, acknowledged));
+    case "ask": {
+      const q = getQuestion(effect.question as QuestionId);
+      if (!sensorLead) return join(skipNotice, T.askQuestion(q, lang, acknowledged));
+      // what was just heard is acknowledged first, then the sensors, then the question
+      const asked = T.askQuestion(q, lang, acknowledged);
+      const prompt = q.prompts[lang];
+      return join(skipNotice, asked.slice(0, asked.length - prompt.length).trim(), sensorLead, prompt);
+    }
     case "clarify":
       return reaskAfterFailedAnswer(getQuestion(effect.question as QuestionId), lang, effect.reason ?? "unclear", effect.attempt ?? 0);
     case "restated":
-      return join(TEMPLATES_EXTRA.restated[lang], T.askQuestion(getQuestion(effect.question as QuestionId), lang));
+      return join(TEMPLATES_EXTRA.restated[lang], sensorLead, T.askQuestion(getQuestion(effect.question as QuestionId), lang));
     case "readBack":
-      return join(missingNotice(ctx, lang), T.readBack(values, lang));
+      return join(missingNotice(ctx, lang), T.readBack(values, lang, sources));
     case "correctionAck": {
       const keys = effect.keys ?? [];
       if (keys.length === 1 && values[keys[0]] !== undefined) {
         return T.correctionAck(keys[0], values[keys[0]] as MeasurementValue, lang);
       }
-      return join(TEMPLATES_EXTRA.updated[lang], T.readBack(values, lang));
+      return join(TEMPLATES_EXTRA.updated[lang], T.readBack(values, lang, sources));
     }
     case "askWhatToChange":
       return T.askWhatToChange(lang);
@@ -457,7 +471,8 @@ function renderTemplate(
 function answersOpenQuestion(ctx: MachineCtx, expected: QuestionId | null, text: string, lang: Lang): boolean {
   // the day note takes any words, so while talking (friend mode) nothing said is "the note": it would end the talk
   // and store the conversation as the note (found in a live replay 2026-11-15)
-  if (ctx.companion && expected === "day_note") return false;
+  // the same holds for the sensor follow-up, which takes free words too
+  if (ctx.companion && (expected === "day_note" || expected === "sensor_check")) return false;
   if (ctx.state === "KPI_CAPTURE" && expected !== null) return interpretAnswer(getQuestion(expected), text, lang).records.length > 0;
   if (ctx.companion) return false;
   if (ctx.state === "CONFIRM") return interpretCorrection(text, lang).result.records.length > 0;
@@ -479,14 +494,23 @@ function agreesToOpenQuestion(ctx: MachineCtx, text: string, lang: Lang): boolea
 }
 
 /** where the check-in stands, said again after the companion conversation */
-function resumeText(effect: ReplyEffect, ctx: MachineCtx, values: Partial<Record<KpiKey, MeasurementValue>>, lang: Lang): string {
+function resumeText(
+  effect: ReplyEffect,
+  ctx: MachineCtx,
+  values: Partial<Record<KpiKey, MeasurementValue>>,
+  lang: Lang,
+  sources?: Partial<Record<KpiKey, MeasurementSource>>,
+): string {
   switch (effect.resume) {
     case "propose":
       return T.proposeMeasurements(lang);
-    case "question":
-      return effect.question ? join(resumeLead(lang), T.askQuestion(getQuestion(effect.question), lang)) : resumeLead(lang);
+    case "question": {
+      if (!effect.question) return resumeLead(lang);
+      const lead = effect.question === "sensor_check" ? T.sensorCheckLead(ctx.sensor, values, lang) : "";
+      return join(resumeLead(lang), lead, T.askQuestion(getQuestion(effect.question), lang));
+    }
     case "readBack":
-      return join(resumeLead(lang), missingNotice(ctx, lang), T.readBack(values, lang));
+      return join(resumeLead(lang), missingNotice(ctx, lang), T.readBack(values, lang, sources));
     case "dashboard":
     case undefined:
       return dashboardLine(lang);
@@ -529,8 +553,8 @@ async function companionTurn(p: {
     spoken = crisisReply(lang, effect.crisis ?? "self");
     emotion = "concerned";
   } else if (effect.kind === "companionLeave") {
-    const values = (await loadTodayValues(crewId, checkInId)).values;
-    spoken = join(companionLeaveLine(lang, ctx0.companionTurns), resumeText(effect, ctx, values, lang));
+    const today = await loadTodayValues(crewId, checkInId);
+    spoken = join(companionLeaveLine(lang, ctx0.companionTurns), resumeText(effect, ctx, today.values, lang, today.sources));
     emotion = "happy";
   } else {
     spoken = companionReply(lang, ctx.companionTurns, text, ctx0.companionCrisis);
@@ -619,7 +643,8 @@ async function* runTurnInner(args: RunTurnArgs, started: number): AsyncGenerator
 
   const checkIn = await getCheckIn(crewId, checkInId); // NotFoundError for another crew member's check-in
   const crew = await getCrewPublic(crewId);
-  const loadedCtx = await loadMachineCtx(checkIn);
+  // the day's (simulated) sensor feed fills what a wearable records, once per check-in, before anything is read
+  const loadedCtx = await syncSensorFeed(checkIn, await loadMachineCtx(checkIn));
   /** where the check-in stands for this turn (friend mode switched off when a plain answer ends it, step 0) */
   let ctx0: MachineCtx = loadedCtx;
 
@@ -709,6 +734,7 @@ async function* runTurnInner(args: RunTurnArgs, started: number): AsyncGenerator
     utterance: text,
     source,
     filled,
+    sensorFilled: new Set(ctx0.sensorFilled),
     dryRun,
   });
 
@@ -991,7 +1017,8 @@ async function* runTurnInner(args: RunTurnArgs, started: number): AsyncGenerator
   /* ── 3. words ── */
   const summaryRequested = effects.some((e) => e.type === "computeSummary");
   const replyEffect = [...effects].reverse().find((e): e is ReplyEffect => e.type === "reply");
-  const valuesNow = (await loadTodayValues(crewId, checkInId)).values;
+  const todayNow = await loadTodayValues(crewId, checkInId);
+  const valuesNow = todayNow.values;
   let finalState: ConversationState = ctx.state;
   let assistantText = "";
   let emotion: Emotion = decision.emotion;
@@ -1066,7 +1093,7 @@ async function* runTurnInner(args: RunTurnArgs, started: number): AsyncGenerator
       (effect.kind === "clarify" && effect.reason === "range" && effect.question && (effect.attempt ?? 0) < 2
         ? rangeReply(getQuestion(effect.question), text, lang, effect.attempt ?? 0)
         : null) ??
-      renderTemplate(effect, lang, ctx, text, valuesNow, acknowledged);
+      renderTemplate(effect, lang, ctx, text, valuesNow, acknowledged, todayNow.sources);
     // a read-back correction was taken and another one was not: say both
     if (ctx0.state === "CONFIRM" && effect.kind === "clarify" && correctedNow.size > 0) {
       template = join(TEMPLATES_EXTRA.updated[lang], template);
@@ -1122,8 +1149,12 @@ async function* runTurnInner(args: RunTurnArgs, started: number): AsyncGenerator
     // just skipped (the template carries the "add it at the confirmation" notice), never at the read-back
     // a value past a general danger threshold: the code's wording says so, never a bland model acknowledgement
     const danger = dangerNotice(acknowledged, lang);
+    // the code's own words stand for the sensor read-out (its numbers come from the feed) and after a low wellbeing
+    // answer (the supportive sentence and the suggestion are fixed, never a model's improvisation)
+    const codeWords = effect.intro === true || effect.question === "sensor_check" || T.wellbeingNote(acknowledged, lang) !== "";
     const modelMayWord =
       danger.length === 0 &&
+      !codeWords &&
       !afterCheckIn &&
       askedReply === null &&
       decision.replyText !== undefined &&

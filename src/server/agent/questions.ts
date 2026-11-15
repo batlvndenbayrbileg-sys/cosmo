@@ -74,6 +74,7 @@ const QUESTION_TOPICS: Array<{ id: QuestionId; re: RegExp }> = [
   { id: "glucose", re: /blood\s+sugar|glucose|sugar|сахар|глюкоз/iu },
   { id: "heart_rate", re: /heart\s*rate|heartbeat|pulse|\bbpm\b|пульс|лугшилт|зүрхний\s+цохилт|зүрх/iu },
   { id: "temperature", re: /temperature|fever|температур|халуу/iu },
+  { id: "sleep_quality", re: /sleep\s+quality|нойрны\s+чанар/iu },
   { id: "sleep", re: /\bsleep|\bslept|унт|нойр/iu },
   { id: "mood", re: /\bmood|сэтгэл/iu },
   { id: "symptoms", re: /headache|dizz|nause|symptom|толгой|дотор\s+муу/iu },
@@ -81,6 +82,9 @@ const QUESTION_TOPICS: Array<{ id: QuestionId; re: RegExp }> = [
   { id: "exercise", re: /exercis|workout|дасгал/iu },
   { id: "vision", re: /vision|eyesight|\beye|хараа|нүд/iu },
   { id: "workload", re: /workload|ачаалал/iu },
+  { id: "stress", re: /\bstress|стресс/iu },
+  { id: "energy", re: /\benergy|\bfatigue|эрч\s+хүч|ядар/iu },
+  { id: "connection", re: /\blonel|connected|ганцаард/iu },
 ];
 
 /** the check-in question a question back names ("how many hours should I SLEEP?" -> sleep), or null */
@@ -158,6 +162,26 @@ const WHY: Record<QuestionId, { en: string; mn: string }> = {
     en: "A short note helps the crew medical officer understand the numbers.",
     mn: "Богино тэмдэглэл нь багийн эмчид тоонуудыг ойлгоход тусалдаг.",
   },
+  sensor_check: {
+    en: "A sensor can see that a reading changed, but not why; your answer tells the medical officer whether it was exercise, stress or something else.",
+    mn: "Мэдрэгч үзүүлэлт өөрчлөгдснийг харж чадна, гэхдээ яагаад гэдгийг мэдэхгүй; таны хариулт эмчид дасгал, стресс эсвэл өөр шалтгаан байсныг хэлж өгнө.",
+  },
+  sleep_quality: {
+    en: "Your sleep watch counts the hours, but only you know how well you slept, and that is what affects the next day.",
+    mn: "Нойрны цаг унтсан цагийг тоолдог ч хэр сайн унтсаныг зөвхөн та мэднэ, энэ нь маргаашийн байдалд нөлөөлдөг.",
+  },
+  energy: {
+    en: "Fatigue builds up quietly on a mission, and how tired you feel is something no sensor can measure.",
+    mn: "Нислэгийн үед ядаргаа аажмаар хуримтлагддаг бөгөөд хэр ядарснаа ямар ч мэдрэгч хэмжиж чаддаггүй.",
+  },
+  stress: {
+    en: "Stress over several days shows when you might need more rest or someone to talk to.",
+    mn: "Хэд хоногийн стресс нь хэзээ илүү амрах эсвэл хэн нэгэнтэй ярилцах хэрэгтэйг харуулдаг.",
+  },
+  connection: {
+    en: "Feeling close to the crew and to home protects how you cope with isolation over a long mission.",
+    mn: "Багийнхан болон гэрийнхэнтэйгээ ойр байх мэдрэмж нь урт нислэгийн тусгаарлалтыг даван туулахад тусалдаг.",
+  },
 };
 
 const HOW: Record<QuestionId, { en: string; mn: string }> = {
@@ -173,6 +197,11 @@ const HOW: Record<QuestionId, { en: string; mn: string }> = {
   vision: { en: "Cover one eye, read the lines on the screen, then the other eye.", mn: "Нэг нүдээ таглаад дэлгэц дээрх мөрүүдийг уншаад, дараа нь нөгөө нүдээрээ." },
   workload: { en: "1 means very light, 5 means very heavy.", mn: "1 бол маш хөнгөн, 5 бол маш хүнд." },
   day_note: { en: "Anything you want the crew medical officer to know, in your own words.", mn: "Багийн эмчид мэдэгдэх хүссэн зүйлээ өөрийнхөө үгээр хэлээрэй." },
+  sensor_check: { en: "Just say what you think explains it, or no if nothing comes to mind.", mn: "Юу шалтгаалсан гэж бодож байгаагаа хэлээрэй, санаанд юу ч орохгүй бол үгүй гэж хэлж болно." },
+  sleep_quality: { en: "1 means very badly, 5 means very well; a word like good or restless works too.", mn: "1 бол маш муу, 5 бол маш сайн; сайн, тайван биш гэх мэт үгээр ч хэлж болно." },
+  energy: { en: "1 means worn out, 5 means full of energy; a word like tired works too.", mn: "1 бол туйлдсан, 5 бол эрч хүчтэй; ядарсан гэх мэт үгээр ч хэлж болно." },
+  stress: { en: "1 means calm, 5 means very stressed; a word like a little or very works too.", mn: "1 бол тайван, 5 бол маш их стресстэй; бага зэрэг, маш их гэх мэт үгээр ч хэлж болно." },
+  connection: { en: "1 means very alone, 5 means very close to people; a word like lonely or close works too.", mn: "1 бол маш ганцаардсан, 5 бол хүмүүстэй маш ойр; ганцаардсан, ойр гэх мэт үгээр ч хэлж болно." },
 };
 
 function join(parts: Array<string | null | undefined>): string {

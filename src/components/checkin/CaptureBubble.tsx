@@ -3,8 +3,13 @@
 import { memo } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import {
+  Activity,
+  BatteryMedium,
+  BedDouble,
   Brain,
   Briefcase,
+  Users,
+  Watch,
   Droplet,
   Dumbbell,
   Eye,
@@ -44,6 +49,11 @@ export const KPI_ICONS: Record<KpiKey, LucideIcon> = {
   vision_check: Eye,
   workload: Briefcase,
   day_note: PenLine,
+  sleep_quality: BedDouble,
+  energy: BatteryMedium,
+  stress: Activity,
+  connection: Users,
+  sensor_note: Watch,
 };
 
 const FLY = { type: "spring", stiffness: 150, damping: 19, mass: 0.9 } as const;

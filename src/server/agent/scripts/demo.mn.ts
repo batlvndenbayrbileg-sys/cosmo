@@ -1,45 +1,47 @@
 import type { DemoScript } from "./index";
 
 /**
- * Mongolian demo: Bat's check-in (same story as the English script). The first sleep answer is 5.5 hours; at the
- * read-back Bat corrects it to 6, so the final stored value is 6. Phrasing is varied: units, bare numbers, number words.
+ * Mongolian demo: Bat's check-in (same story as the English script): the sensors logged sleep and the morning vitals,
+ * the resting heart rate is up after a treadmill run and Cosmo asks about it, then the six spoken questions. At the
+ * read-back Bat changes energy to two. Phrasing is varied: numbers, number words and plain words.
  * Needs a native-speaker review.
  */
 export const DEMO_SCRIPT_MN: DemoScript = {
   language: "mn",
   values: {
-    sleep_hours: 6,
+    // from the simulated sensor feed (scripted demo day)
+    sleep_hours: 7.5,
+    bp_systolic: 117,
+    bp_diastolic: 79,
+    heart_rate: 82,
+    temperature_c: 36.5,
+    glucose_mgdl: 100,
+    water_ml: 2350,
+    exercise_min: 53,
+    // said by Bat
+    sensor_note: "Тийм, сая гүйлтийн зам дээр гүйгээд ирлээ.",
     mood: 4,
     symptom_headache: 0,
     symptom_dizziness: 0,
     symptom_nausea: 0,
-    bp_systolic: 124,
-    bp_diastolic: 82,
-    heart_rate: 68,
-    temperature_c: 36.7,
-    glucose_mgdl: 98,
-    water_ml: 1800,
-    exercise_min: 40,
     vision_check: 0,
-    workload: 3,
+    sleep_quality: 2,
+    energy: 2,
+    stress: 2,
+    connection: 4,
   },
   lines: [
     { say: "Сайн байна, баярлалаа. Жаахан ядарсан ч гайгүй.", expect: "smalltalk" },
     { say: "Өглөө арай завгүй байсан ч сайхан байна.", expect: "smalltalk" },
     { say: "Тийм, хийцгээе.", expect: "start" },
-    { say: "Тав хагас цаг унтсан.", expect: "sleep" },
+    { say: "Тийм, сая гүйлтийн зам дээр гүйгээд ирлээ.", expect: "sensor_check" },
     { say: "Дөрөв байна.", expect: "mood" },
     { say: "Үгүй, юу ч байхгүй.", expect: "symptoms" },
-    { say: "124 дээр 82.", expect: "blood_pressure" },
-    { say: "Пульс жаран найм.", expect: "heart_rate" },
-    { say: "36.7 градус.", expect: "temperature" },
-    { say: "98.", expect: "glucose" },
-    { say: "Ус нэг мянга найман зуун мл.", expect: "water" },
-    { say: "40 минут.", expect: "exercise" },
-    { say: "Тод байна.", expect: "vision" },
-    { say: "Гурав.", expect: "workload" },
-    { say: "Юу ч үгүй.", expect: "day_note" },
-    { say: "Үгүй, би 6 цаг унтсан.", expect: "confirm" },
+    { say: "Тийм ч сайн биш, байн байн сэрсэн.", expect: "sleep_quality" },
+    { say: "Дунд зэрэг, гурав.", expect: "energy" },
+    { say: "Бага зэрэг, хоёр.", expect: "stress" },
+    { say: "Ойр байна, дөрөв.", expect: "connection" },
+    { say: "Үгүй, эрч хүч минь хоёр орчим.", expect: "confirm" },
     { say: "Тийм, зөв.", expect: "confirm2" },
   ],
 };

@@ -9,11 +9,14 @@ import { isPresent } from "./status";
 
 export const SLOT_ORDER: SlotKey[] = ["morning", "midday", "afternoon", "evening"];
 
+/** keys that are only taken when the astronaut volunteers them (vision, workload, day note): never "missing" */
+const VOLUNTEERED: ReadonlySet<KpiKey> = new Set(QUESTIONS.filter((q) => q.capture === "volunteer").flatMap((q) => q.keys));
+
 export function computeDayArc(today: Partial<Record<KpiKey, MeasurementValue>>): DayArcSlot[] {
   return SLOT_ORDER.map((slot) => {
     const keys = QUESTIONS.filter((q) => q.slot === slot).flatMap((q) => q.keys);
     const logged = keys.filter((k) => isPresent(today[k]));
-    const missing = keys.filter((k) => !OPTIONAL_KEYS.has(k) && !isPresent(today[k]));
+    const missing = keys.filter((k) => !OPTIONAL_KEYS.has(k) && !VOLUNTEERED.has(k) && !isPresent(today[k]));
     const state: DayArcSlot["state"] = missing.length === 0 ? "done" : logged.length > 0 ? "partial" : "pending";
     return { slot, state, logged, missing };
   });

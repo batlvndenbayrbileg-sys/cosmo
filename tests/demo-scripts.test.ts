@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { QUESTIONS, getQuestion, validateValue } from "@/lib/kpi/registry";
+import { QUESTIONS, SENSOR_KEYS, SPOKEN_QUESTIONS, getQuestion, validateValue } from "@/lib/kpi/registry";
 import { KPI_KEYS, type KpiKey, type Lang, type MeasurementValue, type QuestionId } from "@/lib/types";
 import {
   interpretAnswer,
@@ -9,6 +9,12 @@ import {
   interpretYesNo,
 } from "@/server/agent/interpret";
 import { DEMO_SCRIPTS, type DemoLine } from "@/server/agent/scripts";
+
+/**
+ * The scripted demo after the check-in redesign (docs/research/checkin-nasa.md): the sensors have logged sleep and the
+ * morning vitals (Bat's resting pulse is up on the demo day), so Bat answers the sensor follow-up and the six spoken
+ * questions only, then changes energy at the read-back. (The pipeline replay is in scripted-flow.test.ts.)
+ */
 
 const LANGS: Lang[] = ["en", "mn"];
 
@@ -20,41 +26,31 @@ function questionLines(lines: DemoLine[]): Array<DemoLine & { expect: QuestionId
 describe.each(LANGS)("demo script (%s)", (lang) => {
   const script = DEMO_SCRIPTS[lang];
 
-  it("belongs to its language and has about 90 seconds of lines", () => {
+  it("belongs to its language and is short (about a minute of lines)", () => {
     expect(script.language).toBe(lang);
-    expect(script.lines.length).toBeGreaterThanOrEqual(15);
-    expect(script.lines.length).toBeLessThanOrEqual(22);
+    expect(script.lines.length).toBeGreaterThanOrEqual(10);
+    expect(script.lines.length).toBeLessThanOrEqual(14);
     for (const line of script.lines) expect(line.say.trim().length).toBeGreaterThan(0);
   });
 
-  it("follows the conversation: small talk, start, all 12 questions in order, correction, final yes", () => {
+  it("follows the conversation: small talk, start, the sensor follow-up and the six spoken questions, correction, yes", () => {
     const expects = script.lines.map((l) => l.expect);
     const firstQuestion = expects.findIndex((e) => QUESTIONS.some((q) => q.id === e));
     expect(expects.slice(0, firstQuestion).filter((e) => e === "smalltalk").length).toBeGreaterThanOrEqual(1);
     expect(expects[firstQuestion - 1]).toBe("start");
-    expect(questionLines(script.lines).map((l) => l.expect)).toEqual(QUESTIONS.map((q) => q.id));
+    expect(questionLines(script.lines).map((l) => l.expect)).toEqual(SPOKEN_QUESTIONS.map((q) => q.id));
+    // no measurement is asked one by one: the sensors gave them
+    for (const id of ["sleep", "blood_pressure", "heart_rate", "temperature", "glucose", "water", "exercise"]) {
+      expect(expects).not.toContain(id);
+    }
     expect(expects.slice(-2)).toEqual(["confirm", "confirm2"]);
   });
 
-  it("uses only Bat's demo values (DASHBOARD_PLAN section 6), with sleep corrected to 6", () => {
-    expect(script.values).toEqual({
-      sleep_hours: 6,
-      mood: 4,
-      symptom_headache: 0,
-      symptom_dizziness: 0,
-      symptom_nausea: 0,
-      bp_systolic: 124,
-      bp_diastolic: 82,
-      heart_rate: 68,
-      temperature_c: 36.7,
-      glucose_mgdl: 98,
-      water_ml: 1800,
-      exercise_min: 40,
-      vision_check: 0,
-      workload: 3,
-    });
+  it("ends with the sensor readings of the demo day and Bat's own answers, every value valid", () => {
+    for (const key of SENSOR_KEYS) expect(typeof script.values[key], key).toBe("number");
+    expect(script.values).toMatchObject({ heart_rate: 82, mood: 4, sleep_quality: 2, energy: 2, stress: 2, connection: 4, vision_check: 0 });
     for (const [key, value] of Object.entries(script.values) as Array<[KpiKey, MeasurementValue]>) {
-      expect(validateValue(key, value).ok).toBe(true);
+      expect(validateValue(key, value).ok, key).toBe(true);
     }
   });
 
@@ -71,33 +67,31 @@ describe.each(LANGS)("demo script (%s)", (lang) => {
     expect(interpretStart(start?.say ?? "", lang)).toBe("yes");
   });
 
-  it("every question line is interpreted into exactly the expected final values", () => {
+  it("every question line is interpreted into the expected value (energy 3 before the correction)", () => {
     for (const line of questionLines(script.lines)) {
       const question = getQuestion(line.expect);
       const result = interpretAnswer(question, line.say, lang);
       expect(result.unclear, line.say).toBe(false);
       expect(result.rejectedKeys, line.say).toEqual([]);
       for (const rec of result.records) {
-        expect(question.keys).toContain(rec.key);
         expect(line.say.includes(rec.sourceText), `${line.say} / ${rec.sourceText}`).toBe(true);
       }
-      if (line.expect === "day_note") {
-        expect(result.records, line.say).toEqual([]); // "nothing to add"
-      } else if (line.expect === "sleep") {
-        expect(result.records.map((r) => [r.key, r.value]), line.say).toEqual([["sleep_hours", 5.5]]);
+      if (line.expect === "energy") {
+        expect(result.records.map((r) => [r.key, r.value]), line.say).toEqual([["energy", 3]]);
       } else {
         for (const rec of result.records) expect(rec.value, `${line.say} -> ${rec.key}`).toBe(script.values[rec.key]);
       }
     }
   });
 
-  it("plays through to the expected final values", () => {
+  it("plays through to the expected final values (the sensor readings come from the feed)", () => {
     const stored = new Map<KpiKey, MeasurementValue>();
+    for (const key of SENSOR_KEYS) stored.set(key, script.values[key] as MeasurementValue);
     for (const line of script.lines) {
       if (line.expect === "smalltalk" || line.expect === "start") continue;
       if (line.expect === "confirm" || line.expect === "correction") {
         const c = interpretCorrection(line.say, lang);
-        expect(c.question?.id, line.say).toBe("sleep");
+        expect(c.question?.id, line.say).toBe("energy");
         expect(interpretYesNo(line.say, lang), line.say).toBe(false);
         for (const rec of c.result.records) stored.set(rec.key, rec.value);
         continue;
@@ -115,29 +109,15 @@ describe.each(LANGS)("demo script (%s)", (lang) => {
       if (v !== undefined) final[key] = v;
     }
     expect(final).toEqual(script.values);
-    expect(stored.get("sleep_hours")).toBe(6);
   });
 
-  it("the correction at the confirm step changes only sleep, from 5.5 to 6", () => {
-    const sleepLine = script.lines.find((l) => l.expect === "sleep");
-    const confirm = script.lines.find((l) => l.expect === "confirm");
-    const first = interpretAnswer(getQuestion("sleep"), sleepLine?.say ?? "", lang);
-    expect(first.records[0].value).toBe(5.5);
-    const corrected = interpretCorrection(confirm?.say ?? "", lang);
-    expect(corrected.question?.id).toBe("sleep");
-    expect(corrected.result.records.map((r) => [r.key, r.value])).toEqual([["sleep_hours", 6]]);
-  });
-
-  it("the phrasing is varied: units, bare numbers and spoken number words all appear", () => {
-    const lines = questionLines(script.lines);
-    const withUnit = lines.filter((l) => /\d\s*\p{L}/u.test(l.say));
-    const bare = lines.filter((l) => /^\d+(?:[.,]\d+)?\.?$/u.test(l.say.trim()));
-    const asWords = lines.filter(
-      (l) => !/\d/.test(l.say) && !["vision", "symptoms", "day_note"].includes(l.expect),
-    );
-    expect(withUnit.length).toBeGreaterThanOrEqual(2);
-    expect(bare.length).toBeGreaterThanOrEqual(1);
-    expect(asWords.length).toBeGreaterThanOrEqual(1);
+  it("the phrasing is varied: bare numbers, number words and plain words all appear", () => {
+    const lines = questionLines(script.lines).filter((l) => l.expect !== "sensor_check" && l.expect !== "symptoms");
+    const digits = lines.filter((l) => /\d/u.test(l.say));
+    const numberWords = lines.filter((l) => /(?<![\p{L}])(?:two|three|four|хоёр|гурав|дөрөв)(?![\p{L}])/iu.test(l.say));
+    const wordsOnly = questionLines(script.lines).filter((l) => l.expect === "sleep_quality");
+    expect(digits.length + numberWords.length).toBeGreaterThanOrEqual(3);
+    expect(wordsOnly.every((l) => !/\d/u.test(l.say))).toBe(true);
   });
 });
 
@@ -147,25 +127,18 @@ describe("demo scripts index", () => {
   });
 
   it("both languages tell the same story", () => {
-    expect(DEMO_SCRIPTS.en.values).toEqual(DEMO_SCRIPTS.mn.values);
+    const { sensor_note: enNote, ...en } = DEMO_SCRIPTS.en.values;
+    const { sensor_note: mnNote, ...mn } = DEMO_SCRIPTS.mn.values;
+    expect(en).toEqual(mn);
+    expect(typeof enNote).toBe("string");
+    expect(typeof mnNote).toBe("string");
     expect(DEMO_SCRIPTS.en.lines.map((l) => l.expect)).toEqual(DEMO_SCRIPTS.mn.lines.map((l) => l.expect));
   });
 
   it("the Mongolian script is Cyrillic and the English one is Latin", () => {
     for (const line of DEMO_SCRIPTS.mn.lines) {
-      // a bare number such as "98." has no letters; every other line is written in Cyrillic
       if (/\p{L}/u.test(line.say)) expect(line.say).toMatch(/[Ѐ-ӿ]/u);
     }
     for (const line of DEMO_SCRIPTS.en.lines) expect(line.say).not.toMatch(/[Ѐ-ӿ]/u);
-  });
-});
-
-describe("demo script (mn): the water answer is natural spoken Mongolian", () => {
-  it("says 1800 ml in words with the thousand (мянга) and still reads back as 1800", () => {
-    const line = DEMO_SCRIPTS.mn.lines.find((l) => l.expect === "water");
-    expect(line?.say).toContain("мянга");
-    const result = interpretAnswer(getQuestion("water"), line?.say ?? "", "mn");
-    expect(result.records.map((r) => [r.key, r.value])).toEqual([["water_ml", 1800]]);
-    expect(result.records[0].confidence).toBe(0.9);
   });
 });

@@ -8,8 +8,9 @@ import {
   type MeasurementDbRow,
 } from "../rows";
 import { assertCheckInOwned, isKpiKey, isTextKey, lockCheckInOwned, toIso } from "../shared";
+import { SENSOR_TAG } from "../rows";
 
-const SOURCES: readonly MeasurementSource[] = ["typed", "voice", "simulated"];
+const SOURCES: readonly MeasurementSource[] = ["typed", "voice", "simulated", "sensor"];
 
 export interface UpsertMeasurementInput {
   key: KpiKey;
@@ -61,6 +62,11 @@ export async function upsertMeasurement(
     }
 
     const createdAt = toIso(input.createdAt ?? new Date(), "createdAt");
+    // a sensor reading is stored as "simulated" (the feed is simulated, and the column's CHECK constraint stays as it is
+    // on every existing database) with SENSOR_TAG in front of its device label; mapMeasurement reads it back as "sensor"
+    const sensor = input.source === "sensor";
+    const dbSource = sensor ? "simulated" : input.source;
+    const dbSourceText = sensor ? `${SENSOR_TAG}${input.sourceText ?? ""}` : input.sourceText;
     await db.run(
       `INSERT INTO measurement
          (id, check_in_id, crew_id, key, value, value_text, unit, source_text, confidence, source, created_at)
@@ -76,9 +82,9 @@ export async function upsertMeasurement(
       value,
       valueText,
       input.unit,
-      input.sourceText,
+      dbSourceText,
       input.confidence,
-      input.source,
+      dbSource,
       createdAt,
     );
 

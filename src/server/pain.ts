@@ -196,6 +196,8 @@ export async function painTurn(p: PainTurnInput): Promise<TurnEvent[] | null> {
     const withGuide = painGuide({ location: reading.location, clause: reading.clause, redFlags: [], urgent: false }) !== null;
     if (
       expected &&
+      // the sensor follow-up takes any words, so a pain said there is the pain check, never just a note
+      expected !== "sensor_check" &&
       reading.redFlags.length === 0 &&
       !withGuide &&
       interpretAnswer(getQuestion(expected), p.text, p.lang).records.length > 0

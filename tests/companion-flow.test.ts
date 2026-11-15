@@ -4,9 +4,10 @@ import type { Agent, AgentDecision, CompanionReplyArgs } from "@/server/agent/ag
 import { ScriptedAgent } from "@/server/agent/scriptedAgent";
 import { DEMO_SCRIPTS } from "@/server/agent/scripts";
 import { setClockForTests } from "@/server/clock";
+import { setSensorFeedForTests } from "@/server/checkin/sensors";
 import { listAlerts } from "@/server/db/repos/alert";
 import { listMeasurements } from "@/server/db/repos/measurement";
-import { assistantText, ctxOf, eventsOf, playTurn, startCheckIn } from "./helpers/agent";
+import { SPOKEN_ANSWERS, assistantText, ctxOf, eventsOf, playTurn, startCheckIn } from "./helpers/agent";
 import { TEST_TODAY, freshSeededDb } from "./helpers/db";
 
 /**
@@ -16,14 +17,19 @@ import { TEST_TODAY, freshSeededDb } from "./helpers/db";
  */
 
 beforeEach(async () => {
+  // these walk to a measurement question, asked only without a sensor feed (a crew member without a wearable)
+  setSensorFeedForTests(false);
   setClockForTests(TEST_TODAY);
   await freshSeededDb();
 });
-afterEach(() => setClockForTests(null));
+afterEach(() => {
+  setClockForTests(null);
+  setSensorFeedForTests(null);
+});
 
 const TO_GLUCOSE: Record<Lang, string[]> = {
-  en: ["Hi Cosmo", "let's start", "6.5 hours", "4", "no headache, no dizziness, no nausea", "124 over 82", "68", "36.7"],
-  mn: ["Сайн уу", "эхэлье", "6 цаг хагас", "дөрөв", "толгой өвдөхгүй, эргэхгүй, дотор муухайрахгүй", "124 дээр 82", "68", "36.7"],
+  en: ["Hi Cosmo", "let's start", ...SPOKEN_ANSWERS.en, "6.5 hours", "124 over 82", "68", "36.7"],
+  mn: ["Сайн уу", "эхэлье", ...SPOKEN_ANSWERS.mn, "6 цаг хагас", "124 дээр 82", "68", "36.7"],
 };
 
 const GLUCOSE_PROMPT: Record<Lang, RegExp> = { en: /What is your blood glucose/i, mn: /Цусны сахар хэд байна/u };
@@ -114,11 +120,12 @@ describe("friend mode at other points of the check-in", () => {
     expect(await ctxOf("bat", id)).toMatchObject({ state: "SMALL_TALK", proposed: true, companion: false });
 
     const start = await playTurn("bat", id, "yes");
-    expect(eventsOf(start, "state")[0]).toMatchObject({ state: "KPI_CAPTURE", expectedQuestion: "sleep" });
+    expect(eventsOf(start, "state")[0]).toMatchObject({ state: "KPI_CAPTURE", expectedQuestion: "mood" });
   });
 
   it("at the read-back: leaving reads the values back again", async () => {
     const lang: Lang = "en";
+    setSensorFeedForTests(true); // the demo script meets the sensor feed
     const id = await startCheckIn("bat", lang);
     for (const line of DEMO_SCRIPTS[lang].lines) {
       if ((await ctxOf("bat", id)).state === "CONFIRM") break;
@@ -134,11 +141,12 @@ describe("friend mode at other points of the check-in", () => {
     expect(await ctxOf("bat", id)).toMatchObject({ state: "CONFIRM", companion: true });
 
     const left = await playTurn("bat", id, "back to the check-in");
-    expect(assistantText(left)).toMatch(/Here is what I have: .*Is everything correct\?/);
+    expect(assistantText(left)).toMatch(/Here is what you told me: .*Your sensor readings are saved too\. Is everything correct\?/);
     expect(await ctxOf("bat", id)).toMatchObject({ state: "CONFIRM", companion: false });
   });
 
   it.each<Lang>(["en", "mn"])("after the check-in, on the dashboard (%s)", async (lang) => {
+    setSensorFeedForTests(true); // the demo script meets the sensor feed
     const id = await startCheckIn("bat", lang);
     for (const line of DEMO_SCRIPTS[lang].lines) await playTurn("bat", id, line.say);
     expect((await ctxOf("bat", id)).state).toBe("DONE");
@@ -158,7 +166,7 @@ describe("friend mode at other points of the check-in", () => {
 
   it("an ordinary feeling that answers the mood question is recorded, not a conversation", async () => {
     const id = await startCheckIn("bat", "en");
-    for (const line of ["Hi Cosmo", "let's start", "6.5 hours"]) await playTurn("bat", id, line);
+    for (const line of ["Hi Cosmo", "let's start"]) await playTurn("bat", id, line);
     expect(eventsOf(await playTurn("bat", id, "I feel down"), "measurement").map((e) => [e.key, e.value])).toEqual([["mood", 2]]);
     expect((await ctxOf("bat", id)).companion).toBe(false);
   });
@@ -195,6 +203,7 @@ describe("crisis words", () => {
   });
 
   it("work after the check-in too, and a medical emergency while talking raises its own alert", async () => {
+    setSensorFeedForTests(true); // the demo script meets the sensor feed
     const id = await startCheckIn("bat", "en");
     for (const line of DEMO_SCRIPTS.en.lines) await playTurn("bat", id, line.say);
     const before = (await listAlerts("bat")).filter((a) => a.checkInId === id).length;
@@ -238,13 +247,13 @@ describe("check-in answers are not swallowed by friend mode", () => {
     const id = await startCheckIn("bat", "en");
     await playTurn("bat", id, "Hi Cosmo");
     const start = await playTurn("bat", id, "yes let's start, I'm a little stressed today");
-    expect(eventsOf(start, "state")[0]).toMatchObject({ state: "KPI_CAPTURE", expectedQuestion: "sleep" });
+    expect(eventsOf(start, "state")[0]).toMatchObject({ state: "KPI_CAPTURE", expectedQuestion: "mood" });
     expect((await ctxOf("bat", id)).companion).toBe(false);
   });
 
   it("'listen, I slept 7 hours' records the sleep", async () => {
     const id = await startCheckIn("bat", "mn");
-    for (const line of ["Сайн уу", "эхэлье"]) await playTurn("bat", id, line);
+    for (const line of ["Сайн уу", "эхэлье", ...SPOKEN_ANSWERS.mn]) await playTurn("bat", id, line);
     const events = await playTurn("bat", id, "сонсооч, би 7 цаг унтсан");
     expect(eventsOf(events, "measurement").map((e) => [e.key, e.value])).toEqual([["sleep_hours", 7]]);
     expect((await ctxOf("bat", id)).companion).toBe(false);
@@ -252,7 +261,7 @@ describe("check-in answers are not swallowed by friend mode", () => {
 
   it("an accident in the symptom answer is not a self-harm crisis and raises no alert", async () => {
     const id = await startCheckIn("bat", "en");
-    for (const line of ["Hi Cosmo", "let's start", "6.5 hours", "4"]) await playTurn("bat", id, line);
+    for (const line of ["Hi Cosmo", "let's start", "4"]) await playTurn("bat", id, line);
     expect((await ctxOf("bat", id)).state).toBe("KPI_CAPTURE");
     const events = await playTurn("bat", id, "I hurt myself on the treadmill");
     expect(assistantText(events)).not.toMatch(/taking this seriously/);
@@ -282,6 +291,7 @@ describe("dashboard answers from the model", () => {
   it.each(["Maybe ask the medical officer about Ambien for tonight.", "A magnesium supplement could help your sleep.", "That could be insomnia."])(
     "never name a drug, a supplement or a condition: %s",
     async (wording) => {
+      setSensorFeedForTests(true); // the demo script meets the sensor feed
       const id = await startCheckIn("bat", "en");
       for (const line of DEMO_SCRIPTS.en.lines) await playTurn("bat", id, line.say);
       expect((await ctxOf("bat", id)).state).toBe("DONE");

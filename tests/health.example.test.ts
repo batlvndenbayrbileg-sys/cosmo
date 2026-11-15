@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { buildKpiStats, evaluateDay } from "@/lib/health";
 import { KPI_KEYS, type KpiKey, type MeasurementSource } from "@/lib/types";
 import { computeBaseline } from "@/lib/health/baseline";
-import { batDemoToday, batHistory, normalToday, steadyHistory } from "./helpers/health";
+import { CALM_WELLBEING, batDemoToday, batHistory, normalToday, steadyHistory } from "./helpers/health";
+import { computeDayArc } from "@/lib/health";
 
 describe("worked example: Bat's scripted demo check-in (docs/DASHBOARD_PLAN.md section 6)", () => {
   const history = batHistory();
@@ -77,15 +78,17 @@ describe("worked example: Bat's scripted demo check-in (docs/DASHBOARD_PLAN.md s
     });
   });
 
-  it("logs every part of the day", () => {
-    expect(day.dayArc.map((s) => s.state)).toEqual(["done", "done", "done", "done"]);
+  it("logs every part of the day once the wellbeing check is answered too", () => {
+    // the worked example predates the wellbeing check: its morning and evening parts wait for those answers
+    expect(day.dayArc.map((s) => s.state)).toEqual(["partial", "done", "done", "partial"]);
+    expect(computeDayArc({ ...today, ...CALM_WELLBEING }).map((s) => s.state)).toEqual(["done", "done", "done", "done"]);
   });
 
   it("is deterministic", () => {
     expect(evaluateDay(today, history)).toEqual(day);
   });
 
-  it("builds 16 KPI stats in KPI_KEYS order for the dashboard cards", () => {
+  it("builds 21 KPI stats in KPI_KEYS order for the dashboard cards", () => {
     const source: Partial<Record<KpiKey, MeasurementSource>> = { sleep_hours: "voice", heart_rate: "typed" };
     const stats = buildKpiStats(today, history, source);
     expect(stats.map((s) => s.key)).toEqual([...KPI_KEYS]);

@@ -12,7 +12,7 @@ import {
   computeReadiness,
 } from "@/lib/health/scores";
 import { evaluateIndicators, type IndicatorEval } from "@/lib/health/status";
-import { constantHistory, historyFromSeries, normalToday, type DayValues } from "./helpers/health";
+import { CALM_WELLBEING, constantHistory, historyFromSeries, normalToday, type DayValues } from "./helpers/health";
 
 const FLAG: RedFlag = {
   rule: "VITAL_RED",
@@ -115,7 +115,7 @@ describe("hazards", () => {
 
   it("links the registry keys and is green on a normal day", () => {
     const byKey = Object.fromEntries(computeHazards(evalsOf(normalToday())).map((h) => [h.hazard, h]));
-    expect(byKey.isolation_confinement.keys).toEqual(["sleep_hours", "mood", "workload"]);
+    expect(byKey.isolation_confinement.keys).toEqual(["sleep_hours", "mood", "workload", "sleep_quality", "energy", "stress", "connection"]);
     expect(byKey.hostile_closed_environment.keys).toEqual([
       "symptom_nausea", "temperature_c", "glucose_mgdl",
     ]);
@@ -235,7 +235,7 @@ describe("day arc", () => {
   });
 
   it("marks slots done when all non-optional keys are present (notes optional)", () => {
-    const arc = computeDayArc(normalToday());
+    const arc = computeDayArc(normalToday(CALM_WELLBEING));
     expect(arc.map((s) => s.state)).toEqual(["done", "done", "done", "done"]);
     expect(arc[0].missing).toEqual([]);
     expect(arc[0].logged).toContain("bp_systolic");
@@ -251,9 +251,11 @@ describe("day arc", () => {
   it("marks a slot partial when only some keys are present, and lists what is missing", () => {
     const arc = computeDayArc({ sleep_hours: 7, mood: 4, glucose_mgdl: 95 });
     expect(arc[0].state).toBe("partial");
-    expect(arc[0].logged).toEqual(["sleep_hours", "mood"]);
+    // in question order: the spoken questions first, then the sensor-filled values
+    expect(arc[0].logged).toEqual(["mood", "sleep_hours"]);
     expect(arc[0].missing).toEqual([
-      "symptom_headache", "symptom_dizziness", "symptom_nausea", "bp_systolic", "bp_diastolic", "heart_rate", "temperature_c",
+      "symptom_headache", "symptom_dizziness", "symptom_nausea", "sleep_quality", "energy",
+      "bp_systolic", "bp_diastolic", "heart_rate", "temperature_c",
     ]);
     expect(arc[1].state).toBe("partial");
     expect(arc[1].missing).toEqual(["water_ml"]);

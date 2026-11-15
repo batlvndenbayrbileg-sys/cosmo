@@ -175,6 +175,11 @@ export interface ToolContext {
   source: MeasurementSource;
   /** keys that already hold a value */
   filled: ReadonlySet<KpiKey>;
+  /**
+   * keys whose value came from the sensor feed: a value the astronaut says ("my pulse is 72") replaces the reading
+   * (validated the same way) instead of being refused as already recorded
+   */
+  sensorFilled?: ReadonlySet<KpiKey>;
   /** validate only: nothing is written */
   dryRun?: boolean;
 }
@@ -463,7 +468,7 @@ async function dispatch(tc: ToolContext, name: string, input: unknown): Promise<
   switch (name) {
     case "record_measurement": {
       const i = parsed.data as z.infer<(typeof INPUT_SCHEMAS)["record_measurement"]>;
-      if (tc.filled.has(i.key)) {
+      if (tc.filled.has(i.key) && !tc.sensorFilled?.has(i.key)) {
         return fail(
           name,
           "already_recorded",

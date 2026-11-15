@@ -5,7 +5,8 @@ import type { Agent } from "@/server/agent/agent";
 import { dangerNotice, rangeReply, rulesRangeKeys } from "@/server/agent/valueChecks";
 import { setClockForTests } from "@/server/clock";
 import { listAlerts } from "@/server/db/repos/alert";
-import { assistantText, ctxOf, eventsOf, playTurn, startCheckIn } from "./helpers/agent";
+import { setSensorFeedForTests } from "@/server/checkin/sensors";
+import { SPOKEN_ANSWERS, assistantText, ctxOf, eventsOf, playTurn, startCheckIn } from "./helpers/agent";
 import { TEST_TODAY, freshSeededDb } from "./helpers/db";
 
 /**
@@ -78,19 +79,24 @@ describe("dangerNotice", () => {
 
 /* ───────────── through the turn pipeline ───────────── */
 
+// the temperature question is asked only without a sensor feed (a crew member without a wearable): feed off here
 beforeEach(async () => {
   setClockForTests(TEST_TODAY);
+  setSensorFeedForTests(false);
   await freshSeededDb();
 });
-afterEach(() => setClockForTests(null));
+afterEach(() => {
+  setClockForTests(null);
+  setSensorFeedForTests(null);
+});
 
 const TO_TEMPERATURE: Record<Lang, string[]> = {
-  en: ["Hi Cosmo", "let's start", "6.5 hours", "4", "no headache, no dizziness, no nausea", "124 over 82", "68"],
-  mn: ["Сайн уу", "эхэлье", "6 цаг хагас", "дөрөв", "толгой өвдөхгүй, эргэхгүй, дотор муухайрахгүй", "124 дээр 82", "68"],
+  en: ["Hi Cosmo", "let's start", ...SPOKEN_ANSWERS.en, "6.5 hours", "124 over 82", "68"],
+  mn: ["Сайн уу", "эхэлье", ...SPOKEN_ANSWERS.mn, "6 цаг хагас", "124 дээр 82", "68"],
 };
 const AFTER_TEMPERATURE: Record<Lang, string[]> = {
-  en: ["98", "1500 ml", "40 minutes", "clear", "3", "nothing", "yes"],
-  mn: ["98", "1500 мл", "40 минут", "тод", "3", "үгүй", "тийм"],
+  en: ["98", "1500 ml", "40 minutes", "yes"],
+  mn: ["98", "1500 мл", "40 минут", "тийм"],
 };
 
 async function atTemperature(lang: Lang): Promise<string> {
@@ -118,7 +124,7 @@ describe.each<[Lang, string, RegExp]>([
 describe("an impossible correction at the read-back while the model says nothing usable", () => {
   it("is explained as out of range", async () => {
     const id = await atTemperature("en");
-    // temperature first, then glucose ... day note; stops before the read-back "yes"
+    // temperature first, then glucose, water, exercise; stops before the read-back "yes"
     for (const line of ["36.6", ...AFTER_TEMPERATURE.en.slice(0, -1)]) await playTurn("bat", id, line);
     expect((await ctxOf("bat", id)).state).toBe("CONFIRM");
     const noAnswer: Agent = { name: "claude", decide: async () => ({ records: [], emotion: "neutral", yesNo: false }) };

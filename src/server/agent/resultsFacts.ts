@@ -20,11 +20,11 @@ export const STATUS_WORD: Record<Status, Record<Lang, string>> = {
 };
 
 export const AXIS_NAME: Record<AxisKey, Record<Lang, string>> = {
-  sleep: { en: "sleep", mn: "нойр" },
+  sleep: { en: "sleep and energy", mn: "нойр, эрч хүч" },
   cardio: { en: "heart and circulation", mn: "зүрх, судас" },
   metabolic: { en: "metabolism and hydration", mn: "бодисын солилцоо, ус" },
   neuro_ocular: { en: "head and vision", mn: "толгой, хараа" },
-  behavioral: { en: "mood and workload", mn: "сэтгэл санаа, ачаалал" },
+  behavioral: { en: "mood, stress and feeling connected", mn: "сэтгэл санаа, стресс, ойр дотно байдал" },
   musculoskeletal: { en: "bones and muscles", mn: "яс, булчин" },
 };
 
@@ -59,7 +59,7 @@ export function buildResultsFacts(
   for (const key of KPI_KEYS) {
     const value = today[key];
     if (value === undefined || value === null || value === "") continue;
-    if (key === "symptom_note" || key === "day_note") continue; // free text is never echoed into model facts
+    if (key === "symptom_note" || key === "day_note" || key === "sensor_note") continue; // free text is never echoed into model facts
     const ev = day.indicators[key];
     const def = getKpi(key);
     const usualMean = typeof value === "number" ? baselineMean(history, key) : null;

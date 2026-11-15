@@ -321,7 +321,17 @@ async function answerInAssistantMode(p: AssistantTurnArgs, loadLatest: () => Pro
           ? { key: r.key, value: r.value, unit: r.unit, source_text: r.sourceText, confidence: r.confidence }
           : { key: r.key, value: r.value, source_text: r.sourceText, confidence: r.confidence };
       const res = await executeTool(
-        { crewId, checkInId: checkIn.id, state: ctx0.state, lang, utterance: text, source: p.source, filled: new Set(ctx0.filled), dryRun: true },
+        {
+          crewId,
+          checkInId: checkIn.id,
+          state: ctx0.state,
+          lang,
+          utterance: text,
+          source: p.source,
+          filled: new Set(ctx0.filled),
+          sensorFilled: new Set(ctx0.sensorFilled),
+          dryRun: true,
+        },
         tool,
         input,
       );
@@ -408,7 +418,7 @@ async function recordOffer(
         ? { key: r.key, value: r.value, unit: r.unit, source_text: r.sourceText, confidence: r.confidence }
         : { key: r.key, value: r.value, source_text: r.sourceText, confidence: r.confidence };
     const res = await executeTool(
-      { crewId, checkInId: checkIn.id, state: ctx0.state, lang, utterance: offer.utterance, source: p.source, filled },
+      { crewId, checkInId: checkIn.id, state: ctx0.state, lang, utterance: offer.utterance, source: p.source, filled, sensorFilled: new Set(ctx0.sensorFilled) },
       tool,
       input,
     );

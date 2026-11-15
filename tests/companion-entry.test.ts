@@ -30,26 +30,30 @@ describe("live flow: greeting and a request to talk mid check-in (Mongolian)", (
 
   it("'Сайн уу' mid check-in is greeted back and the question asked again", async () => {
     const id = await startCheckIn("bat", "mn");
-    for (const line of ["Сайн уу", "эхэлье", "7 цаг"]) await playTurn("bat", id, line);
+    // "үгүй" answers the sensor follow-up (Bat's resting pulse is up on the demo day); the mood question is open
+    for (const line of ["Сайн уу", "эхэлье", "үгүй"]) await playTurn("bat", id, line);
     const ev = await playTurn("bat", id, "Сайн уу");
     expect(assistantText(ev)).toMatch(/^Сайн байна, баярлалаа!/u);
-    expect(assistantText(ev)).toMatch(/Сэтгэл санаа ямар байна/u);
+    expect(assistantText(ev)).toMatch(/Ерөнхийдөө өнөөдөр ямар байна/u);
     expect(eventsOf(ev, "clarification")).toEqual([]);
   });
 
-  it("a request to talk at the workload question opens friend mode and records nothing", async () => {
+  it("a request to talk at the stress question opens friend mode and records nothing", async () => {
     const id = await startCheckIn("bat", "mn");
-    for (const line of ["Сайн уу", "эхэлье", "7 цаг", "4", "үгүй", "120 дээр 80", "70", "36.6", "95", "2 литр", "30 минут", "тод"]) {
+    // sensor follow-up, mood, symptoms, sleep quality, energy: the stress question is open
+    for (const line of ["Сайн уу", "эхэлье", "үгүй", "4", "үгүй", "4", "4"]) {
       await playTurn("bat", id, line);
     }
+    expect((await ctxOf("bat", id)).filled).not.toContain("stress");
     const ev = await playTurn("bat", id, "Чамтай жаахан ярилцаж болох уу? Сүүлийн үед их стресстэй байна.");
     expect(eventsOf(ev, "measurement")).toEqual([]);
     expect((await ctxOf("bat", id)).companion).toBe(true);
   });
 
-  it("while talking at the day-note question, what is said is not stored as the note", async () => {
+  it("while talking at the sensor follow-up (free words), what is said is not stored as the note", async () => {
     const id = await startCheckIn("bat", "mn");
-    for (const line of ["Сайн уу", "эхэлье", "7 цаг", "4", "үгүй", "120 дээр 80", "70", "36.6", "95", "2 литр", "30 минут", "тод", "3"]) {
+    // Bat's resting pulse is up on the demo day, so the follow-up question is open right after the start
+    for (const line of ["Сайн уу", "эхэлье"]) {
       await playTurn("bat", id, line);
     }
     await playTurn("bat", id, "Чамтай ярилцаж болох уу?");

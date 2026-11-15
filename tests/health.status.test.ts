@@ -22,6 +22,20 @@ const BOUNDARY_CASES: Array<[KpiKey, number, Status]> = [
   ["mood", 3, "green"],
   ["mood", 2, "yellow"],
   ["mood", 1, "red"],
+  // the wellbeing check (1-5): a low answer is a yellow "watch", never red on its own
+  ["sleep_quality", 3, "green"],
+  ["sleep_quality", 2, "yellow"],
+  ["sleep_quality", 1, "yellow"],
+  ["energy", 3, "green"],
+  ["energy", 1, "yellow"],
+  ["connection", 3, "green"],
+  ["connection", 2, "yellow"],
+  ["connection", 1, "yellow"],
+  // stress: high {3, 4}, higher = more stressed
+  ["stress", 1, "green"],
+  ["stress", 3, "green"],
+  ["stress", 4, "yellow"],
+  ["stress", 5, "yellow"],
   // symptoms: 0 green, 1 yellow, never red
   ["symptom_headache", 0, "green"],
   ["symptom_headache", 1, "yellow"],
@@ -146,9 +160,9 @@ describe("status: no data and text keys", () => {
     expect(evaluateIndicator("day_note", "", null).status).toBe("no_data");
   });
 
-  it("evaluates a whole empty day as 16 no_data entries", () => {
+  it("evaluates a whole empty day as 21 no_data entries", () => {
     const evals = evaluateIndicators({}, {});
-    expect(Object.keys(evals)).toHaveLength(16);
+    expect(Object.keys(evals)).toHaveLength(21);
     for (const key of KPI_KEYS) expect(evals[key].status).toBe("no_data");
   });
 

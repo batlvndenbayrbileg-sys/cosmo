@@ -112,15 +112,21 @@ export class ScriptedAgent implements Agent {
     }
   }
 
+  /** keys that hold a value the astronaut gave (a sensor reading does not count: a spoken value replaces it) */
+  private ownFilled(args: AgentArgs): Set<string> {
+    const sensor = new Set<string>(args.ctx.sensorFilled ?? []);
+    return new Set<string>(args.ctx.filled.filter((k) => !sensor.has(k)));
+  }
+
   /** keys the astronaut spoke again although they already hold a value */
   private restated(args: AgentArgs): KpiKey[] {
-    const filled = new Set<string>(args.ctx.filled);
+    const filled = this.ownFilled(args);
     return [...new Set(interpretOpportunistic(args.text, args.lang).filter((r) => filled.has(r.key)).map((r) => r.key))];
   }
 
-  /** values volunteered for questions that are still open (never for a key that already has a value) */
+  /** values volunteered for questions that are still open or only hold a sensor reading (never over a spoken value) */
   private volunteered(args: AgentArgs, taken: Set<string>, answering?: QuestionDef): InterpretedRecord[] {
-    const filled = new Set<string>(args.ctx.filled);
+    const filled = this.ownFilled(args);
     return interpretOpportunistic(args.text, args.lang).filter(
       (r) => !filled.has(r.key) && !taken.has(r.key) && !(answering?.keys as string[] | undefined)?.includes(r.key),
     );

@@ -181,8 +181,9 @@ export async function loadTodayValues(crewId: string, checkInId: string): Promis
 export async function loadMachineCtx(checkIn: CheckInRecord): Promise<MachineCtx> {
   const state = checkIn.confirmedAt !== null ? "DONE" : checkIn.state;
   const ctx = parseCtx(state, checkIn.stateJson);
-  const { values } = await loadTodayValues(checkIn.crewId, checkIn.id);
+  const { values, sources } = await loadTodayValues(checkIn.crewId, checkIn.id);
   ctx.filled = Object.keys(values) as KpiKey[];
+  ctx.sensorFilled = ctx.filled.filter((k) => sources[k] === "sensor");
   return ctx;
 }
 
