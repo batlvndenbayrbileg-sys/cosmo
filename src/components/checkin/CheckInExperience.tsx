@@ -36,7 +36,7 @@ import {
 import { ApiClientError, fetchDashboard, fetchHealth, postTour, type TourFocus } from "./api";
 import { DashboardTalk, type TalkStatus } from "./DashboardTalk";
 import { ListeningPill } from "./ListeningPill";
-import { listeningPillMode, quoteForPill } from "./listening";
+import { handsFreeAllowed, listeningPillMode, pillQuoteSource, quoteForPill } from "./listening";
 import { playHeardEarcon } from "./earcon";
 import { EmergencyOverlay } from "@/components/emergency/EmergencyOverlay";
 import { EMERGENCY_REQUEST_EVENT } from "@/components/emergency/EmergencyGuidePanel";
@@ -493,15 +493,27 @@ export function CheckInExperience() {
 
   // Cosmo finished and nobody talked over her: the barge-in recording (tuned to her echo) turns into normal listening
   // on the same open microphone, so an answer given right away is heard from its first word (closing and reopening
-  // lost ~0.5-1 s). Only when that is not possible is it closed and the listening above starts fresh.
+  // lost ~0.5-1 s). Only when hands-free listening may go on (not with the text field open, a finished check-in, a demo)
+  // and the handover works; otherwise it is closed and the listening above starts fresh when allowed.
   const { endBargeIn } = recorder;
+  const handsFree = handsFreeAllowed({
+    conversationMode,
+    micUsable,
+    ready,
+    canTalk,
+    keyboardOpen,
+    blocked: player.blocked,
+    finished: talking && state.conversation === "DONE",
+    busy: state.busy,
+    demoRunning: demo.running,
+  });
   useEffect(() => {
     if (state.speech !== "idle") return;
     if (bargeIn.current.active && !bargeIn.current.heard && recorder.recording) {
       bargeIn.current = { active: false, heard: false };
-      if (!endBargeIn()) cancelRecorder();
+      if (!handsFree || !endBargeIn()) cancelRecorder();
     }
-  }, [state.speech, recorder.recording, cancelRecorder, endBargeIn]);
+  }, [state.speech, recorder.recording, cancelRecorder, endBargeIn, handsFree]);
 
   const handleSendText = useCallback(
     (text: string) => {
@@ -1019,7 +1031,7 @@ export function CheckInExperience() {
                     transcribing: pending?.source === "voice" && pending.text === "",
                   })
             }
-            quote={quoteForPill(lastLine?.speaker === "crew" ? lastLine.text : null)}
+            quote={quoteForPill(pillQuoteSource(pending, lastLine))}
             level={recorder.level}
             onDone={stopRecorder}
           />

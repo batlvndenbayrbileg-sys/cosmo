@@ -21,6 +21,7 @@ import { pickRecorderMimeType } from "@/components/checkin/speech";
 import {
   DEFAULT_VAD_CONFIG,
   createVadState,
+  handOverVadState,
   rmsFromSamples,
   stepVad,
   voicingFromSpectrum,
@@ -435,13 +436,14 @@ export function useRecorder(options: UseRecorderOptions): RecorderApi {
     s.bargeIn = false;
     s.config = s.normalConfig;
     if (s.vad.phase === "waiting") {
-      // nobody spoke over Cosmo: measure the room again without her voice and record afresh (her echo is not an answer)
+      // nobody spoke over Cosmo: record afresh (her echo is not an answer) and listen at once, without a new room
+      // calibration that would swallow an answer given right away (handOverVadState)
       try {
         s.restart();
       } catch {
         return false;
       }
-      s.vad = createVadState();
+      s.vad = handOverVadState(s.vad, s.normalConfig);
       s.startedAt = performance.now();
       s.capMs = recordingCapMs(s.normalConfig, true);
     }

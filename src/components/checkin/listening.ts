@@ -32,6 +32,53 @@ export function listeningPillMode(input: ListeningPillInput): ListeningPillMode 
   return null;
 }
 
+/**
+ * Whether hands-free listening may go on once Cosmo has finished: the same conditions under which the check-in screen
+ * opens the microphone by itself. The barge-in recording (open under her voice) is handed over to normal listening
+ * only then; otherwise it is closed. Without this check, a text field opened while she spoke, a finished check-in or
+ * a running demo left the microphone listening (and sending) after her last word.
+ */
+export interface HandsFreeInput {
+  conversationMode: boolean;
+  micUsable: boolean;
+  ready: boolean;
+  canTalk: boolean;
+  keyboardOpen: boolean;
+  /** autoplay blocked: Cosmo waits for a tap */
+  blocked: boolean;
+  /** the check-in conversation is DONE (on the check-in stage) */
+  finished: boolean;
+  busy: boolean;
+  demoRunning: boolean;
+}
+
+export function handsFreeAllowed(input: HandsFreeInput): boolean {
+  return (
+    input.conversationMode &&
+    input.micUsable &&
+    input.ready &&
+    input.canTalk &&
+    !input.keyboardOpen &&
+    !input.blocked &&
+    !input.finished &&
+    !input.busy &&
+    !input.demoRunning
+  );
+}
+
+/**
+ * The words the "thinking" pill quotes: the line of the turn in flight. Typed text is still pending (it has no
+ * transcript event yet), so it wins over the last transcript line, which can be an older crew line (a turn that
+ * failed after its transcript) and must not be quoted as if it were what Cosmo is thinking about now.
+ */
+export function pillQuoteSource(
+  pending: { text: string } | null | undefined,
+  lastLine: { speaker: string; text: string } | null | undefined,
+): string | null {
+  if (pending) return pending.text.trim() === "" ? null : pending.text;
+  return lastLine?.speaker === "crew" ? lastLine.text : null;
+}
+
 /** The words quoted in the "thinking" pill: short enough for one line on a phone. */
 export function quoteForPill(text: string | null | undefined, max = 48): string | null {
   const clean = (text ?? "").replace(/\s+/g, " ").trim();

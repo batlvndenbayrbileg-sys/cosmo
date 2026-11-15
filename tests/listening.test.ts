@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { listeningPillMode, quoteForPill, type ListeningPillInput } from "@/components/checkin/listening";
+import {
+  handsFreeAllowed,
+  listeningPillMode,
+  pillQuoteSource,
+  quoteForPill,
+  type ListeningPillInput,
+} from "@/components/checkin/listening";
 import { checkInReducer, initialCheckInState } from "@/components/checkin/state";
 
 const idle: ListeningPillInput = { recording: false, heard: false, busy: false, speech: "idle", transcribing: false };
@@ -50,5 +56,53 @@ describe("quoteForPill", () => {
     expect(q!.length).toBeLessThanOrEqual(40);
     expect(q!.endsWith("…")).toBe(true);
     expect(q).toBe("I slept about seven hours but I woke up…");
+  });
+});
+
+describe("handsFreeAllowed: the barge-in recording becomes normal listening only when hands-free listening may go on", () => {
+  const ok = {
+    conversationMode: true,
+    micUsable: true,
+    ready: true,
+    canTalk: true,
+    keyboardOpen: false,
+    blocked: false,
+    finished: false,
+    busy: false,
+    demoRunning: false,
+  };
+
+  it("allows it in an ordinary hands-free check-in", () => {
+    expect(handsFreeAllowed(ok)).toBe(true);
+  });
+
+  it("not with the text field open, hands-free off, a finished check-in, a demo, a blocked player or a turn in flight", () => {
+    expect(handsFreeAllowed({ ...ok, keyboardOpen: true })).toBe(false);
+    expect(handsFreeAllowed({ ...ok, conversationMode: false })).toBe(false);
+    expect(handsFreeAllowed({ ...ok, finished: true })).toBe(false);
+    expect(handsFreeAllowed({ ...ok, demoRunning: true })).toBe(false);
+    expect(handsFreeAllowed({ ...ok, blocked: true })).toBe(false);
+    expect(handsFreeAllowed({ ...ok, busy: true })).toBe(false);
+    expect(handsFreeAllowed({ ...ok, micUsable: false })).toBe(false);
+    expect(handsFreeAllowed({ ...ok, canTalk: false })).toBe(false);
+    expect(handsFreeAllowed({ ...ok, ready: false })).toBe(false);
+  });
+});
+
+describe("pillQuoteSource: the pill quotes the words of the turn in flight", () => {
+  it("typed text in flight wins over an older crew line at the end of the transcript", () => {
+    expect(pillQuoteSource({ text: "how much water should I drink?" }, { speaker: "crew", text: "8 hours" })).toBe(
+      "how much water should I drink?",
+    );
+  });
+
+  it("a voice turn still being transcribed quotes nothing; once transcribed, its line is quoted", () => {
+    expect(pillQuoteSource({ text: "" }, { speaker: "crew", text: "an older line" })).toBeNull();
+    expect(pillQuoteSource(null, { speaker: "crew", text: "1.5 литр" })).toBe("1.5 литр");
+  });
+
+  it("never quotes Cosmo's own words", () => {
+    expect(pillQuoteSource(null, { speaker: "cosmo", text: "How did you sleep?" })).toBeNull();
+    expect(pillQuoteSource(null, null)).toBeNull();
   });
 });

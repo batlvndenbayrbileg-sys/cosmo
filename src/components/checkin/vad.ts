@@ -201,6 +201,18 @@ export function createVadState(): VadState {
 }
 
 /**
+ * The barge-in recording (open while Cosmo spoke) becomes normal listening on the same microphone: Cosmo finished and
+ * nobody spoke over her. The room is NOT measured again: calibration counts its first 300 ms as the room, so a person
+ * who answers the moment she stops ("тийм", "yes") would be measured as the room and the answer would never start (the
+ * mic then waited 30 s). The floor learned under her voice is kept, capped so the threshold starts at the base
+ * threshold (that floor included her echo); quiet frames keep adapting it as usual.
+ */
+export function handOverVadState(state: VadState, config: VadConfig = DEFAULT_VAD_CONFIG): VadState {
+  const cap = config.threshold / Math.max(1, config.noiseMultiplier);
+  return { ...createVadState(), calibratedMs: config.calibrationMs, noiseFloor: Math.min(state.noiseFloor, cap) };
+}
+
+/**
  * The quiet that ends the utterance now: the full `silenceMs` after a short answer (a pause there is usually thinking),
  * falling linearly to `trailSilenceMs` once `longSpeechMs` of voice was heard (a long answer that stops is finished).
  */

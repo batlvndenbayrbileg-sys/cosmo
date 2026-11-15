@@ -5,6 +5,7 @@ import {
   createVadState,
   effectiveThreshold,
   endSilenceMs,
+  handOverVadState,
   rmsFromSamples,
   stepVad,
   voicingFromSpectrum,
@@ -503,5 +504,66 @@ describe("stepVad: adaptive end of speech", () => {
     for (let i = 0; i < 20; i++) clatter.push([0.25, false, 100], hush(150));
     expect(play(clatter).signals).toEqual([]);
     expect(play([[0.3, true, 100], hush(3000)]).signals).toEqual([]);
+  });
+});
+
+/* ───────────── barge-in -> normal listening on the same microphone (Cosmo finished, nobody spoke over her) ───────────── */
+
+describe("handOverVadState: an answer given the moment Cosmo stops is heard", () => {
+  const BARGE: VadConfig = { ...DEFAULT_VAD_CONFIG, ...BARGE_IN_VAD };
+  /** 3 s of Cosmo's echo under the barge-in VAD (voiced, with gaps between words) */
+  function underCosmo(): VadState {
+    let s = createVadState();
+    for (let i = 0; i < 10; i++) {
+      for (let t = 0; t < 250; t += FRAME_MS) s = stepVad(s, { rms: 0.025, dtMs: FRAME_MS, voiced: true }, BARGE).state;
+      s = stepVad(s, { rms: 0.006, dtMs: FRAME_MS, voiced: false }, BARGE).state;
+    }
+    return s;
+  }
+  /** "тийм" (300 ms of voice) right away, then the room */
+  function answer(start: VadState, level: number): VadSignal[] {
+    let s = start;
+    const signals: VadSignal[] = [];
+    const frames = [
+      ...Array.from({ length: 6 }, () => ({ rms: level, voiced: true })),
+      ...Array.from({ length: 80 }, () => ({ rms: 0.004, voiced: false })),
+    ];
+    for (const f of frames) {
+      const step = stepVad(s, { ...f, dtMs: FRAME_MS }, DEFAULT_VAD_CONFIG);
+      s = step.state;
+      if (step.signal !== "none") signals.push(step.signal);
+    }
+    return signals;
+  }
+
+  it("a soft one-word answer at once is sent (a fresh room calibration measured it as the room and waited 30 s)", () => {
+    const cosmo = underCosmo();
+    expect(cosmo.phase).toBe("waiting");
+    for (const level of [0.04, 0.06]) {
+      expect(answer(createVadState(), level)).toEqual([]); // the bug: calibration swallowed the answer
+      expect(answer(handOverVadState(cosmo, DEFAULT_VAD_CONFIG), level)).toEqual(["speech_start", "utterance_end"]);
+    }
+  });
+
+  it("starts with calibration done and a floor capped at the base threshold (the echo floor is not kept)", () => {
+    const loudEcho = { ...createVadState(), noiseFloor: 0.08, calibratedMs: 400 };
+    const s = handOverVadState(loudEcho, DEFAULT_VAD_CONFIG);
+    expect(s.phase).toBe("waiting");
+    expect(s.calibratedMs).toBe(DEFAULT_VAD_CONFIG.calibrationMs);
+    expect(effectiveThreshold(s, DEFAULT_VAD_CONFIG)).toBeCloseTo(DEFAULT_VAD_CONFIG.threshold, 6);
+    expect(s.waitedMs).toBe(0);
+    // a quiet room's own floor is kept as it is
+    expect(handOverVadState({ ...loudEcho, noiseFloor: 0.003 }).noiseFloor).toBe(0.003);
+  });
+
+  it("noise after the handover still does not start speech (a fan, keyboard clatter)", () => {
+    let s = handOverVadState(underCosmo(), DEFAULT_VAD_CONFIG);
+    const signals: VadSignal[] = [];
+    for (let i = 0; i < 60; i++) {
+      const step = stepVad(s, { rms: i % 3 === 0 ? 0.25 : 0.03, dtMs: FRAME_MS, voiced: false });
+      s = step.state;
+      if (step.signal !== "none") signals.push(step.signal);
+    }
+    expect(signals).toEqual([]);
   });
 });
