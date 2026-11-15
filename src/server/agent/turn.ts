@@ -54,6 +54,7 @@ import { createLocalAgent } from "./localLlm";
 import { localLlmConfig } from "./localLlmConfig";
 import { TieredAgent, logTier, type Tier } from "./tieredAgent";
 import { answerAskedQuestion, detectAskedQuestion, isHealthTopic, questionFacts, questionTopicOf, type AskedKind } from "./questions";
+import { answerReferenceQuestion, withReferenceCaveat } from "./questions";
 import type { Baseline } from "@/lib/health/baseline";
 import { buildResultsFacts, numeralsAreGrounded, type ResultsFacts } from "./resultsFacts";
 import { answerSignatureQuestion, insertBeforeDisclaimer, panelClockDay, signatureFollowUp } from "./signature";
@@ -266,7 +267,7 @@ export function askedQuestionReply(
     const lead = leadingStatements(asked.answer);
     const facts = join(questionFacts(about, lang, baselines), about === expected ? "" : questionFacts(expected, lang, baselines));
     if (lead.length > 0 && isSaneAskedAnswer(lead, facts, userText, prompt)) {
-      return join(lead, prompt);
+      return join(withReferenceCaveat(lead, userText, lang), prompt);
     }
   }
   if (asked.kind === "other" && !detected) return null;
@@ -656,6 +657,9 @@ async function* runTurnInner(args: RunTurnArgs, started: number): AsyncGenerator
   // the personal history (baselines) is needed both to answer a question asked back and to judge new values
   const history14 = await loadHistory(crewId, checkIn.localDate);
   const baselines = computeBaselines(history14);
+  // "what is a normal heart rate?" / "is 85 a good pulse?": the general resting-adult range (vital_reference.json), the
+  // value asked about or today's, and the person's own average, at any point of the check-in (null otherwise)
+  const reference = answerReferenceQuestion(text, lang, { baselines, today: today.values });
 
   /* ── 1. the agent proposes what it heard ── */
   const primary = args.agent ?? defaultAgent();
@@ -793,6 +797,11 @@ async function* runTurnInner(args: RunTurnArgs, started: number): AsyncGenerator
         askedReply = ctx0.proposed ? join(midCheckInSignature, TEMPLATES_EXTRA.proposeShort[lang]) : midCheckInSignature;
         break;
       }
+      if (reference) {
+        // a general-range question in small talk is answered (never set aside), then the proposal, if open, again
+        askedReply = ctx0.proposed ? join(reference.text, TEMPLATES_EXTRA.proposeShort[lang]) : reference.text;
+        break;
+      }
       // after "shall we log today's measurements?" a question back ("how fast is the station?") is answered and the
       // proposal asked again; it is never taken for a yes
       const start = decision.startAnswer ?? "unclear";
@@ -808,6 +817,10 @@ async function* runTurnInner(args: RunTurnArgs, started: number): AsyncGenerator
       } else if (midCheckInSignature && expected !== null) {
         // "what does my blood panel mean?" mid check-in: Signature Triage answers, then the open question again
         askedReply = join(midCheckInSignature, getQuestion(expected).prompts[lang]);
+      } else if (reference && expected !== null && failures.length === 0 && !decision.skip && !decision.asked?.answer) {
+        // "what should my oxygen be?" / "is 85 a good pulse?" mid check-in: the general range, then the open question
+        // again (a model-worded answer, when there is one, takes the asked-question path below)
+        askedReply = join(reference.text, getQuestion(expected).prompts[lang]);
       } else if (expected !== null) {
         const restated = [...alreadyRecorded, ...(decision.restated ?? [])];
         const modelAsked = (decision.clarifications?.length ?? 0) > 0 || (decision.rejected?.length ?? 0) > 0;
@@ -996,8 +1009,8 @@ async function* runTurnInner(args: RunTurnArgs, started: number): AsyncGenerator
         !namesConditionOrDrug(answer) &&
         !/\p{Extended_Pictographic}/u.test(answer) &&
         numeralsAreGrounded(answer, facts, text)
-          ? answer
-          : offlineResultsAnswer(facts, lang);
+          ? withReferenceCaveat(answer, text, lang)
+          : (reference?.text ?? offlineResultsAnswer(facts, lang));
     }
     // the model's wording replaces the template only where the machine leaves room for it: never when a question was
     // just skipped (the template carries the "add it at the confirmation" notice), never at the read-back
