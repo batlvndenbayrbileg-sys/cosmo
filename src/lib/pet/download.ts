@@ -3,8 +3,9 @@
  * are hosted elsewhere and named by two public env vars:
  *   NEXT_PUBLIC_LIL_COSMO_URL      the Windows portable .exe
  *   NEXT_PUBLIC_LIL_COSMO_MAC_URL  the macOS .dmg
- * Unset (or not a usable address): that platform has no download and the button says "coming soon" instead of
- * linking to a file that is not there.
+ * Unset (or not a usable address): Windows falls back to the build on the project's GitHub Releases
+ * (DEFAULT_WINDOWS_PET_URL); macOS has no download and the button says "coming soon" instead of linking to a file that
+ * is not there.
  */
 
 export type PetPlatform = "windows" | "mac" | "other";
@@ -69,10 +70,17 @@ export function pickPetDownloads(urls: { windows?: string | null; mac?: string |
   return { primary, others: all.filter((d) => d !== primary) };
 }
 
+/**
+ * The Windows build published on the project's GitHub Releases ("latest" always points at the newest release, so a new
+ * build needs no code change). Used when NEXT_PUBLIC_LIL_COSMO_URL is not set. There is no macOS default: a .dmg can
+ * only be built on a Mac, and none is published yet.
+ */
+export const DEFAULT_WINDOWS_PET_URL = "https://github.com/batlvndenbayrbileg-sys/cosmo/releases/latest/download/lil-cosmo.exe";
+
 /** the configured addresses (inlined at build time: NEXT_PUBLIC_* must be read by their full names) */
 export function configuredPetUrls(): { windows: string | null; mac: string | null } {
   return {
-    windows: safeDownloadUrl(process.env.NEXT_PUBLIC_LIL_COSMO_URL),
+    windows: safeDownloadUrl(process.env.NEXT_PUBLIC_LIL_COSMO_URL) ?? DEFAULT_WINDOWS_PET_URL,
     mac: safeDownloadUrl(process.env.NEXT_PUBLIC_LIL_COSMO_MAC_URL),
   };
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { detectPetPlatform, pickPetDownloads, safeDownloadUrl } from "@/lib/pet/download";
+import { DEFAULT_WINDOWS_PET_URL, configuredPetUrls, detectPetPlatform, pickPetDownloads, safeDownloadUrl } from "@/lib/pet/download";
 import { explainLines } from "@/lib/pet/explain";
 import { petCrewParam } from "@/lib/pet/link";
 import { RUN_FPS, RUN_FRAME_COUNT, RUN_FRAMES, runFrameAt } from "@/lib/pet/sprite";
@@ -54,6 +54,23 @@ describe("lil cosmo download: which file", () => {
     for (const platform of ["windows", "mac", "other"] as const) {
       expect(pickPetDownloads({ windows: undefined, mac: "" }, platform)).toEqual({ primary: null, others: [] });
       expect(pickPetDownloads({ windows: "javascript:alert(1)", mac: "   " }, platform)).toEqual({ primary: null, others: [] });
+    }
+  });
+
+  it("falls back to the project's GitHub release for Windows when no address is set; macOS stays 'coming soon'", () => {
+    const before = { win: process.env.NEXT_PUBLIC_LIL_COSMO_URL, mac: process.env.NEXT_PUBLIC_LIL_COSMO_MAC_URL };
+    try {
+      delete process.env.NEXT_PUBLIC_LIL_COSMO_URL;
+      delete process.env.NEXT_PUBLIC_LIL_COSMO_MAC_URL;
+      expect(configuredPetUrls()).toEqual({ windows: DEFAULT_WINDOWS_PET_URL, mac: null });
+      expect(DEFAULT_WINDOWS_PET_URL).toMatch(/^https:\/\/github\.com\/[^/]+\/cosmo\/releases\/latest\/download\/lil-cosmo\.exe$/);
+      process.env.NEXT_PUBLIC_LIL_COSMO_URL = EXE;
+      expect(configuredPetUrls().windows).toBe(EXE);
+    } finally {
+      if (before.win === undefined) delete process.env.NEXT_PUBLIC_LIL_COSMO_URL;
+      else process.env.NEXT_PUBLIC_LIL_COSMO_URL = before.win;
+      if (before.mac === undefined) delete process.env.NEXT_PUBLIC_LIL_COSMO_MAC_URL;
+      else process.env.NEXT_PUBLIC_LIL_COSMO_MAC_URL = before.mac;
     }
   });
 
