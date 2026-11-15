@@ -33,6 +33,14 @@ export function StayWithArt({ talk = false }: { talk?: boolean }) {
   );
 }
 
+export function StayArt() {
+  return <StayWithArt />;
+}
+
+export function ReassureArt() {
+  return <StayWithArt talk />;
+}
+
 /** keep watching: a person lying down, a helper beside them, an eye above */
 export function WatchArt() {
   return (
