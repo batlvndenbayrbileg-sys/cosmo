@@ -7,6 +7,7 @@ import { dashboardStrings } from "./strings/dashboard";
 import { earthStrings } from "./strings/earth";
 import { emergencyStrings } from "./strings/emergency";
 import { sosStrings } from "./strings/sos";
+import { painStrings } from "./strings/pain";
 import { signatureStrings } from "./strings/signature";
 import { labsStrings } from "./strings/labs";
 import { listenStrings } from "./strings/listen";
@@ -34,10 +35,10 @@ export const areaDictionaries = {
     mn: { ...dashboardStrings.mn, ...signatureStrings.mn, ...labsStrings.mn, ...showDashboard.mn },
   },
   earth: earthStrings,
-  // SOS to Earth keys ("emergency.sos.*") live in the emergency area
+  // SOS to Earth keys ("emergency.sos.*") and the pain check ("emergency.pain.*") live in the emergency area
   emergency: {
-    en: { ...emergencyStrings.en, ...sosStrings.en },
-    mn: { ...emergencyStrings.mn, ...sosStrings.mn },
+    en: { ...emergencyStrings.en, ...sosStrings.en, ...painStrings.en },
+    mn: { ...emergencyStrings.mn, ...sosStrings.mn, ...painStrings.mn },
   },
 } as const satisfies Record<string, AreaDicts>;
 

@@ -44,6 +44,8 @@ import { EMERGENCY_REQUEST_EVENT } from "@/components/emergency/EmergencyGuidePa
 import { useEmergencyLibrary } from "@/components/emergency/hooks";
 import { matchEmergency } from "@/lib/emergency";
 import { SosStatus, sendSosToEarth } from "@/components/sos";
+import { PainStage } from "@/components/pain/PainStage";
+import { detectPain } from "@/lib/pain/detect";
 import { ShieldAlert } from "lucide-react";
 import { bubbleItems, computeStageLayout } from "./bubbles";
 import type { CheckInError } from "./state";
@@ -597,13 +599,15 @@ export function CheckInExperience() {
       const line = lines[i];
       if (line.speaker !== "crew") continue;
       const hit = matchEmergency(line.text, emergencyLib);
-      if (hit && !emergency.open) {
+      // "my chest hurts": the pain check (src/components/pain) shows the body and the data first and opens the guide
+      // after Cosmo's line; while talking (friend mode) the guide still opens at once
+      if (hit && !emergency.open && (state.companion || !detectPain(line.text))) {
         openEmergency(hit.scenarioId);
         break;
       }
     }
     checkedLines.current = lines.length;
-  }, [state.transcript, emergencyLib, emergency.open, openEmergency]);
+  }, [state.transcript, state.companion, emergencyLib, emergency.open, openEmergency]);
 
   const emergencyUi = (where: "conversation" | "dashboard") => (
     <>
@@ -638,6 +642,15 @@ export function CheckInExperience() {
         ) : null}
       </AnimatePresence>
       {emergency.open ? null : <SosStatus variant="floating" checkInId={checkInIdNow} lang={state.language ?? lang} />}
+      {/* "it hurts": the body map, the related data, the guide and the report to Earth (pain event) */}
+      <PainStage
+        speech={state.speech}
+        busy={state.busy}
+        onSay={handleSendText}
+        onOpenGuide={openEmergency}
+        guides={emergencyLib}
+        mascotVariant={crew?.mascotVariant}
+      />
     </>
   );
 

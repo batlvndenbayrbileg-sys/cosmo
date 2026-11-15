@@ -26,6 +26,7 @@ import {
   type TurnEvent,
 } from "@/lib/types";
 import { SOS_PHOTO_STATUSES } from "@/lib/sos";
+import { parsePainEvent } from "@/lib/pain/parse";
 
 export interface SseMessage {
   /** value of the `event:` field, "message" when absent */
@@ -258,6 +259,10 @@ function validateTurnEvent(type: string, raw: Rec): TurnEvent | null {
         duplicate: raw.duplicate === true,
         photoStatus: isOneOf(SOS_PHOTO_STATUSES, raw.photoStatus) ? raw.photoStatus : null,
       };
+    }
+    case "pain": {
+      const data = parsePainEvent(raw);
+      return data ? { type, ...data } : null;
     }
     case "done":
       return { type };

@@ -4,6 +4,7 @@
  * Source of truth for the question set and the dashboard: docs/DASHBOARD_PLAN.md
  */
 import type { ShowPanel } from "./show";
+import type { PainEventData } from "./pain/types";
 
 export type Lang = "mn" | "en";
 export type Bilingual = Record<Lang, string>;
@@ -384,4 +385,6 @@ export type TurnEvent =
       /** SosPhotoStatus (src/lib/sos) */
       photoStatus: "pending" | "attached" | "denied" | "unavailable" | null;
     }
+  /** "it hurts": the body map, the related data, the guide and the report to Earth (src/lib/pain) */
+  | ({ type: "pain" } & PainEventData)
   | { type: "done" };
