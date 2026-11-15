@@ -31,6 +31,20 @@ export async function register(): Promise<void> {
     if (missing.length > 0) {
       console.warn(`[aegis] live mode is missing: ${missing.join(", ")}; the app falls back to text where it can`);
     }
+    // optional local model (never set on Vercel): only looked at when configured. localLlmConfig has no runtime
+    // imports, so this hook never loads the agent, the Anthropic SDK or the database
+    if (env.localLlmUrl || env.localLlmModel) {
+      const { localLlmStatus } = await import("@/server/agent/localLlmConfig");
+      const local = localLlmStatus(env);
+      if (local.kind === "on") {
+        console.info(
+          `[aegis] local llm configured (${local.config.model}, timeout ${local.config.timeoutMs} ms): ` +
+            (ready.llm ? "used when Claude is unavailable" : "used instead of Claude"),
+        );
+      } else if (local.kind === "refused") {
+        console.warn(`[aegis] local llm not used: ${local.reason}`);
+      }
+    }
   }
   console.info(`[aegis] mission start date ${env.missionStartDate}, database ${env.dbPath}`);
 

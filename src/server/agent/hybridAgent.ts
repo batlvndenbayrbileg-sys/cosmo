@@ -75,6 +75,8 @@ export class HybridAgent implements Agent {
   constructor(
     private readonly live: Agent,
     rules?: Agent,
+    /** optional: told when a turn was decided by the rules alone (the tiered local-model setup logs it) */
+    private readonly onFastPath?: () => void,
   ) {
     this.rules = rules ?? new ScriptedAgent();
   }
@@ -82,7 +84,10 @@ export class HybridAgent implements Agent {
   async decide(args: AgentArgs): Promise<AgentDecision> {
     const fromRules = await this.rules.decide(args);
     const verdict = fastPathVerdict(args, fromRules);
-    if (verdict.fast) return { ...fromRules, llmMs: 0 };
+    if (verdict.fast) {
+      this.onFastPath?.();
+      return { ...fromRules, llmMs: 0 };
+    }
     // may throw LlmUnavailable: the pipeline then falls back to the scripted agent for this turn
     return this.live.decide(args);
   }

@@ -54,6 +54,16 @@ export interface ClaudeAgentOptions {
    * message (keeps the cached prefix); "user" puts it in the user turn, for a model that rejects system messages.
    */
   directiveRole?: "system" | "user";
+  /**
+   * The wording methods (companionReply, answerAboutResults, phraseSummary) normally return null on any failure. With
+   * this set, a refusal is thrown as LlmUnavailable("refusal") instead, so a TieredAgent can tell it apart from "no
+   * text" and stop at the templates rather than asking a weaker model to write what Claude refused to.
+   */
+  surfaceRefusals?: boolean;
+}
+
+export function isRefusal(err: unknown): err is LlmUnavailable {
+  return err instanceof LlmUnavailable && err.reason === "refusal";
 }
 
 const INFORMATIONAL_TOOLS = new Set(["get_baseline", "compose_summary"]);
@@ -126,6 +136,7 @@ export class ClaudeAgent implements Agent {
   private readonly modelOverride: string | undefined;
   private readonly timeoutMs: number;
   private readonly directiveRole: "system" | "user";
+  private readonly surfaceRefusals: boolean;
   private lazyClient: LlmClient | null | undefined;
 
   constructor(options: ClaudeAgentOptions = {}) {
@@ -133,6 +144,13 @@ export class ClaudeAgent implements Agent {
     this.modelOverride = options.model;
     this.timeoutMs = options.timeoutMs ?? REQUEST_TIMEOUT_MS;
     this.directiveRole = options.directiveRole ?? "system";
+    this.surfaceRefusals = options.surfaceRefusals ?? false;
+  }
+
+  /** a wording call that failed: null (the template), or the refusal itself when surfaceRefusals is set */
+  private noText(err: unknown): null {
+    if (this.surfaceRefusals && isRefusal(err)) throw err;
+    return null;
   }
 
   private client(): LlmClient {
@@ -361,8 +379,8 @@ export class ClaudeAgent implements Agent {
       const message = await this.call([{ role: "user", content: prompt }]);
       const out = textOf(message).trim();
       return out.length > 0 ? out : null;
-    } catch {
-      return null;
+    } catch (err) {
+      return this.noText(err);
     }
   }
 
@@ -382,8 +400,8 @@ export class ClaudeAgent implements Agent {
       const message = await this.call(this.withDirective(buildMessages(args.history, args.text), directive));
       const out = textOf(message).trim();
       return out.length > 0 ? out : null;
-    } catch {
-      return null;
+    } catch (err) {
+      return this.noText(err);
     }
   }
 
@@ -408,8 +426,8 @@ export class ClaudeAgent implements Agent {
       const message = await this.call([{ role: "user", content: prompt }]);
       const out = textOf(message);
       return out.length > 0 ? out : null;
-    } catch {
-      return null;
+    } catch (err) {
+      return this.noText(err);
     }
   }
 }
