@@ -435,6 +435,52 @@ export function hasDisclaimer(text: string, lang: Lang): boolean {
   return text.trim().endsWith(SIGNATURE_DISCLAIMER[lang]);
 }
 
+/* ───────────── T10 fix: the answer carries the action and, where it changes the action, the badge ───────────── */
+
+/** words of the spec 7.3 / addendum 2 actions (re-test, rest, fluids, sleep, symptom check, temperature, flight surgeon, draw) */
+const ACTION_CUE: Readonly<Record<Lang, RegExp>> = {
+  en: /\bre-?test|\brepeat|\brest\b|\bfluids?\b|\bsleep\b|\bsymptom|\btemperature|\bflight surgeon|\bdraw\b|\blook again|\breport\b/iu,
+  mn: /давт|амр|шингэн|унт|шинж тэмдг|температур|нислэгийн эмч|цус ав|дахин харах|мэдэгд|хэлэх/iu,
+};
+
+/** SINGLE_ASSAY: the two tests do not agree */
+const SINGLE_ASSAY_CUE: Readonly<Record<Lang, RegExp>> = {
+  en: /only one of (?:the )?two (?:tests|assays)|disagree|the other (?:test|assay|one)\b/iu,
+  mn: /зөвхөн нэг|зөрж/iu,
+};
+
+/** TWO_ASSAY_CONFIRMED: a second, independent test agrees */
+const TWO_ASSAY_CUE: Readonly<Record<Lang, RegExp>> = {
+  en: /\bboth\b|\bsecond,? (?:independent )?(?:test|assay)|\btwo (?:independent )?(?:tests|assays)\b[^.!?]*\b(?:agree|match|confirm)/iu,
+  mn: /хоёр дахь|бие даасан хоёр|хоёуланд|таарч/iu,
+};
+
+/**
+ * The model's wording of a triage answer must also carry what the template carries where it matters (build prompt T6
+ * "one action"; addendum section 2): for EXPECTED_FLIGHT_RESPONSE and UNEXPECTED_ACTIVATION at least one action of the
+ * action table, and for UNEXPECTED_ACTIVATION with a second-assay badge the badge sentence (both tests agree, or only
+ * one of two tests shows it), because there the badge decides the action (escalate, or repeat the measurement and do not
+ * escalate); a SINGLE_ASSAY answer may not claim agreement and a TWO_ASSAY_CONFIRMED answer may not claim disagreement.
+ * BASELINE, INDETERMINATE and INSUFFICIENT need no action ("none; next routine check"). On failure the template is sent.
+ */
+export function answerCoversPanel(
+  text: string,
+  facts: Pick<SignatureFacts, "class" | "secondAssay">,
+  lang: Lang,
+): boolean {
+  const t = text.split(SIGNATURE_DISCLAIMER[lang]).join(" ");
+  const needsAction = facts.class === "EXPECTED_FLIGHT_RESPONSE" || facts.class === "UNEXPECTED_ACTIVATION";
+  if (needsAction && !ACTION_CUE[lang].test(t)) return false;
+  const badge = facts.secondAssay?.badge ?? null;
+  if (facts.class === "UNEXPECTED_ACTIVATION" && badge === "SINGLE_ASSAY") {
+    if (!SINGLE_ASSAY_CUE[lang].test(t) || TWO_ASSAY_CUE[lang].test(t)) return false;
+  }
+  if (facts.class === "UNEXPECTED_ACTIVATION" && badge === "TWO_ASSAY_CONFIRMED") {
+    if (!TWO_ASSAY_CUE[lang].test(t) || SINGLE_ASSAY_CUE[lang].test(t)) return false;
+  }
+  return true;
+}
+
 /** phrases that contain a forbidden word but are not a verdict (spec template sentences, copied verbatim) */
 const ALLOWED_PHRASES = [/normal fluids/giu, /шингэнээ хэвийн ууж/giu];
 

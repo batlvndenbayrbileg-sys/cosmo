@@ -14,6 +14,7 @@ import {
 import { median, scorePanel } from "@/lib/signature/engine";
 import {
   SIGNATURE_DISCLAIMER,
+  answerCoversPanel,
   assertNumbersGrounded,
   buildDrawFacts,
   buildFacts,
@@ -377,7 +378,9 @@ export async function answerSignatureQuestion(p: {
   if (worded && !assertNoOrbitClaim(worded)) {
     return { text: orbitClaimFallback(p.lang), tool, worded: false, llmMs };
   }
-  if (worded && acceptSignatureAnswer(worded, facts, p.lang)) return { text: worded.trim(), tool, worded: true, llmMs };
+  // T10 fix: a triage answer must also carry the action and, where it decides the action, the second-assay badge
+  const covers = (w: string) => facts.kind !== "triage" || answerCoversPanel(w, facts, p.lang);
+  if (worded && acceptSignatureAnswer(worded, facts, p.lang) && covers(worded)) return { text: worded.trim(), tool, worded: true, llmMs };
   return { text: template, tool, worded: false, llmMs };
 }
 
