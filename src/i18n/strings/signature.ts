@@ -150,6 +150,14 @@ export const signatureStrings: AreaDicts = {
     "dashboard.signature.ev.kimRef": "Kim J. et al., Nature Communications 2024, DOI {doi}",
     "dashboard.signature.ev.n": "n = {n}, descriptive only.",
 
+    "dashboard.signature.space.caption": "Scored on ground laboratory panels",
+    "dashboard.signature.space.title": "Can this be measured in space?",
+    "dashboard.signature.ev.twins.title": "Different mission, same direction (n = 1)",
+    "dashboard.signature.ev.twins.study": "NASA Twins Study: one astronaut, one year on the ISS.",
+    "dashboard.signature.ev.twins.limits":
+      "Limits: one person, a one-year mission, and an assay we did not compare with ours. It supports the direction of the core triad, not the thresholds.",
+    "dashboard.signature.ev.twins.ref": "Gertz M. L. et al., Cell Reports 2020, DOI {doi}",
+
     "dashboard.signature.sa.label": "Second assay",
     "dashboard.signature.sa.badge.TWO_ASSAY_CONFIRMED": "Confirmed by two assays",
     "dashboard.signature.sa.badge.SINGLE_ASSAY": "Single assay",
@@ -313,6 +321,14 @@ export const signatureStrings: AreaDicts = {
     "dashboard.signature.ev.dataset": "NASA OSDR {id}, DOI {doi}",
     "dashboard.signature.ev.kimRef": "Kim J. нар, Nature Communications 2024, DOI {doi}",
     "dashboard.signature.ev.n": "n = {n}, зөвхөн тодорхойлох шинжилгээ.",
+
+    "dashboard.signature.space.caption": "Дэлхий дээрх лабораторийн хариугаар оноо өгсөн",
+    "dashboard.signature.space.title": "Үүнийг сансарт хэмжиж болох уу?",
+    "dashboard.signature.ev.twins.title": "Өөр нислэг, ижил чиглэл (n = 1)",
+    "dashboard.signature.ev.twins.study": "NASA-гийн Ихрүүдийн судалгаа: нэг сансрын нисгэгч, Олон улсын сансрын станц дээр нэг жил.",
+    "dashboard.signature.ev.twins.limits":
+      "Хязгаарлалт: нэг хүн, нэг жилийн нислэг, мөн бидний шинжилгээтэй харьцуулаагүй арга. Энэ нь үндсэн гурван үзүүлэлтийн чиглэлийг дэмждэг, босго утгыг биш.",
+    "dashboard.signature.ev.twins.ref": "Gertz M. L. нар, Cell Reports 2020, DOI {doi}",
 
     "dashboard.signature.sa.label": "Хоёр дахь шинжилгээ",
     "dashboard.signature.sa.badge.TWO_ASSAY_CONFIRMED": "Хоёр шинжилгээгээр батлагдсан",

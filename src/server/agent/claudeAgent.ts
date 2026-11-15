@@ -12,7 +12,7 @@ import { detectAskedQuestion } from "./questions";
 import type { ClarifyReason } from "./templates";
 import { TOOL_DEFINITIONS, type ToolResult } from "./tools";
 import type { ResultsFacts } from "./resultsFacts";
-import { SIGNATURE_PROMPT_ADDITION, type SignatureAnswerArgs } from "./signature";
+import { SIGNATURE_PROMPT_ADDITION, SPACE_PROMPT_ADDITION, SPACE_TOOL_NAME, type SignatureAnswerArgs } from "./signature";
 
 /**
  * The live agent: Claude through the Messages API with tool use (docs/PLAN.md sections 4.2 to 4.4).
@@ -392,11 +392,18 @@ export class ClaudeAgent implements Agent {
    */
   async answerAboutSignature(args: SignatureAnswerArgs): Promise<string | null> {
     const { tool, facts, question, lang } = args;
+    // T14: a space-measurability question is answered from the three statements only (no numbers, no disclaimer rule)
+    const space = tool === SPACE_TOOL_NAME;
     const prompt = [
       "DIRECTIVE (written by the system, not by the astronaut)",
-      "state: DONE - the daily check-in is complete; the astronaut asks about a blood panel or a blood draw (Signature Triage).",
+      space
+        ? "state: DONE - the daily check-in is complete; the astronaut asks whether these blood markers can be measured in space."
+        : "state: DONE - the daily check-in is complete; the astronaut asks about a blood panel or a blood draw (Signature Triage).",
       `reply_language: ${lang === "mn" ? "Mongolian (Cyrillic)" : "English"}`,
-      `instruction: ${SIGNATURE_PROMPT_ADDITION}`,
+      space
+        ? "instruction: Use only sentences of the tool result, copied exactly; you may leave sentences out, never add one. No numbers."
+        : `instruction: ${SIGNATURE_PROMPT_ADDITION}`,
+      `instruction: ${SPACE_PROMPT_ADDITION}`,
       "Speak calmly and kindly. The panels are Inspiration4 reference data (NASA OSDR); never present them as the astronaut's own blood. Quote numbers exactly as written in the tool result. Never diagnose, never name a disease, drug, dose or treatment. Do not call any tool.",
       `tool_called: ${tool}`,
       `tool_result: ${JSON.stringify(facts)}`,

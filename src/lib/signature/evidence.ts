@@ -205,3 +205,6 @@ export function buildSecondAssayEvidence(
     il6Panels: { sameSign: ref.il6_16_panels.same_sign, n: Object.keys(ref.panels).length, spearman: ref.il6_16_panels.spearman },
   };
 }
+
+/** spec section 11, paper 9 (NASA Twins Study landing signature; spec section 8 item 4b, static text in the Evidence card) */
+export const TWINS_STUDY_DOI = "10.1016/j.celrep.2020.108429";

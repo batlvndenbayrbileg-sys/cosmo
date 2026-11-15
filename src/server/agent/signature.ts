@@ -31,6 +31,14 @@ import {
 import { drawAdvice, drawStateFromPanels, dssSeries, strainDayFromKpis, strainDaysFromHistory } from "@/lib/signature/strain";
 import type { PanelResult, Timepoint } from "@/lib/signature/types";
 import { scorePanelWithSecondAssay } from "@/lib/signature/secondAssay";
+import {
+  assertNoOrbitClaim,
+  buildSpaceFacts,
+  onlyStatementSentences,
+  orbitClaimFallback,
+  spaceStatements,
+  type SpaceFacts,
+} from "@/lib/signature/spaceMeasurability";
 import { getLabData, tryLoadSecondAssay } from "@/server/signature/files";
 import { namesConditionOrDrug } from "./companion";
 
@@ -89,6 +97,59 @@ export const SIGNATURE_TOOL_DEFINITIONS: readonly Anthropic.Tool[] = Object.free
 /** build prompt T6, verbatim: rides in the signature directive after the frozen system prompt */
 export const SIGNATURE_PROMPT_ADDITION =
   "Use only numbers present in the tool result. At most five sentences, one action, end with: Decision support, not a diagnosis. / Энэ бол шийдвэр гаргахад туслах мэдээлэл, онош биш.";
+
+/* ───────────── T14: get_space_measurability (spec section 8.1) ───────────── */
+
+/**
+ * The third Cosmo signature tool. Kept beside, not inside, SIGNATURE_TOOL_DEFINITIONS (whose two names are pinned by the
+ * T6 tests) and, like them, outside the frozen check-in tool list.
+ */
+export const SPACE_TOOL_NAME = "get_space_measurability" as const;
+export type SpaceToolName = typeof SPACE_TOOL_NAME;
+
+export const SPACE_TOOL_DEFINITION: Anthropic.Tool = Object.freeze({
+  name: SPACE_TOOL_NAME,
+  description:
+    "Returns the three fixed statements (S1-S3) about measuring these blood markers in space, in orbit or on the ISS, in the session language. Answer only from them; never claim in-flight measurement.",
+  strict: true,
+  input_schema: { type: "object", properties: {}, required: [], additionalProperties: false },
+} as Anthropic.Tool);
+
+/** build prompt T14, verbatim: rides in the signature directive after the frozen system prompt, like the T6 addition */
+export const SPACE_PROMPT_ADDITION =
+  "For questions about measuring in space, in orbit or on the ISS, call get_space_measurability and answer only from its result.";
+
+/** `get_space_measurability()`: the three statements for the session language */
+export function executeSpaceTool(input: unknown, lang: Lang): { ok: true; name: SpaceToolName; data: SpaceFacts } | { ok: false; name: SpaceToolName; code: "bad_input"; error: string } {
+  const parsed = z.object({}).strict().safeParse(input ?? {});
+  if (!parsed.success) return { ok: false, name: SPACE_TOOL_NAME, code: "bad_input", error: "Invalid input" };
+  return { ok: true, name: SPACE_TOOL_NAME, data: buildSpaceFacts(lang) };
+}
+
+const SPACE_PLACE_EN = /\b(?:in\s+(?:orbit|space|flight)|in-flight|on\s+(?:the\s+)?(?:ISS|space\s+station|orbit)|on\s*board|onboard|aboard)\b/iu;
+const SPACE_VERB_EN = /\b(?:measur\w*|test\w*|track\w*|monitor\w*|analy[sz]\w*|detect\w*|scor\w*|run\b)/iu;
+const SPACE_MN = /(тойрог зам|сансар|сансрын станц|нислэгийн үеэр)[^.?!]{0,60}(хэмж|шинж|тоол)|(хэмж|шинж|тоол)[^.?!]{0,60}(тойрог зам|сансар|сансрын станц)/iu;
+
+/** is the utterance about measuring in space / in orbit / on the ISS? (checked before the panel and draw intents) */
+export function detectSpaceIntent(text: string): boolean {
+  if (SPACE_MN.test(text)) return true;
+  return SPACE_PLACE_EN.test(text) && SPACE_VERB_EN.test(text);
+}
+
+/** the answer to a space question without (or after rejected) model wording: S1-S3 */
+export function renderSpaceTemplate(lang: Lang): string {
+  return spaceStatements(lang).join(" ");
+}
+
+/** model wording of a space answer: only statement sentences (shorten, never add), no number, no orbit claim */
+export function acceptSpaceAnswer(text: string, lang: Lang): boolean {
+  const t = text.trim();
+  if (t.length === 0 || t.length > MAX_SIGNATURE_CHARS) return false;
+  if (!onlyStatementSentences(t, lang)) return false;
+  if (!assertNumbersGrounded(t, { allowedNumbers: [] })) return false;
+  if (!assertNoOrbitClaim(t)) return false;
+  return !hasForbiddenWording(t);
+}
 
 const INPUTS = {
   get_signature_triage: z.object({ crew_id: z.string(), panel_id: z.string().optional() }).strict(),
@@ -257,6 +318,8 @@ export function acceptSignatureAnswer(text: string, facts: { allowedNumbers: rea
   if (/\p{Extended_Pictographic}/u.test(t)) return false;
   if (!hasDisclaimer(t, lang)) return false;
   if (!assertNumbersGrounded(t, facts)) return false;
+  // T14: next to the number guard, no claim of in-flight measurement
+  if (!assertNoOrbitClaim(t)) return false;
   if (hasForbiddenWording(t)) return false;
   if (namesConditionOrDrug(t.split(SIGNATURE_DISCLAIMER[lang]).join(" "))) return false;
   return true;
@@ -264,15 +327,16 @@ export function acceptSignatureAnswer(text: string, facts: { allowedNumbers: rea
 
 /** what the agent is given to word a signature answer */
 export interface SignatureAnswerArgs {
-  tool: SignatureToolName;
-  facts: SignatureFacts | DrawFacts;
+  tool: SignatureToolName | SpaceToolName;
+  facts: SignatureFacts | DrawFacts | SpaceFacts;
   question: string;
   lang: Lang;
   history: TurnRow[];
 }
 
 /** the template for a tool result */
-export function signatureTemplate(facts: SignatureFacts | DrawFacts, lang: Lang): string {
+export function signatureTemplate(facts: SignatureFacts | DrawFacts | SpaceFacts, lang: Lang): string {
+  if (facts.kind === "space") return renderSpaceTemplate(lang);
   return facts.kind === "triage" ? renderTriageTemplate(facts, lang) : renderDrawTemplate(facts, lang);
 }
 
@@ -280,6 +344,10 @@ export function signatureTemplate(facts: SignatureFacts | DrawFacts, lang: Lang)
  * The DONE-state answer to a question about the blood panel or a blood draw: null when the words are not such a
  * question or the crew member has no reference panels (the caller then answers as before). The model words it when
  * `answer` is given and its text passes `acceptSignatureAnswer`; otherwise the template.
+ *
+ * T14: a question about measuring in space / in orbit / on the ISS is answered from S1-S3 only (get_space_measurability;
+ * model wording only when `acceptSpaceAnswer`), for any crew member. Model wording of a triage or draw answer that
+ * claims in-flight measurement (`assertNoOrbitClaim`, run next to the number guard) is replaced by S1 + S3.
  */
 export async function answerSignatureQuestion(p: {
   crewId: string;
@@ -288,7 +356,8 @@ export async function answerSignatureQuestion(p: {
   ctx: SignatureToolContext;
   history: TurnRow[];
   answer?: (args: SignatureAnswerArgs) => Promise<string | null>;
-}): Promise<{ text: string; tool: SignatureToolName; worded: boolean; llmMs: number } | null> {
+}): Promise<{ text: string; tool: SignatureToolName | SpaceToolName; worded: boolean; llmMs: number } | null> {
+  if (detectSpaceIntent(p.text)) return answerSpaceQuestion(p);
   const tool = detectSignatureIntent(p.text);
   if (!tool) return null;
   const input = tool === "get_signature_triage" ? { crew_id: p.crewId, panel_id: "" } : { crew_id: p.crewId };
@@ -305,8 +374,34 @@ export async function answerSignatureQuestion(p: {
     worded = null;
   }
   const llmMs = Math.round(performance.now() - started);
+  if (worded && !assertNoOrbitClaim(worded)) {
+    return { text: orbitClaimFallback(p.lang), tool, worded: false, llmMs };
+  }
   if (worded && acceptSignatureAnswer(worded, facts, p.lang)) return { text: worded.trim(), tool, worded: true, llmMs };
   return { text: template, tool, worded: false, llmMs };
+}
+
+/** T14: the answer to a question about measuring in space, from `get_space_measurability` only */
+async function answerSpaceQuestion(p: {
+  text: string;
+  lang: Lang;
+  history: TurnRow[];
+  answer?: (args: SignatureAnswerArgs) => Promise<string | null>;
+}): Promise<{ text: string; tool: SpaceToolName; worded: boolean; llmMs: number }> {
+  const facts = buildSpaceFacts(p.lang);
+  const template = renderSpaceTemplate(p.lang);
+  if (!p.answer) return { text: template, tool: SPACE_TOOL_NAME, worded: false, llmMs: 0 };
+  const started = performance.now();
+  let worded: string | null = null;
+  try {
+    worded = await p.answer({ tool: SPACE_TOOL_NAME, facts, question: p.text, lang: p.lang, history: p.history });
+  } catch {
+    worded = null;
+  }
+  const llmMs = Math.round(performance.now() - started);
+  if (worded && !assertNoOrbitClaim(worded)) return { text: orbitClaimFallback(p.lang), tool: SPACE_TOOL_NAME, worded: false, llmMs };
+  if (worded && acceptSpaceAnswer(worded, p.lang)) return { text: worded.trim(), tool: SPACE_TOOL_NAME, worded: true, llmMs };
+  return { text: template, tool: SPACE_TOOL_NAME, worded: false, llmMs };
 }
 
 /* ───────────── after the daily summary ───────────── */

@@ -8,6 +8,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { IconChip } from "@/components/dashboard/parts";
 import { useI18n } from "@/i18n/I18nProvider";
 import { T_HIGH, T_LOW, TIMEPOINT_DAY } from "@/lib/signature/config";
+import { spaceStatements } from "@/lib/signature/spaceMeasurability";
 import type { PanelResult, Timepoint } from "@/lib/signature/types";
 import { cn } from "@/lib/utils";
 import {
@@ -221,6 +222,23 @@ export function TriageCard({
           {t("dashboard.signature.triage.panel", { tp: panel.timepoint, day: panel.missionDay })}
         </p>
         <p className="text-[11px] text-[var(--aegis-label)]">{t("dashboard.signature.source", { crew: panel.crew })}</p>
+        {/* T14 (spec section 8.1): every number comes from ground laboratories; the popover gives S1-S3 */}
+        <Popover>
+          <PopoverTrigger
+            data-slot="signature-space-caption"
+            className="self-start rounded text-[11px] text-[var(--aegis-label)] underline decoration-dotted underline-offset-2 outline-none hover:text-[var(--aegis-ink)] focus-visible:ring-3 focus-visible:ring-ring/60"
+          >
+            {t("dashboard.signature.space.caption")}
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-[min(22rem,calc(100vw-2rem))] rounded-[18px] bg-white/95 p-3">
+            <p className="text-[13px] font-medium text-[var(--aegis-ink)]">{t("dashboard.signature.space.title")}</p>
+            <ul className="mt-1.5 flex flex-col gap-1.5 text-[12px] leading-snug text-[var(--aegis-ink)]">
+              {spaceStatements(lang).map((s, i) => (
+                <li key={i}>{s}</li>
+              ))}
+            </ul>
+          </PopoverContent>
+        </Popover>
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
