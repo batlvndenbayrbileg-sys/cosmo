@@ -6,6 +6,14 @@ const nextConfig: NextConfig = {
   // better-sqlite3 is a native module and must not be bundled; pg (Postgres/Supabase) and PGlite (tests) stay
   // external too, so their optional native/wasm parts are loaded by Node at run time.
   serverExternalPackages: ["better-sqlite3", "pg", "@electric-sql/pglite"],
+  // Signature Triage reads the NASA OSDR lab CSVs from data/nasa at run time (src/server/signature/files.ts), so the
+  // routes that use it carry those files in their server trace (Vercel). Read-only data; nothing else is included.
+  outputFileTracingIncludes: {
+    "/signature": ["./data/nasa/**/*.csv"],
+    "/demo/signature": ["./data/nasa/**/*.csv"],
+    "/api/signature/**": ["./data/nasa/**/*.csv"],
+    "/api/checkins/**": ["./data/nasa/**/*.csv"],
+  },
   turbopack: {
     rules: {
       "*.css": {
