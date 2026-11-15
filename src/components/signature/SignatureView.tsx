@@ -10,7 +10,9 @@ import { useI18n } from "@/i18n/I18nProvider";
 import { SIGNATURE_DISCLAIMER } from "@/lib/signature/facts";
 import type { SignatureViewData } from "@/lib/signature/view";
 import type { Timepoint } from "@/lib/signature/types";
+import { EvidenceCard } from "./EvidenceCard";
 import { FingerprintCard } from "./FingerprintCard";
+import { RecoveryCard } from "./RecoveryCard";
 import { TriageCard } from "./TriageCard";
 import { panelOf } from "./logic";
 
@@ -103,6 +105,8 @@ export function SignatureView({
         <div role="region" aria-label={t("dashboard.signature.cardsLabel")} className="grid grid-cols-1 gap-5 lg:grid-cols-2">
           <TriageCard panel={panel} timepoints={data.timepoints} onTimepoint={setTp} />
           <FingerprintCard view={data} panel={panel} />
+          <RecoveryCard view={data} crew={crew} timepoint={panel.timepoint} />
+          <EvidenceCard />
         </div>
 
         <p className="text-center text-[13px] text-[var(--aegis-label)]">{SIGNATURE_DISCLAIMER[lang]}</p>

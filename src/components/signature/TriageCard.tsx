@@ -178,7 +178,7 @@ export function TriageCard({
             </span>
           ))}
         </div>
-        <div aria-hidden="true" className="grid grid-cols-[20fr_20fr_60fr] text-[10px] leading-tight text-[var(--aegis-label)]">
+        <div aria-hidden="true" className="hidden grid-cols-[20fr_20fr_60fr] gap-x-1 text-[10px] leading-tight text-[var(--aegis-label)] sm:grid">
           <span>{t("dashboard.signature.triage.zone.low")}</span>
           <span>{t("dashboard.signature.triage.zone.mid")}</span>
           <span>{t("dashboard.signature.triage.zone.high")}</span>

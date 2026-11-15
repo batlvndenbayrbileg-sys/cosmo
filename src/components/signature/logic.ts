@@ -7,7 +7,9 @@
 import type { Lang } from "@/lib/types";
 import { dictionaries } from "@/i18n/dictionary";
 import { translate } from "@/i18n/translate";
-import { T_HIGH, T_LOW, TIMEPOINTS, TIMEPOINT_DAY, WINDOW_DAYS, Z_CAP } from "@/lib/signature/config";
+import { DSS_HISTORY_DAYS, T_HIGH, T_LOW, TIMEPOINTS, TIMEPOINT_DAY, WINDOW_DAYS, Z_CAP } from "@/lib/signature/config";
+import { recoveryFor, round1, type RecoveryEstimate } from "@/lib/signature/recovery";
+import { drawAdvice, drawStateFromPanels, type DrawAdvice } from "@/lib/signature/strain";
 import { baseline as baselineOf, preVals } from "@/lib/signature/engine";
 import { glucoseRemoved, markerLabel, spokenFold, spokenInt } from "@/lib/signature/facts";
 import { SIGNATURE_REFERENCE } from "@/lib/signature/reference";
@@ -242,6 +244,103 @@ export function otherChanges(panel: PanelResult): OtherChange[] {
     fold: spokenFold(o.fold),
     direction: o.fold >= 1 ? "up" : "down",
   }));
+}
+
+/* ───────────── Recovery & next draw card (spec section 7.2 item 3) ───────────── */
+
+export interface TimelinePoint {
+  tp: Timepoint;
+  day: number;
+  /** FRI, one decimal as in the fixture; null when INSUFFICIENT */
+  fri: number | null;
+  band: [number, number] | null;
+  /** error-bar extent below / above the point */
+  err: [number, number] | null;
+  cls: TriageClass;
+  selected: boolean;
+  /** drawn on or before the selected panel (the clock of the page) */
+  drawn: boolean;
+}
+
+export interface FanPoint {
+  day: number;
+  /** predicted FRI with the fast and the slow reference half-life */
+  fast: number;
+  slow: number;
+}
+
+export interface RecoveryTimeline {
+  points: TimelinePoint[];
+  /** the last EXPECTED_FLIGHT_RESPONSE panel up to the selected one, with its ETA and first re-test */
+  from: TimelinePoint | null;
+  recovery: RecoveryEstimate | null;
+  /** decay curves from that panel until the slow curve re-enters the baseline zone */
+  fan: FanPoint[];
+  threshold: number;
+}
+
+export function recoveryTimeline(view: SignatureViewData, crew: string, tp: Timepoint): RecoveryTimeline {
+  const panels = view.panels[crew] ?? [];
+  const today = TIMEPOINT_DAY[tp];
+  const points: TimelinePoint[] = panels.map((p) => {
+    const fri = p.fri === null ? null : round1(p.fri);
+    const band = p.band ? ([round1(p.band[0]), round1(p.band[1])] as [number, number]) : null;
+    return {
+      tp: p.timepoint,
+      day: p.missionDay,
+      fri,
+      band,
+      err: fri !== null && band ? [Math.max(fri - band[0], 0), Math.max(band[1] - fri, 0)] : null,
+      cls: p.cls,
+      selected: p.timepoint === tp,
+      drawn: p.missionDay <= today,
+    };
+  });
+  const expected = panels.filter((p) => p.missionDay <= today && p.cls === "EXPECTED_FLIGHT_RESPONSE");
+  const last = expected.length ? expected[expected.length - 1] : null;
+  const recovery = last ? recoveryFor(last) : null;
+  const fan: FanPoint[] = [];
+  if (last && recovery) {
+    const [tFast, tSlow] = recovery.halfLifeBand;
+    const end = Math.ceil(recovery.etaDays[1]);
+    for (let d = 0; d <= end; d += 1) {
+      fan.push({
+        day: last.missionDay + d,
+        fast: round1(recovery.fri0 * 2 ** (-d / tFast)),
+        slow: round1(recovery.fri0 * 2 ** (-d / tSlow)),
+      });
+    }
+  }
+  return {
+    points,
+    from: last ? (points.find((p) => p.tp === last.timepoint) ?? null) : null,
+    recovery,
+    fan,
+    threshold: T_LOW,
+  };
+}
+
+export interface DrawView {
+  advice: DrawAdvice;
+  /** the pending re-test day after the advice (panel clock), null when none */
+  nextRetestDay: number | null;
+  /** the last 14 DSS values (oldest first), empty when no check-ins are linked */
+  dss: (number | null)[];
+}
+
+/** the draw advisor on the selected panel's day: panels up to that day, DSS from linked check-ins (if any) */
+export function drawView(view: SignatureViewData, crew: string, tp: Timepoint, dss: readonly (number | null)[] = []): DrawView {
+  const advice = drawAdvice(drawStateFromPanels(view.panels[crew] ?? [], TIMEPOINT_DAY[tp], dss));
+  return {
+    advice,
+    nextRetestDay: advice.state.retestDay,
+    dss: dss.slice(-DSS_HISTORY_DAYS),
+  };
+}
+
+/** numbers joined for a sentence; `signed` adds "+" to positives (percent changes) */
+export function numberList(xs: readonly number[], signed = false): string {
+  return xs.map((x) => (signed && x > 0 ? `+${x}` : String(x))).join(", ");
 }
 
 export interface DrawerPoint {
