@@ -13,10 +13,15 @@
  *    microphone nor gets sent to be "answered". Loud unvoiced frames inside an utterance (consonants like s, sh, ts)
  *    still keep it open; but if nothing voiced is heard for `unvoicedEndMs` the utterance ends anyway, so a noise that
  *    follows the speech cannot hold the microphone open.
- *  - pauses: 1.5 s of quiet ends an utterance (was 0.9 s, which cut people off while they were thinking mid-sentence).
- *  - minimum speech: an utterance with less than 400 ms of voiced speech is a click, a cough or a noise and is
+ *  - pauses (adaptive end of speech, `endSilenceMs`): after a short or medium answer 1.5 s of quiet ends the utterance
+ *    (0.9 s cut people off while they were thinking mid-sentence); once 5 s of voice was heard, 1 s does (a long answer
+ *    that stops is finished, and waiting 1.5 s more felt like Cosmo was not listening). Nothing ends within the first
+ *    second. Soft voiced frames under the threshold (a phrase that trails off quietly) hold a pause open (hysteresis);
+ *    loud unvoiced frames hold it only as consonants right after a voice, and frames far below the speaker's own level
+ *    (distant voices, the room lifted by automatic gain) count as quiet.
+ *  - minimum speech: an utterance with less than 200 ms of voiced speech is a click, a cough or a noise and is
  *    discarded (`too_short`); the machine goes back to waiting and the recorder restarts. Nothing is sent, so Cosmo
- *    does not answer noise with "sorry, I didn't catch that".
+ *    does not answer noise with "sorry, I didn't catch that". (400 ms dropped one-word answers such as "yes".)
  *  - maximum length: 30 s after speech started the utterance is cut (`max_length`) and still sent.
  *  - no speech at all for `noSpeechTimeoutMs`: `no_speech` (the mic closes instead of listening forever).
  *  - the loudness threshold adapts to the room: it is max(base threshold, noise floor x multiplier),
@@ -37,8 +42,29 @@ export interface VadConfig {
   noiseMultiplier: number;
   /** the same factor for a frame the spectrum says is a voice (it needs less margin over a noisy room) */
   voicedMultiplier: number;
-  /** continuous quiet after speech that ends the utterance */
+  /** continuous quiet after speech that ends the utterance (a short or medium answer, see `endSilenceMs`) */
   silenceMs: number;
+  /** the quiet that ends a LONG utterance: someone who has talked for a while and stops is done, not thinking */
+  trailSilenceMs: number;
+  /** up to this much voiced speech the end needs the full `silenceMs` ... */
+  shortSpeechMs: number;
+  /** ... from this much on only `trailSilenceMs` (linear in between) */
+  longSpeechMs: number;
+  /** an utterance never ends (by quiet or by noise) earlier than this after it started */
+  minUtteranceMs: number;
+  /**
+   * inside an utterance, a loud frame that does not sound like a voice keeps it open only this soon after the last
+   * voiced frame (a consonant: s, sh, ts, kh). Later it counts as quiet, so a fan or traffic that follows the last word
+   * ends the utterance like silence does instead of holding it open
+   */
+  consonantMs: number;
+  /**
+   * inside an utterance a frame below this share of the speaker's own level is quiet even when it clears the room
+   * threshold: distant voices (TV, colleagues) or the room lifted by automatic gain once the person stopped
+   */
+  quietRatio: number;
+  /** smoothing of the speaker's level (loud voiced frames only) */
+  levelAlpha: number;
   /** minimum accumulated loud AND voiced time for an utterance to be kept */
   minSpeechMs: number;
   /** inside an utterance: this long without a voiced frame ends it, even if it is still loud (noise after speech) */
@@ -89,7 +115,16 @@ export const DEFAULT_VAD_CONFIG: VadConfig = {
   noiseMultiplier: 3,
   voicedMultiplier: 1.4,
   silenceMs: 1500,
-  minSpeechMs: 400,
+  trailSilenceMs: 1000,
+  shortSpeechMs: 2000,
+  longSpeechMs: 5000,
+  minUtteranceMs: 1000,
+  consonantMs: 400,
+  quietRatio: 0.2,
+  levelAlpha: 0.1,
+  // 400 ms dropped one-word answers ("yes", "тийм", "найм" have 250-350 ms of voice): the person then waited for an
+  // answer that never came. Noise is kept out by the voicing check, the 150 ms onset and the voiced share.
+  minSpeechMs: 200,
   unvoicedEndMs: 2500,
   onsetMs: 150,
   minVoicedShare: 0.35,
@@ -116,6 +151,10 @@ export interface VadState {
   onsetMs: number;
   /** accumulated loud time (voiced or not) of the current utterance */
   loudMs: number;
+  /** `loudMs` at the last loud voiced frame: noise after the last word does not count against the voiced share */
+  loudAtVoicedMs: number;
+  /** moving average of the speaker's level (RMS of the loud voiced frames of this utterance), 0 before speech */
+  speechLevel: number;
   /** time since the first loud frame of the current utterance */
   utteranceMs: number;
   /** moving average of quiet-frame RMS, 0 until the first frame */
@@ -152,11 +191,23 @@ export function createVadState(): VadState {
     sinceVoicedMs: 0,
     onsetMs: 0,
     loudMs: 0,
+    loudAtVoicedMs: 0,
+    speechLevel: 0,
     utteranceMs: 0,
     noiseFloor: 0,
     calibratedMs: 0,
     calibSum: 0,
   };
+}
+
+/**
+ * The quiet that ends the utterance now: the full `silenceMs` after a short answer (a pause there is usually thinking),
+ * falling linearly to `trailSilenceMs` once `longSpeechMs` of voice was heard (a long answer that stops is finished).
+ */
+export function endSilenceMs(speechMs: number, config: VadConfig = DEFAULT_VAD_CONFIG): number {
+  const span = config.longSpeechMs - config.shortSpeechMs;
+  const t = span > 0 ? Math.min(1, Math.max(0, (speechMs - config.shortSpeechMs) / span)) : speechMs >= config.longSpeechMs ? 1 : 0;
+  return Math.round(config.silenceMs + t * (Math.min(config.trailSilenceMs, config.silenceMs) - config.silenceMs));
 }
 
 /** RMS (0..1) of a time-domain buffer: bytes are centred on 128, floats are already -1..1. */
@@ -269,6 +320,8 @@ function stepCalibration(
         phase: "speaking",
         speechMs: dt,
         loudMs: dt,
+        loudAtVoicedMs: dt,
+        speechLevel: rms,
         silenceMs: 0,
         sinceVoicedMs: 0,
         onsetMs: 0,
@@ -323,6 +376,8 @@ export function stepVad(
             waitedMs,
             speechMs: onsetMs,
             loudMs: onsetMs,
+            loudAtVoicedMs: onsetMs,
+            speechLevel: rms,
             silenceMs: 0,
             sinceVoicedMs: 0,
             onsetMs: 0,
@@ -349,23 +404,49 @@ export function stepVad(
 
   // speaking
   const utteranceMs = state.utteranceMs + dt;
-  const speechMs = loud && voiced ? state.speechMs + dt : state.speechMs;
-  const loudMs = loud ? state.loudMs + dt : state.loudMs;
-  // loud unvoiced frames (s, sh, ts...) keep the utterance open; only real quiet counts as a pause
-  const silenceMs = loud ? 0 : state.silenceMs + dt;
-  const sinceVoicedMs = loud && voiced ? 0 : state.sinceVoicedMs + dt;
+  // far below the speaker's own level: distant voices, or the room lifted by gain control once the person stopped
+  const underSpeaker = state.speechLevel > 0 && rms < state.speechLevel * config.quietRatio;
+  const loudHere = loud && !underSpeaker;
+  const speech = loudHere && voiced;
+  // a voice that does not clear the threshold (soft words, a phrase that trails off quietly) holds the pause open but is
+  // not speech; how long it can do that is bounded by unvoicedEndMs since the last real speech frame
+  const hold =
+    !speech &&
+    frame.voiced === true &&
+    rms > Math.max(config.threshold * 0.5, state.noiseFloor * config.voicedMultiplier);
+  const sinceVoicedMs = speech ? 0 : state.sinceVoicedMs + dt;
+  // loud unvoiced frames right after a voice are consonants (s, sh, ts) and keep the utterance open; the same sound
+  // going on for longer is the room (fan, traffic) and counts as quiet
+  const consonant = loudHere && !voiced && sinceVoicedMs <= config.consonantMs;
+  const silenceMs = speech || hold || consonant ? 0 : state.silenceMs + dt;
+  const speechMs = speech ? state.speechMs + dt : state.speechMs;
+  const loudMs = loudHere ? state.loudMs + dt : state.loudMs;
+  const loudAtVoicedMs = speech ? loudMs : state.loudAtVoicedMs;
+  const speechLevel = speech ? state.speechLevel + config.levelAlpha * (rms - state.speechLevel) : state.speechLevel;
   // quiet, unvoiced frames inside the utterance (pauses) keep the room estimate current
-  const roomFrame = !loud && !(voiced && frame.voiced !== undefined);
+  const roomFrame = !loudHere && !(voiced && frame.voiced !== undefined);
   const noiseFloor = roomFrame ? adaptFloor(state.noiseFloor, rms, config) : state.noiseFloor;
-  const next: VadState = { ...state, utteranceMs, speechMs, loudMs, silenceMs, sinceVoicedMs, noiseFloor };
+  const next: VadState = {
+    ...state,
+    utteranceMs,
+    speechMs,
+    loudMs,
+    loudAtVoicedMs,
+    speechLevel,
+    silenceMs,
+    sinceVoicedMs,
+    noiseFloor,
+  };
 
   if (utteranceMs >= config.maxUtteranceMs) {
     return { state: { ...next, phase: "ended" }, signal: "max_length" };
   }
-  // a pause, or noise with no voice in it for a while (a fan or traffic that follows the speech)
-  if (silenceMs >= config.silenceMs || sinceVoicedMs >= config.unvoicedEndMs) {
-    // enough voice, and not mostly noise with a few voice-like moments in it
-    if (speechMs >= config.minSpeechMs && speechMs >= config.minVoicedShare * loudMs) {
+  // a pause (shorter once a long answer was heard), or no real voice for a while (only soft or distant voices)
+  const needQuietMs = endSilenceMs(speechMs, config);
+  const needNoVoiceMs = config.unvoicedEndMs - (config.silenceMs - needQuietMs);
+  if (utteranceMs >= config.minUtteranceMs && (silenceMs >= needQuietMs || sinceVoicedMs >= needNoVoiceMs)) {
+    // enough voice, and not mostly noise with a few voice-like moments in it (noise after the last word does not count)
+    if (speechMs >= config.minSpeechMs && speechMs >= config.minVoicedShare * loudAtVoicedMs) {
       return { state: { ...next, phase: "ended" }, signal: "utterance_end" };
     }
     // a blip: forget it and keep listening; its duration still counts towards the no-speech timeout
@@ -378,6 +459,8 @@ export function stepVad(
         sinceVoicedMs: 0,
         onsetMs: 0,
         loudMs: 0,
+        loudAtVoicedMs: 0,
+        speechLevel: 0,
         utteranceMs: 0,
         noiseFloor: next.noiseFloor,
         calibratedMs: state.calibratedMs,

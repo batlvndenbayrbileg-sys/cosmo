@@ -4,6 +4,7 @@ import {
   DEFAULT_VAD_CONFIG,
   createVadState,
   effectiveThreshold,
+  endSilenceMs,
   rmsFromSamples,
   stepVad,
   voicingFromSpectrum,
@@ -80,8 +81,9 @@ describe("stepVad: utterance boundaries", () => {
     expect(end.signals).toEqual(["utterance_end"]);
   });
 
-  it("discards an utterance with less than 400 ms of speech and goes back to waiting", () => {
-    const blip = run(createVadState(), LOUD, 300).state; // 300 ms of speech
+  it("discards an utterance with less than 200 ms of speech and goes back to waiting", () => {
+    // was 400 ms; that also dropped one-word answers ("yes", "тийм": 250-350 ms of voice), see the answer tests below
+    const blip = run(createVadState(), LOUD, 150).state; // 150 ms of speech
     const after = run(blip, QUIET, 1500);
     expect(after.signals).toEqual(["too_short"]);
     expect(after.state.phase).toBe("waiting");
@@ -290,11 +292,23 @@ describe("stepVad: background noise is not speech (voicing)", () => {
   });
 
   it("an utterance that was mostly noise with a little voice in it is dropped, not sent", () => {
-    let s = runV(room(), 0.3, true, 450).state; // 450 ms of voice
-    s = runV(s, 0.3, false, 2000).state; // then 2 s of loud noise (voiced share < 35 %)
+    // Was: 450 ms of voice FOLLOWED by 2 s of noise. That is a short answer and a fan, and dropping it left the person
+    // waiting for a reply (the noise after the last word no longer counts against the voiced share). Here the
+    // voice-like moments are scattered through the noise: voiced share < 35 % up to the last of them.
+    let s = runV(room(), 0.3, true, 200).state;
+    for (let i = 0; i < 5; i++) {
+      s = runV(s, 0.3, false, 350).state;
+      s = runV(s, 0.3, true, 50).state;
+    }
     const end = runV(s, 0.001, false, 1500);
     expect(end.signals).toEqual(["too_short"]);
     expect(end.state.phase).toBe("waiting");
+  });
+
+  it("a real answer followed by a fan is sent, not dropped (the noise after the last word is the room)", () => {
+    const s = runV(room(), 0.3, true, 1500).state;
+    const after = runV(s, 0.3, false, 3000);
+    expect(after.signals).toEqual(["utterance_end"]);
   });
 
   it("soft speech in a noisy room still gets through: a voice only has to clear the room by 1.4x", () => {
@@ -375,9 +389,119 @@ describe("voicingFromSpectrum", () => {
 });
 
 describe("DEFAULT_VAD_CONFIG", () => {
-  it("1.5 s pause tolerance, 400 ms minimum speech, 30 s maximum (team feedback 2026-11-15: 0.9 s cut people off)", () => {
+  it("1.5 s pause tolerance, 200 ms minimum speech, 30 s maximum (team feedback 2026-11-15: 0.9 s cut people off)", () => {
     expect(DEFAULT_VAD_CONFIG.silenceMs).toBe(1500);
-    expect(DEFAULT_VAD_CONFIG.minSpeechMs).toBe(400);
+    // 400 ms dropped one-word answers (the person then waited for a reply that never came)
+    expect(DEFAULT_VAD_CONFIG.minSpeechMs).toBe(200);
     expect(DEFAULT_VAD_CONFIG.maxUtteranceMs).toBe(30_000);
+  });
+});
+
+/* ───────────── end of speech: natural pauses vs. finished answers (team feedback 2026-11-15, round 2) ───────────── */
+
+/** a frame list: [rms, voiced, ms] segments, so a test reads like the sound it describes */
+type Seg = [rms: number, voiced: boolean, ms: number];
+const ROOM = 0.004;
+/** speech: 200 ms of voice, a 50 ms consonant (loud, not voiced), a 50 ms gap between syllables */
+function talk(ms: number, level = 0.2): Seg[] {
+  const out: Seg[] = [];
+  let t = 0;
+  while (t < ms) {
+    out.push([level, true, 200], [level * 0.35, false, 50], [ROOM, false, 50]);
+    t += 300;
+  }
+  return out;
+}
+const hush = (ms: number): Seg => [ROOM, false, ms];
+
+/** plays the segments from a fresh state (after 600 ms of quiet room); signal times are from the start of `segs` */
+function play(segs: Seg[], config: VadConfig = DEFAULT_VAD_CONFIG) {
+  let state = createVadState();
+  for (let t = 0; t < 600; t += FRAME_MS) state = stepVad(state, { rms: ROOM, dtMs: FRAME_MS, voiced: false }, config).state;
+  const out: { signal: VadSignal; at: number }[] = [];
+  let t = 0;
+  for (const [rms, voiced, ms] of segs) {
+    for (let i = 0; i < ms; i += FRAME_MS) {
+      const step = stepVad(state, { rms, dtMs: FRAME_MS, voiced }, config);
+      state = step.state;
+      t += FRAME_MS;
+      if (step.signal !== "none") out.push({ signal: step.signal, at: t });
+    }
+  }
+  return { state, out, signals: out.map((o) => o.signal) };
+}
+const total = (segs: Seg[]) => segs.reduce((sum, s) => sum + s[2], 0);
+
+describe("stepVad: adaptive end of speech", () => {
+  it("a 1.2 s pause inside a sentence does not end it", () => {
+    const first = talk(1500);
+    const { signals, out } = play([...first, hush(1200), ...talk(1500), hush(3000)]);
+    expect(signals).toEqual(["speech_start", "utterance_end"]);
+    expect(out[1].at).toBeGreaterThan(total(first) + 1200 + 1500); // ended after the second phrase, not in the pause
+  });
+
+  it("a 1.2 s pause after 3 s of talking does not end it either", () => {
+    const { signals } = play([...talk(3000), hush(1200), ...talk(1500), hush(3000)]);
+    expect(signals).toEqual(["speech_start", "utterance_end"]);
+  });
+
+  it("1 s of silence after a long utterance ends it (was 1.5 s)", () => {
+    const long = talk(8000); // about 5.3 s of voice
+    const { signals, out } = play([...long, hush(3000)]);
+    expect(signals).toEqual(["speech_start", "utterance_end"]);
+    const after = out[1].at - (total(long) - 50); // talk() ends with a 50 ms gap after the last consonant
+    expect(after).toBeGreaterThanOrEqual(1000);
+    expect(after).toBeLessThanOrEqual(1000 + FRAME_MS);
+  });
+
+  it("the end tolerance falls from 1.5 s to 1 s as more voice is heard", () => {
+    expect(endSilenceMs(0)).toBe(1500);
+    expect(endSilenceMs(2000)).toBe(1500);
+    expect(endSilenceMs(3500)).toBe(1250);
+    expect(endSilenceMs(5000)).toBe(1000);
+    expect(endSilenceMs(60_000)).toBe(1000);
+  });
+
+  it("never ends within the first second of speech", () => {
+    const config = { ...DEFAULT_VAD_CONFIG, silenceMs: 300, trailSilenceMs: 300 };
+    const { out } = play([[0.2, true, 200], hush(2000)], config);
+    expect(out.map((o) => o.signal)).toEqual(["speech_start", "utterance_end"]);
+    expect(out[1].at).toBeGreaterThanOrEqual(1000); // the voice began at 0
+  });
+
+  it("a one-word answer ('yes', 'тийм': 250 ms of voice) is sent, not dropped as a blip (it used to be)", () => {
+    const { signals, out } = play([[0.2, true, 250], [0.07, false, 100], hush(3000)]);
+    expect(signals).toEqual(["speech_start", "utterance_end"]);
+    expect(out[1].at - 350).toBe(1500);
+  });
+
+  it("soft words under the threshold keep a sentence open instead of ending it after 1.5 s", () => {
+    const { signals, out } = play([...talk(1500), [0.015, true, 1800], ...talk(1500), hush(3000)]);
+    expect(signals).toEqual(["speech_start", "utterance_end"]);
+    expect(out[1].at).toBeGreaterThan(1500 + 1800 + 1500);
+  });
+
+  it("room noise after the last word (a fan, gain control lifting the room) ends it like silence", () => {
+    const answer = talk(2000);
+    const { signals, out } = play([...answer, [0.04, false, 5000]]);
+    expect(signals).toEqual(["speech_start", "utterance_end"]); // was too_short: the answer was dropped
+    expect(out[1].at - total(answer)).toBeLessThanOrEqual(1500 + FRAME_MS);
+  });
+
+  it("distant voices after the answer end it within 2.5 s (they used to hold the mic open until the 30 s cap)", () => {
+    const answer = talk(2000);
+    const { signals, out } = play([...answer, [0.03, true, 10_000]]);
+    expect(signals).toEqual(["speech_start", "utterance_end"]);
+    expect(out[1].at - total(answer)).toBeLessThanOrEqual(DEFAULT_VAD_CONFIG.unvoicedEndMs + FRAME_MS);
+  });
+
+  it("noise does not start it: a fan with voice-like pops, keyboard clatter, a 100 ms voiced click", () => {
+    const pops: Seg[] = [];
+    for (let i = 0; i < 10; i++) pops.push([0.3, false, 900], [0.3, true, 100]);
+    expect(play(pops).signals).toEqual([]);
+    const clatter: Seg[] = [];
+    for (let i = 0; i < 20; i++) clatter.push([0.25, false, 100], hush(150));
+    expect(play(clatter).signals).toEqual([]);
+    expect(play([[0.3, true, 100], hush(3000)]).signals).toEqual([]);
   });
 });
