@@ -8,13 +8,15 @@ import { earthStrings } from "./strings/earth";
 import { emergencyStrings } from "./strings/emergency";
 import { signatureStrings } from "./strings/signature";
 import { labsStrings } from "./strings/labs";
+import { listenStrings } from "./strings/listen";
 
 export type { Dict, AreaDicts };
 
 /** One entry per UI area; every key inside an area starts with "<area>.". */
 export const areaDictionaries = {
   shell: shellStrings,
-  checkin: checkinStrings,
+  // the listening pill's keys ("checkin.listen.*") live in the checkin area
+  checkin: { en: { ...checkinStrings.en, ...listenStrings.en }, mn: { ...checkinStrings.mn, ...listenStrings.mn } },
   crew: crewStrings,
   // Signature Triage keys ("dashboard.signature.*") and the Labs tab keys ("dashboard.labs.*") live in the dashboard area
   // (no extra area)

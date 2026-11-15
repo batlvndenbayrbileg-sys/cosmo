@@ -35,6 +35,9 @@ import {
 } from "./StageControls";
 import { ApiClientError, fetchDashboard, fetchHealth, postTour, type TourFocus } from "./api";
 import { DashboardTalk, type TalkStatus } from "./DashboardTalk";
+import { ListeningPill } from "./ListeningPill";
+import { listeningPillMode, quoteForPill } from "./listening";
+import { playHeardEarcon } from "./earcon";
 import { EmergencyOverlay } from "@/components/emergency/EmergencyOverlay";
 import { EMERGENCY_REQUEST_EVENT } from "@/components/emergency/EmergencyGuidePanel";
 import { useEmergencyLibrary } from "@/components/emergency/hooks";
@@ -285,6 +288,7 @@ export function CheckInExperience() {
     onUtterance: (blob) => {
       bargeIn.current = { active: false, heard: false };
       if (blob.size < MIN_AUDIO_BYTES) return;
+      playHeardEarcon(); // "got it", the moment the words are sent
       void sendAudio(blob);
     },
     // the person talks over Cosmo: she stops at once and listens (team feedback 2026-11-15)
@@ -487,15 +491,17 @@ export function CheckInExperience() {
     demo.running,
   ]);
 
-  // Cosmo finished and nobody talked over her: close the barge-in recording (tuned to her echo) and let the normal
-  // listening above start fresh
+  // Cosmo finished and nobody talked over her: the barge-in recording (tuned to her echo) turns into normal listening
+  // on the same open microphone, so an answer given right away is heard from its first word (closing and reopening
+  // lost ~0.5-1 s). Only when that is not possible is it closed and the listening above starts fresh.
+  const { endBargeIn } = recorder;
   useEffect(() => {
     if (state.speech !== "idle") return;
     if (bargeIn.current.active && !bargeIn.current.heard && recorder.recording) {
       bargeIn.current = { active: false, heard: false };
-      cancelRecorder();
+      if (!endBargeIn()) cancelRecorder();
     }
-  }, [state.speech, recorder.recording, cancelRecorder]);
+  }, [state.speech, recorder.recording, cancelRecorder, endBargeIn]);
 
   const handleSendText = useCallback(
     (text: string) => {
@@ -999,6 +1005,24 @@ export function CheckInExperience() {
           </div>
 
           <StageToasts toasts={visibleToasts} onAction={handleToastAction} />
+
+          {/* listening / heard you (Done) / writing it down / thinking: never a silent wait after speaking */}
+          <ListeningPill
+            mode={
+              preparing
+                ? null
+                : listeningPillMode({
+                    recording: recorder.recording,
+                    heard: recorder.heard,
+                    busy: state.busy,
+                    speech: state.speech,
+                    transcribing: pending?.source === "voice" && pending.text === "",
+                  })
+            }
+            quote={quoteForPill(lastLine?.speaker === "crew" ? lastLine.text : null)}
+            level={recorder.level}
+            onDone={stopRecorder}
+          />
 
           <Corner className="fixed top-4 left-4">
             <BackControl />
