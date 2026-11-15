@@ -1038,6 +1038,13 @@ async function* runTurnInner(args: RunTurnArgs, started: number): AsyncGenerator
         assistantText = reply;
       }
     }
+    // "is 85 a good pulse?" while the pulse is asked: the 85 is recorded, and the question is answered before the next
+    if (reference && askedReply === null && acknowledged.length > 0 && effect.kind === "ask" && effect.question) {
+      const prompt = getQuestion(effect.question).prompts[lang];
+      if (assistantText.endsWith(prompt)) {
+        assistantText = join(assistantText.slice(0, assistantText.length - prompt.length).trim(), reference.brief, prompt);
+      }
+    }
     emotion =
       effect.kind === "clarify" && effect.reason === "range"
         ? "concerned"

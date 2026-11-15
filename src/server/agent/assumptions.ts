@@ -81,7 +81,7 @@ function assumedReading(rec: NoteRecord, lang: Lang, spoken: string): string | n
       // a bare small number taken as litres ("2" -> 2000 ml)
       if (nums.length === 1 && !LITRE_WORD.test(src) && !ML_WORD.test(src) && nums[0] <= 10 && near(nums[0] * 1000, value, 0.5)) {
         const n = formatNumber(nums[0], 2);
-        return lang === "mn" ? `${n} литр буюу ${v} миллилитр гэж ойлголоо` : `${v} millilitres, taking ${n} as litres`;
+        return lang === "mn" ? `${n} литр буюу ${v} миллилитр гэж тооцлоо` : `${v} millilitres, taking ${n} as litres`;
       }
       return null;
     }
@@ -97,13 +97,14 @@ function assumedReading(rec: NoteRecord, lang: Lang, spoken: string): string | n
       const n = formatNumber(nums[0], 2);
       // a reading said in mmol/L is only converted (explicitMmol below); a bare number read as mmol/L is an assumption
       if (MMOL_WORD.test(src)) return null;
-      return lang === "mn" ? `${n} ммоль/л буюу ${v} mg/dL гэж ойлголоо` : `${spoken}, reading ${n} as mmol per litre`;
+      // (after the opener "Ойлголоо," the Mongolian notes end in "гэж тооцлоо / гэж авлаа", never a second "ойлголоо")
+      return lang === "mn" ? `${n} ммоль/л буюу ${v} mg/dL гэж тооцлоо` : `${spoken}, reading ${n} as mmol per litre`;
     }
     case "temperature_c": {
       if (nums.length !== 1 || FAHRENHEIT_WORD.test(src) || near(nums[0], value, 0.05)) return null;
       if (!near(((nums[0] - 32) * 5) / 9, value, 0.06)) return null;
       const n = formatNumber(nums[0], 2);
-      return lang === "mn" ? `${n} фаренгейт буюу ${v} хэм гэж ойлголоо` : `${v} degrees Celsius, reading ${n} as Fahrenheit`;
+      return lang === "mn" ? `${n} фаренгейт буюу ${v} хэм гэж тооцлоо` : `${v} degrees Celsius, reading ${n} as Fahrenheit`;
     }
     default:
       return null;

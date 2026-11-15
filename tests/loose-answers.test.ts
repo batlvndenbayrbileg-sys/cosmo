@@ -124,7 +124,8 @@ describe("the acknowledgement names the reading", () => {
 
   it("mmol/L and Fahrenheit", () => {
     expect(ack("glucose", "en", "5.5")).toMatch(/99 milligrams per decilitre, reading 5\.5 as mmol per litre/u);
-    expect(ack("temperature", "mn", "98.6")).toMatch(/98\.6 фаренгейт буюу 37 хэм гэж ойлголоо/u);
+    expect(ack("temperature", "mn", "98.6")).toMatch(/^Ойлголоо, 98\.6 фаренгейт буюу 37 хэм гэж тооцлоо\./u);
+    expect(ack("glucose", "mn", "5,4")).toMatch(/^Ойлголоо, 5\.4 ммоль\/л буюу 97 mg\/dL гэж тооцлоо\. Буруу бол хэлээрэй\./u);
   });
 
   it("a literal answer is acknowledged as before", () => {

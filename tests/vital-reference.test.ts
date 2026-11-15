@@ -177,6 +177,16 @@ describe("asked at any point", () => {
     expect(text).toMatch(/What is your pulse\?$/);
   });
 
+  it("'is 85 a good pulse?' while the pulse is asked: recorded, and the question answered before the next one", async () => {
+    const id = await startCheckIn("bat", "en");
+    for (const line of FLOW.en.slice(0, 6)) await playTurn("bat", id, line);
+    const events = await playTurn("bat", id, "is 85 a good pulse?");
+    expect(eventsOf(events, "measurement").map((e) => [e.key, e.value])).toEqual([["heart_rate", 85]]);
+    expect(assistantText(events)).toMatch(
+      /^Got it, 85 beats per minute\. For a resting adult, a heart rate of 60-100 .* 85 bpm: which is within that general range\. What is your body temperature\?$/u,
+    );
+  });
+
   it.each<Lang>(["en", "mn"])("after the check-in (%s), offline: the general range and today's value", async (lang) => {
     const id = await startCheckIn("bat", lang);
     for (const line of FLOW[lang]) await playTurn("bat", id, line);

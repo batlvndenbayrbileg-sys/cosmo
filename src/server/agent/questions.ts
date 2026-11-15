@@ -307,16 +307,19 @@ export function answerReferenceQuestion(
   text: string,
   lang: Lang,
   ctx: { baselines: Partial<Record<KpiKey, Baseline>>; today: Partial<Record<KpiKey, MeasurementValue>> },
-): { topic: ReferenceTopic; questionId: QuestionId | null; text: string } | null {
+): { topic: ReferenceTopic; questionId: QuestionId | null; text: string; brief: string } | null {
   const topic = referenceQuestionTopic(text, lang);
   if (!topic) return null;
   const questionId = QUESTION_OF[topic] ?? null;
+  const value = valueSentence(topic, lang, text, ctx.today);
   return {
     topic,
     questionId,
+    // after a value that was recorded from the same words ("is 85 a good pulse?"): the range and the judgement only
+    brief: join([referenceSentence(topic, lang), value]),
     text: join([
       referenceSentence(topic, lang),
-      valueSentence(topic, lang, text, ctx.today),
+      value,
       questionId ? demoBandSentence(questionId, lang) : null,
       questionId ? baselineSentence(questionId, ctx.baselines, lang) : null,
       REFERENCE_CAVEAT[lang],
