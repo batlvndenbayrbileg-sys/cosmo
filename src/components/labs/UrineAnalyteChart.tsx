@@ -4,7 +4,7 @@ import { CartesianGrid, ComposedChart, Line, ReferenceArea, ReferenceLine, XAxis
 import { ChartContainer, type ChartConfig } from "@/components/ui/chart";
 import { useDashboardAnimate } from "@/components/dashboard/motion";
 import { useI18n } from "@/i18n/I18nProvider";
-import type { UrineAnalyte, UrinePointKind } from "@/lib/labs/urine";
+import { formatDecimal, type UrineAnalyte, type UrinePointKind } from "@/lib/labs/urine";
 import { cn } from "@/lib/utils";
 
 const INK = "var(--aegis-ink)";
@@ -108,7 +108,7 @@ export function UrineAnalyteChart({
     npq: { label: t("dashboard.labs.chart.axisY"), color: INK },
   } satisfies ChartConfig;
 
-  const fmt = (v: number | null) => (v === null ? "–" : v.toFixed(1));
+  const fmt = (v: number | null) => formatDecimal(v, 1);
   const points = analyte.points
     .map((p) => t("dashboard.labs.chart.point", { tp: p.timepoint, value: p.npq === null ? t("dashboard.labs.chart.notDetected") : fmt(p.npq) }))
     .join(", ");

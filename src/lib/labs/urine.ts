@@ -249,10 +249,38 @@ export function flaggedAt(view: UrinePersonView, timepoint: string): FlaggedAnal
   );
 }
 
-/** "x15.1": one decimal; below 1 two decimals, so a drop to 0.14 does not read as 0.1 */
-export function formatFold(fold: number | null): string {
+/** |v| * 10^digits with the binary noise snapped off (2.55 * 10 is 25.499999999999996 as a float; this gives 25.5) */
+function scaledOf(v: number, digits: number): number {
+  return Number((Math.abs(v) * 10 ** digits).toPrecision(12));
+}
+
+function fixed(sign: number, rounded: number, digits: number): string {
+  return ((sign < 0 && rounded !== 0 ? -rounded : rounded) / 10 ** digits).toFixed(digits);
+}
+
+/**
+ * Decimal rounding (half away from zero) of a sheet value, which the workbook stores with 3 decimals. Plain
+ * Number.prototype.toFixed rounds the binary float, so 2.55 -> "2.5" and 0.495 -> "0.49"; this gives "2.6" and "0.50".
+ */
+export function formatDecimal(v: number | null, digits: number): string {
+  if (v === null || !Number.isFinite(v)) return "–";
+  return fixed(Math.sign(v), Math.round(scaledOf(v, digits)), digits);
+}
+
+/**
+ * "x15.1": one decimal; below 1 two decimals, so a drop to 0.14 does not read as 0.1. The sheet's Fold_change has 3
+ * decimals, so a fold that sits exactly half-way at the shown precision (2.55, 0.495, 0.075) cannot say which way it
+ * rounds; the sheet's Change_log2 (fold = 2^change) breaks the tie when it is given (2^1.351 = 2.551 -> "x2.6").
+ */
+export function formatFold(fold: number | null, change?: number | null): string {
   if (fold === null || !Number.isFinite(fold)) return "–";
-  return `x${fold >= 1 ? fold.toFixed(1) : fold.toFixed(2)}`;
+  const digits = fold >= 1 ? 1 : 2;
+  const scaled = scaledOf(fold, digits);
+  let rounded = Math.round(scaled);
+  if (scaled % 1 === 0.5 && typeof change === "number" && Number.isFinite(change)) {
+    rounded = 2 ** change * 10 ** digits >= scaled ? Math.ceil(scaled) : Math.floor(scaled);
+  }
+  return `x${fixed(1, rounded, digits)}`;
 }
 
 /** i18n key suffix of a sheet Status ("Abnormal high" -> "abnormal_high"); null for text the app does not know */

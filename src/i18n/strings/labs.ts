@@ -9,7 +9,7 @@ export const labsStrings: AreaDicts = {
   en: {
     "dashboard.labs.titleLight": "Urine",
     "dashboard.labs.titleStrong": "panel",
-    "dashboard.labs.caption": "Changes versus your own pre-flight urine. Not a clinical test or a diagnosis.",
+    "dashboard.labs.caption": "Changes versus the person's own pre-flight urine. Not a clinical test or a diagnosis.",
     "dashboard.labs.dilution": "Urine is easily diluted, so Borderline means: confirm before acting.",
     "dashboard.labs.source":
       "Data: NASA OSDR OSD-656, Inspiration4 urine, Alamar NULISA panel (NPQ, log2). Linked Inspiration4 reference crew member {person}, shown for demonstration.",
@@ -72,7 +72,7 @@ export const labsStrings: AreaDicts = {
   mn: {
     "dashboard.labs.titleLight": "Шээсний",
     "dashboard.labs.titleStrong": "шинжилгээ",
-    "dashboard.labs.caption": "Нислэгийн өмнөх өөрийн шээстэй харьцуулсан өөрчлөлт. Эмнэлгийн шинжилгээ эсвэл онош биш.",
+    "dashboard.labs.caption": "Тухайн хүний нислэгийн өмнөх шээстэй харьцуулсан өөрчлөлт. Эмнэлгийн шинжилгээ эсвэл онош биш.",
     "dashboard.labs.dilution": "Шээс амархан шингэрдэг тул «Хязгаарт ойр» гэдэг нь: арга хэмжээ авахаасаа өмнө дахин шалгана уу.",
     "dashboard.labs.source":
       "Өгөгдөл: NASA OSDR OSD-656, Inspiration4-ийн шээс, Alamar NULISA (NPQ, log2). Холбосон Inspiration4-ийн жишиг багийн гишүүн {person}, үзүүлэх зорилгоор.",

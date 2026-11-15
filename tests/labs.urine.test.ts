@@ -9,7 +9,7 @@ import { labsStrings } from "@/i18n/strings/labs";
 import type { Lang } from "@/lib/types";
 import { batYellow } from "@/lib/fixtures/dashboard";
 import { APP_CREW_REFERENCE_PANELS } from "@/lib/signature/config";
-import { countAt, decodePerson, flaggedAt, formatFold, noteKey, statusKey, type UrinePersonView } from "@/lib/labs/urine";
+import { countAt, decodePerson, flaggedAt, formatDecimal, formatFold, noteKey, statusKey, type UrinePersonView } from "@/lib/labs/urine";
 import { getUrinePanelFile, getUrinePersonSlice } from "@/server/labs/urine";
 import { GET as getUrine } from "@/app/api/labs/urine/route";
 import { UrinePanelView } from "@/components/labs/UrinePanelView";
@@ -144,6 +144,46 @@ describe("urine panel data: src/data/urine_panel.json against the workbook", () 
     expect(formatFold(0.143)).toBe("x0.14");
     expect(formatFold(null)).toBe("–");
   });
+
+  it("folds and chart numbers round from the decimal value, not the binary float (2.55 is 2.5499... as a float)", () => {
+    // half-way at the shown precision: decimal rounding, and the sheet's Change_log2 breaks the tie (fold = 2^change)
+    expect(formatFold(2.55)).toBe("x2.6");
+    expect(formatFold(0.495)).toBe("x0.50");
+    expect(formatFold(0.075)).toBe("x0.08");
+    expect(formatFold(2.55, 1.351)).toBe("x2.6"); // 2^1.351 = 2.5509
+    expect(formatFold(0.495, -1.013)).toBe("x0.50"); // 2^-1.013 = 0.4955
+    expect(formatFold(0.075, -3.736)).toBe("x0.08"); // 2^-3.736 = 0.07505
+    expect(formatFold(2.55, 1.3495)).toBe("x2.5"); // 2^1.3495 = 2.5482: the change says the true fold is below half-way
+    expect(formatFold(15.141, 3.92)).toBe("x15.1");
+    expect(formatDecimal(2.55, 1)).toBe("2.6");
+    expect(formatDecimal(2.65, 1)).toBe("2.7");
+    expect(formatDecimal(-2.55, 1)).toBe("-2.6");
+    expect(formatDecimal(-0.04, 1)).toBe("0.0");
+    expect(formatDecimal(11.974, 1)).toBe("12.0");
+    expect(formatDecimal(null, 1)).toBe("–");
+
+    // the workbook rows the review named
+    const c2 = point("C002", "S100A12", "R+82")!;
+    expect([c2.fold, c2.change, c2.status]).toEqual([2.55, 1.351, "Borderline high"]);
+    expect(formatFold(c2.fold, c2.change)).toBe("x2.6");
+    expect(formatFold(point("C004", "IL17F", "R+82")!.fold, point("C004", "IL17F", "R+82")!.change)).toBe("x0.50");
+    expect(formatFold(point("C003", "IL17B", "R+82")!.fold, point("C003", "IL17B", "R+82")!.change)).toBe("x0.08");
+    const out = html(createElement(UrinePanelView, { view: view("C002"), initialTimepoint: "R+82" }));
+    expect(out).toMatch(/data-analyte="S100A12"[\s\S]*?x2\.6[\s\S]*?Borderline high/);
+
+    // every fold shown anywhere agrees with 2^Change_log2 to within half a shown step (plus the 3-decimal slack)
+    for (const p of file.persons) {
+      for (const a of view(p.person).analytes) {
+        for (const x of a.points) {
+          if (x.fold === null || x.change === null) continue;
+          const shown = Number(formatFold(x.fold, x.change).slice(1));
+          const exact = 2 ** x.change;
+          const step = x.fold >= 1 ? 0.1 : 0.01;
+          expect(Math.abs(shown - exact), `${p.person} ${a.analyte} ${x.timepoint}`).toBeLessThanOrEqual(step / 2 + exact * 4e-4 + 5e-4);
+        }
+      }
+    }
+  });
 });
 
 describe("GET /api/labs/urine", () => {
@@ -182,7 +222,8 @@ describe("Labs tab view (server render)", () => {
     const order = [...out.matchAll(/data-analyte="([^"]+)"/g)].map((m) => m[1]);
     expect(order.slice(0, 3)).toEqual(["BMP10", "S100A12", "CXCL8"]);
     expect(text).toContain("Outside personal range, also after sample-level adjustment");
-    expect(text).toContain("Changes versus your own pre-flight urine. Not a clinical test or a diagnosis.");
+    expect(text).toContain("Changes versus the person's own pre-flight urine. Not a clinical test or a diagnosis.");
+    expect(text).not.toMatch(/\byour own\b/i);
     expect(text).toContain("Borderline means: confirm before acting");
     expect(text).toContain("NASA OSDR OSD-656");
     expect(text).toContain("Alamar NULISA");
@@ -197,6 +238,22 @@ describe("Labs tab view (server render)", () => {
     const out = textOf(html(createElement(UrinePanelView, { view: view("C002"), initialTimepoint: "R+1", initialAnalyte: "CXCL8" })));
     expect(out).toContain("CXCL8 over time");
     expect(out).toContain("Personal range 8.6 to 15.4, baseline 12.0.");
+  });
+
+  it("phones: the analyte name is never cut (wraps, pill on its own row); lg truncates with a title", () => {
+    const out = html(createElement(UrinePanelView, { view: view("C003"), initialTimepoint: "R+1" }));
+    const names = [...out.matchAll(/<span([^>]*data-slot="labs-analyte-name"[^>]*)>([^<]*)<\/span>/g)];
+    expect(names.length).toBe(flaggedAt(view("C003"), "R+1").length);
+    for (const [, attrs, name] of names) {
+      expect(attrs).toContain(`title="${name}"`);
+      const cls = /class="([^"]*)"/.exec(attrs)![1].split(/\s+/);
+      expect(cls).not.toContain("truncate");
+      expect(cls).toContain("lg:truncate");
+      expect(cls).toContain("wrap-anywhere");
+    }
+    // the row is two columns below lg (pill under the name), three at lg
+    expect(out).toMatch(/data-analyte="[^"]+"[^>]*class="grid w-full grid-cols-\[18px_minmax\(0,1fr\)\] [^"]*lg:grid-cols-\[18px_minmax\(0,1fr\)_auto\]/);
+    expect(out).toContain('class="col-start-2 row-start-2 flex min-w-0 lg:col-start-3 lg:row-start-1 lg:justify-end"');
   });
 
   it("C001 R+1: no urine sample message", () => {
