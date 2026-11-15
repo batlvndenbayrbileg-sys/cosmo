@@ -46,7 +46,16 @@ export async function register(): Promise<void> {
       }
     }
   }
-  console.info(`[aegis] mission start date ${env.missionStartDate}, database ${env.dbPath}`);
+  // which database is actually used: Postgres (DATABASE_URL / POSTGRES_URL, host only, never the credentials) or SQLite
+  let database = `sqlite ${env.dbPath}`;
+  if (env.databaseUrl) {
+    try {
+      database = `postgres ${new URL(env.databaseUrl).hostname}`;
+    } catch {
+      database = "postgres (unparsable URL)";
+    }
+  }
+  console.info(`[aegis] mission start date ${env.missionStartDate}, database ${database}`);
 
   // ───────────────────────────────────────────────────────────────────────────────────────────
   // HOOK (another lane): ElevenLabs model probe goes here.
