@@ -2,7 +2,7 @@
 
 import type { KeyboardEvent } from "react";
 import Link from "next/link";
-import { Activity, Bell, CalendarDays, LayoutGrid, ListChecks, Satellite, type LucideIcon } from "lucide-react";
+import { Activity, Bell, CalendarDays, LayoutGrid, LifeBuoy, ListChecks, Satellite, type LucideIcon } from "lucide-react";
 import type { DashboardPayload } from "@/lib/types";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useI18n } from "@/i18n/I18nProvider";
@@ -11,7 +11,7 @@ import { AlertsStrip } from "./AlertsStrip";
 import type { Viewer } from "./logic";
 import { MascotPicture } from "./parts";
 
-export type NavSection = "overview" | "vitals" | "plan" | "trends" | "earth";
+export type NavSection = "overview" | "vitals" | "plan" | "trends" | "earth" | "guide";
 
 export const NAV_ITEMS: ReadonlyArray<{ id: NavSection; icon: LucideIcon }> = [
   { id: "overview", icon: LayoutGrid },
@@ -19,6 +19,7 @@ export const NAV_ITEMS: ReadonlyArray<{ id: NavSection; icon: LucideIcon }> = [
   { id: "plan", icon: ListChecks },
   { id: "trends", icon: CalendarDays },
   { id: "earth", icon: Satellite },
+  { id: "guide", icon: LifeBuoy },
 ];
 
 const ROUND_BTN =
