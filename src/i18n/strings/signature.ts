@@ -205,6 +205,16 @@ export const signatureStrings: AreaDicts = {
     "dashboard.signature.demo.beatName.d": "Single-assay signal",
     "dashboard.signature.demo.beatName.b": "Daily check-in",
     "dashboard.signature.demo.beatName.evidence": "Evidence",
+
+    "dashboard.signature.limits.label": "Limitations",
+    "dashboard.signature.limits.triage":
+      "n = 4 after a 3-day low-Earth-orbit flight, and the 20 and 40 zone limits were chosen on the same four people.",
+    "dashboard.signature.limits.fp":
+      "Multiplex research assays, not clinical tests, compared with only three pre-flight draws (one batch-shifted) and an unknown fasting state.",
+    "dashboard.signature.limits.rec":
+      "No sample between day 1 and day 45, so the decay is an upper bound, and the daily check-in rules are not validated.",
+    "dashboard.signature.limits.ev":
+      "Private astronauts with all samples taken on the ground and none in flight, so this is not evidence for long-duration missions.",
   },
   mn: {
     "dashboard.signature.title": "Цусны дохионы ангилал",
@@ -407,5 +417,15 @@ export const signatureStrings: AreaDicts = {
     "dashboard.signature.demo.beatName.d": "Ганц шинжилгээний дохио",
     "dashboard.signature.demo.beatName.b": "Өдөр тутмын асуулга",
     "dashboard.signature.demo.beatName.evidence": "Нотолгоо",
+
+    "dashboard.signature.limits.label": "Хязгаарлалт",
+    "dashboard.signature.limits.triage":
+      "n = 4, 3 хоногийн нам тойрог замын нислэгийн дараах өгөгдөл бөгөөд 20 ба 40-ийн бүсийн хязгаарыг мөн энэ дөрвөн хүн дээр сонгосон.",
+    "dashboard.signature.limits.fp":
+      "Эмнэлзүйн шинжилгээ биш, судалгааны мультиплекс шинжилгээ бөгөөд нислэгийн өмнөх зөвхөн гурван дээжтэй (нэг нь багцын шилжилттэй) харьцуулсан, өлөн байсан эсэх нь тодорхойгүй.",
+    "dashboard.signature.limits.rec":
+      "Газардсанаас хойш 1 ба 45 дахь өдрийн хооронд дээж байхгүй тул бууралт нь дээд хязгаарын тооцоо бөгөөд өдөр тутмын асуулгын дүрмийг баталгаажуулаагүй.",
+    "dashboard.signature.limits.ev":
+      "Хувийн сансрын нисгэгчид, бүх дээжийг дэлхий дээр авсан, нислэгийн үеэр нэг ч дээж аваагүй тул урт хугацааны нислэгийн нотолгоо биш.",
   },
 };

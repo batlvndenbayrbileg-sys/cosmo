@@ -11,6 +11,7 @@ import { OTHER_LARGE_FOLD, Z_CAP } from "@/lib/signature/config";
 import type { SignatureViewData } from "@/lib/signature/view";
 import type { PanelResult } from "@/lib/signature/types";
 import { cn } from "@/lib/utils";
+import { CardLimits } from "./CardLimits";
 import {
   drawerSeries,
   fingerprintRows,
@@ -150,6 +151,7 @@ export function FingerprintCard({ view, panel }: { view: SignatureViewData; pane
         <h2 id="sig-fp-title" className="text-[17px] leading-tight font-medium text-[var(--aegis-ink)]">
           {t("dashboard.signature.fp.title")}
         </h2>
+        <CardLimits card="fp" />
       </header>
       <p className="text-[12px] leading-snug text-[var(--aegis-label)]">{t("dashboard.signature.fp.hint", { cap: Z_CAP })}</p>
 

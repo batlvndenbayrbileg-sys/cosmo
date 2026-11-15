@@ -82,3 +82,55 @@ Checked 2026-11-15. Each page was read and the built-in steps in `src/lib/emerge
 Rules the tests enforce (`tests/emergency-guides.test.ts`): step 1 is always getting help (crew medical officer and flight surgeon; the local emergency number on Earth); lay first aid only; no diagnosis; no medicine or dose names except the auto-injector line; English and Mongolian have the same steps and sentence count; every guide is `reviewedBy: "PENDING"` and the app shows "not yet reviewed by a medical professional".
 
 Not from the cited pages (written for the space setting, flagged as such in the UI under "In space"): the notes that the station's own procedures decide how to hold a person for CPR and how to cool a burn (no running tap on the station), and that after landing or a long time in weightlessness standing up can make a person feel faint (orthostatic intolerance). These need review by the flight surgeon. The Mongolian texts need review by a native speaker with first-aid training.
+
+## Signature Triage (Inspiration4 blood panels)
+
+The twelve references of `docs/SIGNATURE_SPEC.md` section 11, numbered as there (the spec lists 8 after 12). Data files
+in `data/nasa/` are used read-only; every number on the `/signature` and `/demo/signature` pages is computed from them
+and checked against `docs/signature_reference/expected_values.json` and `expected_second_assay.json`.
+
+Datasets (NASA Open Science Data Repository)
+
+1. OSD-569 - Whole Blood Measurements from the SpaceX Inspiration4 Mission (RNA-seq, epitranscriptome, WGS, clonal
+   hematopoiesis, CBC). DOI 10.26030/e0rx-sh52. https://osdr.nasa.gov/bio/repo/data/studies/OSD-569
+2. OSD-575 - SpaceX Inspiration4 Blood Serum Metabolic Panel and Immune/Cardiac Cytokine Arrays (Comprehensive
+   Metabolic Panel and Multiplex). DOI 10.26030/mc5d-p710. https://osdr.nasa.gov/bio/repo/data/studies/OSD-575
+   (also the second assay of the addendum, the Alamar NULISAseq serum file).
+3. OSD-656 - SpaceX Inspiration4 Urine Inflammation Panel (Multiplex, NULISAseq). DOI 10.26030/7cax-yj10.
+   https://osdr.nasa.gov/bio/repo/data/studies/OSD-656 (cited for the rejected urine proxy; the file is not in the
+   repo and the engine does not read it).
+
+Papers
+
+4. Kim J. et al. Single-cell multi-ome and immune profiles of the Inspiration4 crew reveal conserved, cell-type, and
+   sex-specific responses to spaceflight. Nature Communications 15, 4954 (2024). DOI 10.1038/s41467-024-49211-2
+5. Overbey E. G. et al. Collection of biospecimens from the Inspiration4 mission establishes the standards for the
+   Space Omics and Medical Atlas (SOMA). Nature Communications 15 (2024). DOI 10.1038/s41467-024-48806-z
+
+NASA Human Research Program risks (no DOI; NASA pages and report numbers)
+
+6. Risk of Adverse Health Event Due to Altered Immune Response.
+   https://www.nasa.gov/directorates/esdmd/hhp/risk-of-adverse-health-event-due-to-altered-immune-response/
+   Evidence report: Crucian B., Sams C. F., NASA JSC, NTRS document 20140002769.
+7. Risk of Performance Decrements and Adverse Health Outcomes Resulting from Sleep Loss, Circadian
+   Desynchronization, and Work Overload. NASA evidence report, NTRS document 20160003864.
+
+Other
+
+8. Torchlight Biosovereignty Hackathon 2026, Inspiration4 guide ("Immune & Inflammatory Response" page):
+   https://torchlight-summit.pages.dev/narrative/immune/ - used only for the claim discussed in spec section 1.3.
+
+Other missions
+
+9. Gertz M. L. et al. Multi-omic, single-cell, and biochemical profiles of astronauts guide pharmacological strategies
+   for returning to gravity. Cell Reports 33(10), 108429 (2020). DOI 10.1016/j.celrep.2020.108429
+
+In-space measurement (technology demonstrations)
+
+10. Perusek G. P. et al. HemoCue ISS Tech Demo - Results and Lessons Learned. NASA Human Research Program
+    Investigators' Workshop 2022. NTRS document 20210026808. https://ntrs.nasa.gov/citations/20210026808
+11. ISS Technology Demonstrations for Future Spaceflight Medical Systems. ISS Research and Development Conference 2024.
+    NTRS document 20240004905.
+12. rHEALTH ONE Demonstration Aboard ISS. NASA Human Research Program Investigators' Workshop 2023. NTRS document
+    20230001079. https://ntrs.nasa.gov/citations/20230001079. Peer-reviewed report: Rea D. J. et al. Single drop
+    cytometry onboard the International Space Station. Nature Communications (2024). DOI 10.1038/s41467-024-46483-6

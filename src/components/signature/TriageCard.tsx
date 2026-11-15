@@ -11,6 +11,7 @@ import { T_HIGH, T_LOW, TIMEPOINT_DAY } from "@/lib/signature/config";
 import { spaceStatements } from "@/lib/signature/spaceMeasurability";
 import type { PanelResult, Timepoint } from "@/lib/signature/types";
 import { cn } from "@/lib/utils";
+import { CardLimits } from "./CardLimits";
 import {
   FRI_MAX,
   classLabel,
@@ -115,6 +116,7 @@ export function TriageCard({
         <h2 id="sig-triage-title" className="text-[17px] leading-tight font-medium text-[var(--aegis-ink)]">
           {t("dashboard.signature.triage.title")}
         </h2>
+        <CardLimits card="triage" />
         <span className="ml-auto flex flex-wrap items-center gap-1.5">
           <Badge variant="outline" className={cn("h-6 px-2.5 text-[12px]", BADGE_TONE[classTone(panel.cls)])}>
             {cls}

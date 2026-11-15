@@ -13,6 +13,7 @@ import {
   buildSecondAssayEvidence,
   type SecondAssayEvidenceRow,
 } from "@/lib/signature/evidence";
+import { CardLimits } from "./CardLimits";
 import { formatFri, markerName, numberList } from "./logic";
 
 const SUMMARY =
@@ -53,6 +54,7 @@ export function EvidenceCard() {
         <h2 id="sig-ev-title" className="text-[17px] leading-tight font-medium text-[var(--aegis-ink)]">
           {t("dashboard.signature.ev.title")}
         </h2>
+        <CardLimits card="ev" />
       </header>
 
       <div className="-mx-1 overflow-x-auto px-1">

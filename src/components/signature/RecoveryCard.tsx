@@ -10,6 +10,7 @@ import { spokenInt } from "@/lib/signature/facts";
 import { SIGNATURE_REFERENCE } from "@/lib/signature/reference";
 import type { SignatureViewData } from "@/lib/signature/view";
 import type { Timepoint } from "@/lib/signature/types";
+import { CardLimits } from "./CardLimits";
 import { FRI_MAX, drawView, formatFri, recoveryTimeline } from "./logic";
 
 const POINT = "var(--aegis-ink)";
@@ -98,6 +99,7 @@ export function RecoveryCard({
         <h2 id="sig-rec-title" className="text-[17px] leading-tight font-medium text-[var(--aegis-ink)]">
           {t("dashboard.signature.rec.title")}
         </h2>
+        <CardLimits card="rec" />
       </header>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_200px]">
