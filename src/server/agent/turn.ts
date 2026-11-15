@@ -50,6 +50,9 @@ import {
 } from "./machine";
 import { ScriptedAgent } from "./scriptedAgent";
 import { HybridAgent } from "./hybridAgent";
+import { createLocalAgent } from "./localLlm";
+import { localLlmConfig } from "./localLlmConfig";
+import { TieredAgent, logTier, type Tier } from "./tieredAgent";
 import { answerAskedQuestion, detectAskedQuestion, questionFacts, type AskedKind } from "./questions";
 import type { Baseline } from "@/lib/health/baseline";
 import { buildResultsFacts, numeralsAreGrounded, type ResultsFacts } from "./resultsFacts";
@@ -116,6 +119,7 @@ export function scriptedAgent(): Agent {
 }
 
 let hybridSingleton: HybridAgent | undefined;
+let tieredSingleton: HybridAgent | undefined;
 
 /**
  * Live mode with a key: the hybrid agent (instant rule-based path for clear answers, Claude for everything else and
@@ -123,6 +127,20 @@ let hybridSingleton: HybridAgent | undefined;
  */
 export function defaultAgent(): Agent {
   const env = getEnv();
+  // optional local model (LOCAL_LLM_URL + LOCAL_LLM_MODEL, never set on Vercel): Claude -> local -> rules
+  const local = env.demoMode === "live" ? localLlmConfig(env) : null;
+  if (local) {
+    if (!tieredSingleton) {
+      const tiers: Tier[] = [];
+      if (env.anthropicApiKey) {
+        // a refusal from Claude ends at the templates; it is never handed to the local model (tieredAgent.ts)
+        tiers.push({ tier: "claude", agent: new ClaudeAgent({ surfaceRefusals: true }) });
+      }
+      tiers.push({ tier: "local", agent: createLocalAgent(local) });
+      tieredSingleton = new HybridAgent(new TieredAgent(tiers), undefined, () => logTier("rules", "turn"));
+    }
+    return tieredSingleton;
+  }
   if (env.demoMode === "live" && env.anthropicApiKey) {
     claudeSingleton ??= new ClaudeAgent();
     hybridSingleton ??= new HybridAgent(claudeSingleton);

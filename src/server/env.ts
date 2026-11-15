@@ -22,7 +22,18 @@ const schema = z.object({
   POSTGRES_URL: optional,
   SESSION_SECRET: optional,
   MISSION_START_DATE: optional,
+  LOCAL_LLM_URL: optional,
+  LOCAL_LLM_MODEL: optional,
+  LOCAL_LLM_TIMEOUT_MS: optional,
+  LOCAL_LLM_ALLOW_REMOTE: optional,
 });
+
+/** a positive whole number of milliseconds, else undefined (the default applies); never throws */
+function parseMs(v: string | undefined): number | undefined {
+  if (v === undefined || !/^\d+$/u.test(v)) return undefined;
+  const n = Number(v);
+  return n > 0 ? n : undefined;
+}
 
 export interface Env {
   demoMode: "live" | "scripted";
@@ -43,6 +54,14 @@ export interface Env {
   databaseUrl?: string;
   sessionSecret?: string;
   missionStartDate: string;
+  /**
+   * Optional local language model (Ollama on the same machine), see src/server/agent/localLlm.ts. Both unset (as on
+   * Vercel): nothing changes. Used only when URL and model are both set and the host is local (or remote is allowed).
+   */
+  localLlmUrl?: string;
+  localLlmModel?: string;
+  localLlmTimeoutMs?: number;
+  localLlmAllowRemote: boolean;
 }
 
 export function parseEnv(source: Record<string, string | undefined>): Env {
@@ -64,6 +83,10 @@ export function parseEnv(source: Record<string, string | undefined>): Env {
     databaseUrl: e.DATABASE_URL ?? e.POSTGRES_URL,
     sessionSecret: e.SESSION_SECRET,
     missionStartDate: e.MISSION_START_DATE ?? "2026-10-01",
+    localLlmUrl: e.LOCAL_LLM_URL,
+    localLlmModel: e.LOCAL_LLM_MODEL,
+    localLlmTimeoutMs: parseMs(e.LOCAL_LLM_TIMEOUT_MS),
+    localLlmAllowRemote: e.LOCAL_LLM_ALLOW_REMOTE === "1",
   };
 }
 
