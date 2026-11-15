@@ -529,6 +529,23 @@ describe("the turn pipeline", () => {
     expect(summary.summary.spoken.text).toContain(summary.summary.disclaimer[lang]);
   });
 
+  it.each<[Lang, string]>([
+    ["mn", "Миний бие өнөөдөр ямар байна?"],
+    ["en", "How am I today?"],
+  ])("'how am I today?' before anything is recorded today walks through the recent days (%s)", async (lang, said) => {
+    const id = await startCheckIn("bat", lang);
+    await playTurn("bat", id, lang === "mn" ? "Сайн байна" : "Fine, thanks");
+    const events = await playTurn("bat", id, said);
+    const [explain] = eventsOf(events, "explain");
+    expect(explain, JSON.stringify(events.map((e) => (e.type === "assistant" ? e.text : e.type)))).toBeDefined();
+    expect(explain.intent).toBe("today");
+    expect(explain.beats.length).toBeGreaterThan(1);
+    expect(explain.beats[0].caption).toMatch(lang === "mn" ? /^Өнөөдөр хараахан хэмжилт алга тул сүүлийн үзлэгээ/u : /^Nothing is recorded yet today, so here is your last check-in/u);
+    // after the lead, no caption claims the values are today's
+    for (const b of explain.beats.slice(1)) expect(b.caption).not.toMatch(lang === "mn" ? /өнөөдөр/iu : /\btoday\b/iu);
+    expect((await ctxOf("bat", id)).state).toBe("SMALL_TALK");
+  });
+
   it("'how am I today?' mid check-in: the walkthrough, then the open question again; nothing recorded or moved", async () => {
     const id = await startCheckIn("bat", "en");
     for (const line of ["Hi Cosmo", "let's start", "6.5 hours", "4"]) await playTurn("bat", id, line);
@@ -594,11 +611,20 @@ describe("the turn pipeline", () => {
     expect(eventsOf(asked, "explain")).toHaveLength(1);
     expect(eventsOf(asked, "measurement")).toEqual([]);
     expect(await ctxOf("bat", id)).toEqual(ctx);
-    const words = "yes, why does my head hurt so much?";
+    // (not "so much": severe pain is a red flag and goes to the pain check first, see the next test)
+    const words = "yes, why does my head hurt?";
     expect(explainIntent(words)).toBe("why");
     const answered = await playTurn("bat", id, words);
     expect(eventsOf(answered, "explain")).toEqual([]);
     expect(eventsOf(answered, "measurement").map((m) => m.key)).toContain("symptom_headache");
+  });
+
+  it("severe pain at the symptoms question goes to the pain check (a red flag), never to a walkthrough", async () => {
+    const id = await startCheckIn("bat", "en");
+    for (const line of ["Hi Cosmo", "let's start", "6.5 hours", "4"]) await playTurn("bat", id, line);
+    const events = await playTurn("bat", id, "yes, why does my head hurt so much?");
+    expect(eventsOf(events, "explain")).toEqual([]);
+    expect(eventsOf(events, "pain")).toHaveLength(1);
   });
 
   it("the audio route voices one line of the walkthrough turn (?part=n), and nothing past its end", async () => {

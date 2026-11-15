@@ -917,6 +917,43 @@ function steadyItem(stats: Map<KpiKey, KpiStat>, key: KpiKey): Item | null {
 /* ───────────── on the turn ───────────── */
 
 /** the storyboard as one stored Cosmo turn (one caption per line) and its `explain` event */
+/** the newest past day with any value, and the days before it (the walkthrough's "today" and its history) */
+function lastRecordedDay(history: HistoryDay[]): { day: HistoryDay; rest: HistoryDay[] } | null {
+  const sorted = [...history].sort((a, b) => a.date.localeCompare(b.date));
+  for (let i = sorted.length - 1; i >= 0; i--) {
+    if (Object.values(sorted[i].values).some((v) => v !== null && v !== undefined && v !== "")) {
+      return { day: sorted[i], rest: sorted.slice(0, i) };
+    }
+  }
+  return null;
+}
+
+/**
+ * A walkthrough built from a past day's values: the first caption says which day it is, and "today" in the captions
+ * becomes "that day" (no number changes, so the caption gate's facts still hold).
+ */
+function asOfDay(board: Storyboard, date: string): Storyboard {
+  const md = date.slice(5).replace("-", "/");
+  const lead: Bilingual = {
+    en: `Nothing is recorded yet today, so here is your last check-in, on ${md}.`,
+    mn: `Өнөөдөр хараахан хэмжилт алга тул сүүлийн үзлэгээ (${md}) харцгаая.`,
+  };
+  const swap = (s: string, lang: Lang) =>
+    lang === "en"
+      ? s.replace(/\btoday's\b/gu, "that day's").replace(/\bToday\b/gu, "That day").replace(/\btoday\b/gu, "that day")
+      : s.replace(/Өнөөдрийн/gu, "Тэр өдрийн").replace(/өнөөдрийн/gu, "тэр өдрийн").replace(/Өнөөдөр/gu, "Тэр өдөр").replace(/өнөөдөр/gu, "тэр өдөр");
+  return {
+    intent: board.intent,
+    beats: board.beats.map((b, i) => ({
+      ...b,
+      caption: {
+        en: i === 0 ? join(lead.en, swap(b.caption.en, "en")) : swap(b.caption.en, "en"),
+        mn: i === 0 ? join(lead.mn, swap(b.caption.mn, "mn")) : swap(b.caption.mn, "mn"),
+      },
+    })),
+  };
+}
+
 async function storeWalkthrough(
   crewId: string,
   checkInId: string,
@@ -1034,14 +1071,19 @@ export async function explainQuestionTurn(p: {
   const values = (await loadTodayValues(p.crewId, p.checkInId)).values;
   const history = await loadHistory(p.crewId, p.localDate);
   const final = ctx.state === "DONE";
-  const board = buildStoryboard({
+  // "how am I today?" before anything was recorded today (start of the day, the assistant): walk through the most
+  // recent check-in day instead, and say so (seen live 2026-11-15: the question fell through to small talk)
+  const nothingToday = Object.values(values).every((v) => v === null || v === undefined || v === "");
+  const latest = nothingToday && intent !== "before" ? lastRecordedDay(history) : null;
+  const board0 = buildStoryboard({
     intent,
-    values,
-    history,
+    values: latest ? latest.day.values : values,
+    history: latest ? latest.rest : history,
     final,
     topics: topicKeys(p.text),
     signature: final && intent === "today" ? signatureFor(p.crewId, p.localDate, history, values) : null,
   });
+  const board = board0 && latest ? asOfDay(board0, latest.day.date) : board0;
   if (!board) return null;
 
   const expected = ctx.state === "KPI_CAPTURE" ? cursorQuestion(ctx) : null;
