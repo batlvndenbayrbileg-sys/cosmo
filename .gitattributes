@@ -4,3 +4,5 @@
 /docs/signature_reference/** -text
 # the app's copy of the fixture stays a byte copy of docs/signature_reference/expected_values.json
 /src/data/signature_reference.json -text
+# the same for the second-assay fixture (addendum T11): a byte copy of docs/signature_reference/expected_second_assay.json
+/src/data/signature_second_assay.json -text
