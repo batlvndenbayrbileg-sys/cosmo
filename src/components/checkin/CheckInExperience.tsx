@@ -38,6 +38,7 @@ import { DashboardTalk, type TalkStatus } from "./DashboardTalk";
 import { ListeningPill } from "./ListeningPill";
 import { handsFreeAllowed, listeningPillMode, pillQuoteSource, quoteForPill } from "./listening";
 import { playHeardEarcon } from "./earcon";
+import { ShowStage } from "@/components/show/ShowPanels";
 import { EmergencyOverlay } from "@/components/emergency/EmergencyOverlay";
 import { EMERGENCY_REQUEST_EVENT } from "@/components/emergency/EmergencyGuidePanel";
 import { useEmergencyLibrary } from "@/components/emergency/hooks";
@@ -752,6 +753,14 @@ export function CheckInExperience() {
               onSendText={handleSendText}
             />
           ) : null}
+          {/* the small panels Cosmo shows when asked about a value (show event), above her dock */}
+          <ShowStage
+            show={state.show}
+            hold={state.busy || state.speech !== "idle"}
+            onDismiss={checkIn.dismissShow}
+            placement="dashboard"
+            checkInId={state.checkInId}
+          />
           {veil ? (
             <motion.div
               aria-hidden="true"
@@ -898,6 +907,16 @@ export function CheckInExperience() {
                 <VisionCard key="vision" />
               ) : null}
             </AnimatePresence>
+
+            {/* the small panels Cosmo shows beside her (show event): right of her on wide screens, under her on phones */}
+            <ShowStage
+              show={preparing ? null : state.show}
+              hold={state.busy || state.speech !== "idle"}
+              onDismiss={checkIn.dismissShow}
+              placement={layout.mode === "wide" ? "wide" : "narrow"}
+              top={layout.captionY + 36}
+              checkInId={state.checkInId}
+            />
 
             {/* captured values */}
             <ul aria-label={t("checkin.bubbles.title")} className="contents">

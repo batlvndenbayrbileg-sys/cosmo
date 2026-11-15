@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { CalendarDays, ListChecks, Radar as RadarIcon } from "lucide-react";
+import { CalendarDays, ListChecks, PersonStanding, Radar as RadarIcon } from "lucide-react";
 import type { DashboardPayload, HazardKey, HazardStat, KpiKey, KpiStat } from "@/lib/types";
 import { useShellHeader } from "@/components/shell";
 import { StatusGlyph } from "@/components/status";
@@ -13,6 +13,9 @@ import { suggestGuides } from "@/lib/emergency";
 import { EmergencyGuidePanel } from "@/components/emergency/EmergencyGuidePanel";
 import { useEmergencyLibrary } from "@/components/emergency/hooks";
 import { LabsPanel } from "@/components/labs/LabsPanel";
+import { BodyMap } from "@/components/show/BodyMap";
+import { OPEN_DASHBOARD_SECTION_EVENT } from "@/components/show/ShowPanels";
+import { showVitalFromStat } from "@/lib/show";
 import { AlertsStrip } from "./AlertsStrip";
 import { IfWorseCard } from "./IfWorseCard";
 import { BodyHero } from "./BodyHero";
@@ -92,6 +95,17 @@ export function DashboardView({ payload, viewer, dockSlot, dockOpen }: Dashboard
   const related = useMemo(() => cardsRelatedToHazard(cards, hazardStat), [cards, hazardStat]);
 
   const navigate = useCallback((next: NavSection) => setSection(next), []);
+  const bodyVitals = useMemo(() => payload.kpis.map(showVitalFromStat), [payload.kpis]);
+
+  // a panel Cosmo shows (the labs card) can switch the tab
+  useEffect(() => {
+    const onOpen = (e: Event) => {
+      const next = (e as CustomEvent<{ section?: NavSection }>).detail?.section;
+      if (next) setSection(next);
+    };
+    window.addEventListener(OPEN_DASHBOARD_SECTION_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_DASHBOARD_SECTION_EVENT, onOpen);
+  }, []);
 
   // emergency guide: built-in guides at once (works offline), team content when the server has it
   const emergencyLib = useEmergencyLibrary();
@@ -169,13 +183,30 @@ export function DashboardView({ payload, viewer, dockSlot, dockOpen }: Dashboard
             <p className="text-[13px] text-[var(--aegis-label)] lg:text-[12px]">{t("dashboard.vitals.textHidden")}</p>
           ) : null}
         </div>
-        <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:min-h-0 lg:flex-1 lg:auto-rows-[minmax(0,1fr)] lg:grid-flow-row-dense lg:grid-cols-5 lg:gap-[clamp(8px,1.2vh,14px)]">
-          {ordered.map((card) => (
-            <li key={card.id} className={cn("min-h-0 min-w-0", (card.kind === "bp" || card.kind === "symptoms") && "lg:row-span-2")}>
-              <KpiCard card={card} byKey={byKey} viewer={viewer} highlighted={related.has(card.id)} compact />
-            </li>
-          ))}
-        </ul>
+        <div className="flex flex-col gap-4 lg:grid lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,2.3fr)] lg:gap-[clamp(10px,1.2vw,18px)]">
+          {/* the body figure with callouts: each value beside the part of the body it belongs to */}
+          <section aria-labelledby="body-map-title" data-slot="body-map-card" className="glass-card flex flex-col gap-1 p-3 lg:min-h-0">
+            <div className="flex items-center gap-2 px-1">
+              <span aria-hidden="true" className="icon-chip size-7!">
+                <PersonStanding className="size-3.5" />
+              </span>
+              <div className="min-w-0">
+                <h3 id="body-map-title" className="text-[15px] leading-tight font-medium text-[var(--aegis-ink)]">
+                  {t("dashboard.bodyMap.title")}
+                </h3>
+                <p className="truncate text-[11.5px] text-[var(--aegis-label)]">{t("dashboard.bodyMap.subtitle")}</p>
+              </div>
+            </div>
+            <BodyMap vitals={bodyVitals} animate={!reduced} className="h-[360px] lg:h-auto lg:min-h-0 lg:flex-1" />
+          </section>
+          <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:min-h-0 lg:auto-rows-[minmax(0,1fr)] lg:grid-flow-row-dense lg:grid-cols-4 lg:gap-[clamp(8px,1.2vh,14px)]">
+            {ordered.map((card) => (
+              <li key={card.id} className={cn("min-h-0 min-w-0", (card.kind === "bp" || card.kind === "symptoms") && "lg:row-span-2")}>
+                <KpiCard card={card} byKey={byKey} viewer={viewer} highlighted={related.has(card.id)} compact />
+              </li>
+            ))}
+          </ul>
+        </div>
       </section>
     ),
     plan: () => (

@@ -73,6 +73,8 @@ export interface UseCheckIn {
   setTyping: (text: string | null) => void;
   dismissError: () => void;
   dismissClarification: () => void;
+  /** hide the panels Cosmo is showing */
+  dismissShow: () => void;
   /**
    * The crew member switched EN/MN on the screen: the open check-in continues in that language (Cosmo says so and
    * repeats where it stands, through `onAssistant`). Resolves false when nothing changed or the request failed.
@@ -227,6 +229,7 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckIn {
   const setTyping = useCallback((text: string | null) => dispatch({ type: "TYPING", text }), []);
   const dismissError = useCallback(() => dispatch({ type: "DISMISS_ERROR" }), []);
   const dismissClarification = useCallback(() => dispatch({ type: "DISMISS_CLARIFICATION" }), []);
+  const dismissShow = useCallback(() => dispatch({ type: "DISMISS_SHOW" }), []);
 
   const setLanguage = useCallback(async (language: Lang): Promise<boolean> => {
     const id = checkInId.current;
@@ -262,6 +265,7 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckIn {
     setTyping,
     dismissError,
     dismissClarification,
+    dismissShow,
     setLanguage,
   };
 }
