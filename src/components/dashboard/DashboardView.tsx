@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
