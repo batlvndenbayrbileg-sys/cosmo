@@ -4,6 +4,7 @@
  * Source of truth for the question set and the dashboard: docs/DASHBOARD_PLAN.md
  */
 import type { ShowPanel } from "./show";
+import type { ExplainEvent } from "./explain";
 
 export type Lang = "mn" | "en";
 export type Bilingual = Record<Lang, string>;
@@ -372,6 +373,8 @@ export type TurnEvent =
   | { type: "summary"; summary: SummaryPayload }
   /** small panels Cosmo shows on screen beside her (decided by code from the words and the data; src/lib/show.ts) */
   | { type: "show"; panels: ShowPanel[] }
+  /** Cosmo explains one thing at a time: an ordered storyboard of captions and panels (src/lib/explain.ts) */
+  | ExplainEvent
   | { type: "timing"; sttMs: number; llmMs: number; totalMs: number }
   | { type: "error"; code: ApiErrorCode; message: string; recoverable: boolean }
   /** the crew member asked Cosmo to alert Earth (src/lib/sos): ok = the urgent alert is stored (or already was) */

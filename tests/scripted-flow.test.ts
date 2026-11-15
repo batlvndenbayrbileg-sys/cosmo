@@ -64,6 +64,8 @@ describe.each<Lang>(["en", "mn"])("scripted demo flow (%s)", (lang) => {
       summary: 5,
       // the panels Cosmo shows on screen (show.ts) come after her words
       show: 6,
+      // Cosmo's step-by-step walkthrough (explain.ts) comes after the summary, before the timing
+      explain: 6,
       timing: 7,
       done: 8,
     };

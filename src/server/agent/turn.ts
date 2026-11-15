@@ -72,6 +72,7 @@ import type { Baseline } from "@/lib/health/baseline";
 import { buildResultsFacts, numeralsAreGrounded, type ResultsFacts } from "./resultsFacts";
 import { answerSignatureQuestion, insertBeforeDisclaimer, panelClockDay, signatureFollowUp } from "./signature";
 import { showEvent } from "./show";
+import { explainQuestionTurn, explainSummaryEvent } from "./explain";
 
 /** without the model: today's headline, the first suggestion, and an invitation to ask about any part */
 export function offlineResultsAnswer(facts: ResultsFacts, lang: Lang): string {
@@ -635,6 +636,15 @@ async function* runTurnInner(args: RunTurnArgs, started: number): AsyncGenerator
     return;
   }
 
+  /* ── Cosmo explains: "how am I today?", "was it like this before?", "why do I feel tired?" at any point (explain.ts) ── */
+  const explained = await explainQuestionTurn({ crewId, checkInId, localDate: checkIn.localDate, text, lang, ctx: ctx0 });
+  if (explained) {
+    yield* explained;
+    yield { type: "timing", sttMs: Math.max(0, Math.round(input.sttMs ?? 0)), llmMs: 0, totalMs: Math.round(performance.now() - started) };
+    yield { type: "done" };
+    return;
+  }
+
   const env = getEnv();
   const source: MeasurementSource = input.kind === "voice" ? "voice" : env.demoMode === "scripted" ? "simulated" : "typed";
 
@@ -1123,6 +1133,11 @@ async function* runTurnInner(args: RunTurnArgs, started: number): AsyncGenerator
     crewId,
   });
   if (show) out.push(show);
+  // after the summary: Cosmo's step-by-step walkthrough, which replaces the dashboard intro (explain.ts)
+  const walkthrough = summaryRequested
+    ? await explainSummaryEvent({ crewId, checkInId, localDate: checkIn.localDate, lang, values: valuesNow, history: history14 })
+    : null;
+  if (walkthrough) out.push(walkthrough);
 
   out.push({
     type: "timing",
