@@ -73,6 +73,7 @@ export function offlineResultsAnswer(facts: ResultsFacts, lang: Lang): string {
   return parts.join(" ").replace(/\.\./g, ".");
 }
 import * as T from "./templates";
+import { reaskAfterFailedAnswer } from "./reask";
 import { executeTool, type ToolContext, type ToolName, type ToolResult } from "./tools";
 
 /**
@@ -396,7 +397,7 @@ function renderTemplate(
     case "ask":
       return join(skipNotice, T.askQuestion(getQuestion(effect.question as QuestionId), lang, acknowledged));
     case "clarify":
-      return T.clarify(getQuestion(effect.question as QuestionId), lang, effect.reason ?? "unclear", effect.attempt ?? 0);
+      return reaskAfterFailedAnswer(getQuestion(effect.question as QuestionId), lang, effect.reason ?? "unclear", effect.attempt ?? 0);
     case "restated":
       return join(TEMPLATES_EXTRA.restated[lang], T.askQuestion(getQuestion(effect.question as QuestionId), lang));
     case "readBack":

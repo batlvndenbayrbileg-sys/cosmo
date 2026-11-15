@@ -5,8 +5,11 @@
  *
  *  - MediaRecorder with audio/webm;codecs=opus, falling back to the browser's default type.
  *  - Voice-activity detection: an AnalyserNode is sampled every 50 ms and fed to the pure state
- *    machine in components/checkin/vad.ts (900 ms of silence ends the utterance, 300 ms minimum
- *    speech, 30 s maximum). When VAD is off (push-to-talk) the caller ends the utterance.
+ *    machine in components/checkin/vad.ts (1.5 s of quiet ends a short answer, 1 s a long one, 200 ms
+ *    minimum speech, 30 s maximum). When VAD is off (push-to-talk) the caller ends the utterance.
+ *  - `heard`: the person has started speaking in this recording (the screen then offers "Done" to send at once).
+ *  - endBargeIn(): Cosmo finished and nobody talked over her. The open microphone switches to normal listening at
+ *    once instead of closing and reopening (that gap, ~0.5-1 s, lost the first words of an answer given right away).
  *  - Half-duplex: the microphone stream is opened per listen and released afterwards, so the mic is
  *    really closed while Cosmo speaks; the caller simply does not call start() until she is done.
  *  - Errors (permission denied, no device, unsupported browser) are reported through `onError`; the
@@ -18,6 +21,7 @@ import { pickRecorderMimeType } from "@/components/checkin/speech";
 import {
   DEFAULT_VAD_CONFIG,
   createVadState,
+  handOverVadState,
   rmsFromSamples,
   stepVad,
   voicingFromSpectrum,
@@ -69,8 +73,15 @@ export interface RecorderApi {
   recording: boolean;
   /** true when the current recording ends by itself (VAD), false for push-to-talk */
   autoStop: boolean;
+  /** the VAD heard the person start speaking in the current recording */
+  heard: boolean;
   level: LevelStore;
   start: (options?: StartOptions) => Promise<boolean>;
+  /**
+   * The barge-in recording (open while Cosmo spoke) becomes normal listening without closing the microphone. Returns
+   * false when there is no barge-in recording to hand over (the caller then cancels or starts as usual).
+   */
+  endBargeIn: () => boolean;
   /** end the recording and send what was captured */
   stop: () => void;
   /** end the recording and throw it away */
@@ -79,6 +90,15 @@ export interface RecorderApi {
 
 const SAMPLE_MS = 50;
 const TIMESLICE_MS = 250;
+
+/** Marks the end of an utterance on the performance timeline (latency to Cosmo's reply can be read in devtools). */
+function markUtteranceEnd(): void {
+  try {
+    performance.mark("aegis:utterance-end");
+  } catch {
+    // no performance timeline
+  }
+}
 
 function createLevelStore(): LevelStore & { set: (value: number) => void } {
   let value = 0;
@@ -122,6 +142,13 @@ interface Session {
   startedAt: number;
   /** hard cap of this recording in ms (see recordingCapMs) */
   capMs: number;
+  /** the VAD settings in use (barge-in until endBargeIn) */
+  config: VadConfig;
+  /** the settings for normal listening, what endBargeIn switches to */
+  normalConfig: VadConfig;
+  bargeIn: boolean;
+  /** drop the audio so far and record afresh on the same stream */
+  restart: () => void;
 }
 
 function errorKind(error: unknown): RecorderError["kind"] {
@@ -138,6 +165,7 @@ export function useRecorder(options: UseRecorderOptions): RecorderApi {
   const [permission, setPermission] = useState<MicPermission>("unknown");
   const [recording, setRecording] = useState(false);
   const [autoStop, setAutoStop] = useState(true);
+  const [heard, setHeard] = useState(false);
   const [level] = useState(createLevelStore);
 
   const optionsRef = useRef(options);
@@ -151,6 +179,7 @@ export function useRecorder(options: UseRecorderOptions): RecorderApi {
 
   const emitRecording = useCallback((value: boolean) => {
     setRecording(value);
+    setHeard(false);
     optionsRef.current.onRecordingChange?.(value);
   }, []);
 
@@ -201,6 +230,7 @@ export function useRecorder(options: UseRecorderOptions): RecorderApi {
         const blob = new Blob(chunks, { type });
         // recording flag and utterance are published in the same tick: no idle flicker in between
         setRecording(false);
+        setHeard(false);
         optionsRef.current.onRecordingChange?.(false);
         if (send && blob.size > 0) optionsRef.current.onUtterance(blob);
       };
@@ -224,6 +254,7 @@ export function useRecorder(options: UseRecorderOptions): RecorderApi {
     }
     release(s);
     setRecording(false);
+    setHeard(false);
     optionsRef.current.onRecordingChange?.(false);
   }, [release]);
 
@@ -265,7 +296,8 @@ export function useRecorder(options: UseRecorderOptions): RecorderApi {
         const useVad = startOptions?.vad !== false;
         const mimeType = pickRecorderMimeType((t) => MediaRecorder.isTypeSupported(t));
         const bargeIn = useVad && startOptions?.bargeIn === true;
-        const config: VadConfig = { ...DEFAULT_VAD_CONFIG, ...optionsRef.current.vad, ...(bargeIn ? BARGE_IN_VAD : {}) };
+        const normalConfig: VadConfig = { ...DEFAULT_VAD_CONFIG, ...optionsRef.current.vad };
+        const config: VadConfig = bargeIn ? { ...normalConfig, ...BARGE_IN_VAD } : normalConfig;
 
         // analysis graph: source -> analyser only (never to the speakers, that would echo)
         let context: AudioContext | null = null;
@@ -302,6 +334,21 @@ export function useRecorder(options: UseRecorderOptions): RecorderApi {
           ended: false,
           startedAt: performance.now(),
           capMs: recordingCapMs(config, useVad && analyser !== null),
+          config,
+          normalConfig,
+          bargeIn,
+          restart: () => {
+            const old = s.recorder;
+            old.ondataavailable = null;
+            old.onstop = null;
+            try {
+              if (old.state !== "inactive") old.stop();
+            } catch {
+              // already stopped
+            }
+            s.recorder = createRecorder({ stream, mimeType }, () => holder.current);
+            s.recorder.start(TIMESLICE_MS);
+          },
         };
         holder.current = s;
         session.current = s;
@@ -330,42 +377,25 @@ export function useRecorder(options: UseRecorderOptions): RecorderApi {
             analyser.getFloatFrequencyData(spectrum);
             voiced = voicingFromSpectrum(spectrum, sampleRate, analyser.fftSize).voiced;
           }
-          const step = stepVad(s.vad, { rms, dtMs, voiced }, config);
+          const step = stepVad(s.vad, { rms, dtMs, voiced }, s.config);
           s.vad = step.state;
           switch (step.signal) {
             case "speech_start": {
-              if (bargeIn) {
-                // start the audio at the person's voice: what came before is Cosmo's echo, not an answer
-                const old = s.recorder;
-                old.ondataavailable = null;
-                old.onstop = null;
-                try {
-                  if (old.state !== "inactive") old.stop();
-                } catch {
-                  // already stopped
-                }
-                s.recorder = createRecorder({ stream, mimeType }, () => holder.current);
-                s.recorder.start(TIMESLICE_MS);
-              }
-              optionsRef.current.onSpeechStart?.({ bargeIn });
+              // barge-in: start the audio at the person's voice, what came before is Cosmo's echo, not an answer
+              if (s.bargeIn) s.restart();
+              setHeard(true);
+              optionsRef.current.onSpeechStart?.({ bargeIn: s.bargeIn });
               break;
             }
             case "utterance_end":
             case "max_length":
+              markUtteranceEnd();
               finish(s, true);
               break;
             case "too_short": {
               // a click or a cough: drop the audio so far and keep listening with a fresh recorder
-              const old = s.recorder;
-              old.ondataavailable = null;
-              old.onstop = null;
-              try {
-                if (old.state !== "inactive") old.stop();
-              } catch {
-                // already stopped
-              }
-              s.recorder = createRecorder({ stream, mimeType }, () => holder.current);
-              s.recorder.start(TIMESLICE_MS);
+              s.restart();
+              setHeard(false);
               break;
             }
             case "no_speech":
@@ -394,9 +424,31 @@ export function useRecorder(options: UseRecorderOptions): RecorderApi {
   );
 
   const stop = useCallback(() => {
-    if (session.current) finish(session.current, true);
-    else gate.defer("stop");
+    if (session.current) {
+      markUtteranceEnd();
+      finish(session.current, true);
+    } else gate.defer("stop");
   }, [finish, gate]);
+
+  const endBargeIn = useCallback((): boolean => {
+    const s = session.current;
+    if (!s || s.ended || !s.bargeIn || !s.vad) return false;
+    s.bargeIn = false;
+    s.config = s.normalConfig;
+    if (s.vad.phase === "waiting") {
+      // nobody spoke over Cosmo: record afresh (her echo is not an answer) and listen at once, without a new room
+      // calibration that would swallow an answer given right away (handOverVadState)
+      try {
+        s.restart();
+      } catch {
+        return false;
+      }
+      s.vad = handOverVadState(s.vad, s.normalConfig);
+      s.startedAt = performance.now();
+      s.capMs = recordingCapMs(s.normalConfig, true);
+    }
+    return true;
+  }, []);
 
   const cancel = useCallback(() => {
     if (session.current) finish(session.current, false);
@@ -423,5 +475,5 @@ export function useRecorder(options: UseRecorderOptions): RecorderApi {
     };
   }, [gate, release]);
 
-  return { supported, permission, recording, autoStop, level, start, stop, cancel };
+  return { supported, permission, recording, autoStop, heard, level, start, stop, cancel, endBargeIn };
 }

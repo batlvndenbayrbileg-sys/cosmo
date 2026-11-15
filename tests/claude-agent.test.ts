@@ -505,8 +505,12 @@ describe("turn pipeline with a live agent", () => {
     await toCapture(checkInId);
     const agent = withReply("No worries. How is your mood from 1 to 5?");
     const first = await playTurn("bat", checkInId, "no idea really", { agent });
-    expect(assistantText(first)).toMatch(/didn't catch that/i); // clarification: template, not the model
-    await playTurn("bat", checkInId, "I really don't know", { agent });
+    // clarification: template, not the model. The first unclear answer is asked again gently (reask.ts); the
+    // "didn't catch" line comes with the second one
+    expect(assistantText(first)).toMatch(/say that once more/i);
+    expect(assistantText(first)).not.toContain("No worries");
+    const second = await playTurn("bat", checkInId, "I really don't know", { agent });
+    expect(assistantText(second)).toMatch(/didn't catch that/i);
     const third = await playTurn("bat", checkInId, "still no idea", { agent });
     expect(eventsOf(third, "state")[0].expectedQuestion).toBe("mood");
     expect(assistantText(third)).toMatch(/add it when we confirm/i);
