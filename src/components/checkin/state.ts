@@ -231,6 +231,9 @@ function applyEvent(state: CheckInState, event: TurnEvent): CheckInState {
     case "sos":
       // the SOS status card (src/components/sos) follows it; the conversation itself is unchanged
       return state;
+    case "explain":
+      // the walkthrough is played by the screen (onExplain in useCheckIn); its words arrived as the assistant line
+      return state;
   }
 }
 

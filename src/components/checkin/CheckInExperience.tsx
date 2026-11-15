@@ -39,6 +39,8 @@ import { ListeningPill } from "./ListeningPill";
 import { handsFreeAllowed, listeningPillMode, pillQuoteSource, quoteForPill } from "./listening";
 import { playHeardEarcon } from "./earcon";
 import { ShowStage } from "@/components/show/ShowPanels";
+import { ExplainerStage } from "@/components/explain/ExplainerStage";
+import type { ExplainEvent } from "@/lib/explain";
 import { EmergencyOverlay } from "@/components/emergency/EmergencyOverlay";
 import { EMERGENCY_REQUEST_EVENT } from "@/components/emergency/EmergencyGuidePanel";
 import { useEmergencyLibrary } from "@/components/emergency/hooks";
@@ -153,6 +155,8 @@ export function CheckInExperience() {
   /** index into the transcript where the after-check-in conversation starts */
   const [talkFrom, setTalkFrom] = useState(0);
   const tourCancelled = useRef(false);
+  /** Cosmo explains one thing at a time (src/components/explain): after the summary (then the dashboard), or a question */
+  const [explainer, setExplainer] = useState<{ event: ExplainEvent; checkInId: string; after: "dashboard" | "talk" } | null>(null);
   /** "Cosmo looks at you" (camera face following): off unless turned on here before */
   const faceFollow = useSyncExternalStore(faceFollowPref.subscribe, faceFollowPref.read, () => false);
   const [faceHint, setFaceHint] = useState<FaceTrackFailure | null>(null);
@@ -255,10 +259,16 @@ export function CheckInExperience() {
       lastTurn.current = speakTurn;
       void speakRef.current?.(speakTurn);
     },
-    onSummary: (summary, checkInId) => {
+    onSummary: (summary, checkInId, explain) => {
       setConversationMode(false);
       cancelRecordingRef.current?.();
-      void openDashboard(checkInId, summary);
+      // the step-by-step walkthrough replaces the dashboard intro; the dashboard opens after it (or from its button)
+      if (explain) setExplainer({ event: explain, checkInId, after: "dashboard" });
+      else void openDashboard(checkInId, summary);
+    },
+    onExplain: (explain, checkInId) => {
+      cancelRecordingRef.current?.();
+      setExplainer({ event: explain, checkInId, after: "talk" });
     },
     onResumedFinished: (checkInId) => {
       setConversationMode(false);
@@ -316,6 +326,20 @@ export function CheckInExperience() {
     cancelRecordingRef.current = cancelRecorder;
   }, [speak, cancelRecorder]);
 
+  // the walkthrough closes: after the summary the dashboard opens; after a question Cosmo picks the check-in up again
+  // (the open question said once more) unless `quiet` (emergency guidance takes over)
+  const closeExplainer = useCallback(
+    (quiet = false) => {
+      if (!explainer) return;
+      setExplainer(null);
+      const { event, checkInId } = explainer;
+      const resume = event.resume;
+      if (explainer.after === "dashboard") void openDashboard(checkInId, null);
+      else if (!quiet && resume) void speak({ checkInId, turnId: event.turnId, part: resume.part, text: resume.text, language: event.language });
+    },
+    [explainer, openDashboard, speak],
+  );
+
   // start the check-in (Cosmo greets right away) and look at /api/health once
   useEffect(() => {
     void createCheckIn();
@@ -360,7 +384,7 @@ export function CheckInExperience() {
   const scripted = health?.mode === "scripted";
   const talking = phase === "conversation";
   /** the microphone may be used: during the check-in, and on the dashboard once the spoken tour is over */
-  const canTalk = talking || (phase === "dashboard" && afterTalk && !touring);
+  const canTalk = !explainer && (talking || (phase === "dashboard" && afterTalk && !touring));
 
   /* ───────────── demo ───────────── */
 
@@ -556,6 +580,7 @@ export function CheckInExperience() {
 
   const openEmergency = useCallback(
     (id: string | null) => {
+      closeExplainer(true);
       cancelRecorder();
       stopSpeech();
       tourCancelled.current = true;
@@ -574,7 +599,7 @@ export function CheckInExperience() {
           .catch(() => {});
       }
     },
-    [cancelRecorder, stopSpeech, checkInIdNow],
+    [cancelRecorder, stopSpeech, checkInIdNow, closeExplainer],
   );
 
   // the dashboard's "Emergency guide" tab asks for help through a window event (DashboardView knows no check-in)
@@ -739,6 +764,29 @@ export function CheckInExperience() {
     />
   );
 
+  // Cosmo explains one thing at a time; she moves to its side (the shared element leaves the stage or the dock)
+  const explainerUi = explainer ? (
+    <ExplainerStage
+      key={explainer.event.turnId}
+      explain={explainer.event}
+      checkInId={explainer.checkInId}
+      cosmo={cosmo}
+      mascotVariant={variant}
+      speak={(b) =>
+        speak({ checkInId: explainer.checkInId, turnId: explainer.event.turnId, part: b.part, text: b.text, language: explainer.event.language })
+      }
+      stopSpeech={stopSpeech}
+      onClose={() => closeExplainer()}
+      onOpenDashboard={explainer.after === "dashboard" ? () => closeExplainer() : undefined}
+      autoCloseMs={explainer.after === "dashboard" ? 12_000 : 900}
+      onContactGround={() => {
+        void sendSosToEarth({ checkInId: explainer.checkInId, lang: state.language ?? lang });
+        openEmergency(null);
+      }}
+      onOpenGuide={(id) => openEmergency(id)}
+    />
+  ) : null;
+
   if (phase === "dashboard" && dashboard) {
     return (
       <MotionConfig reducedMotion="user">
@@ -746,7 +794,7 @@ export function CheckInExperience() {
           <DashboardView
             payload={dashboard}
             viewer="crew"
-            dockSlot={cosmo}
+            dockSlot={explainer ? <span aria-hidden="true" /> : cosmo}
             dockOpen={touring || afterTalk ? false : undefined}
           />
           {touring || afterTalk ? (
@@ -779,6 +827,7 @@ export function CheckInExperience() {
             />
           ) : null}
           {emergencyUi("dashboard")}
+          {explainerUi}
         </LayoutGroup>
       </MotionConfig>
     );
@@ -893,7 +942,7 @@ export function CheckInExperience() {
                 disabled={preparing}
                 className="size-full cursor-pointer rounded-[38%] outline-none focus-visible:ring-4 focus-visible:ring-[var(--aegis-accent)]/30 disabled:cursor-default"
               >
-                {cosmo}
+                {explainer ? null : cosmo}
               </button>
             </motion.div>
 
@@ -1098,6 +1147,7 @@ export function CheckInExperience() {
           </p>
         </div>
         {emergencyUi("conversation")}
+        {explainerUi}
       </LayoutGroup>
     </MotionConfig>
   );

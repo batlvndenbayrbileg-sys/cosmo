@@ -11,6 +11,7 @@
  */
 import { normalizeLanguageCode } from "@/lib/language";
 import { parseShowPanels } from "@/lib/show";
+import { parseExplainEvent } from "@/lib/explain";
 import {
   KPI_KEYS,
   QUESTION_IDS,
@@ -232,6 +233,8 @@ function validateTurnEvent(type: string, raw: Rec): TurnEvent | null {
       const panels = parseShowPanels(raw.panels);
       return panels.length > 0 ? { type, panels } : null;
     }
+    case "explain":
+      return parseExplainEvent(raw);
     case "timing": {
       return {
         type,
