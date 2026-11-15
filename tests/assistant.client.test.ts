@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkInReducer, initialCheckInState } from "@/components/checkin/state";
+import { checkInReducer, freshCrewLines, initialCheckInState } from "@/components/checkin/state";
 import { parseTurnEvent } from "@/components/checkin/sse";
 import { checkupButtonState } from "@/components/assistant/AssistantControls";
 import type { CheckInCreated } from "@/lib/types";
@@ -43,6 +43,27 @@ describe("assistant mode in the client reducer", () => {
     expect(parse({ type: "action", action: { kind: "assistant" } })).toEqual({ type: "action", action: { kind: "assistant" } });
     expect(parse({ type: "action", action: { kind: "dashboard" } })).toBeNull();
     expect(parse({ type: "action", action: { kind: "launch" } })).toBeNull();
+  });
+
+  it("a resumed conversation's history never reopens an emergency guide; words said now do", () => {
+    let s = checkInReducer(initialCheckInState(), { type: "CREATED", created: created({ assistant: true, resumed: true }) });
+    s = checkInReducer(s, {
+      type: "SNAPSHOT",
+      snapshot: {
+        checkIn: { id: "c1", state: "GREETING", language: "en", confirmedAt: null },
+        measurements: [],
+        turns: [
+          { id: "h1", speaker: "cosmo", text: "Hi Mira!", language: "en", createdAt: "2026-11-15T08:00:00.000Z" },
+          { id: "h2", speaker: "crew", text: "I have chest pain", language: "en", createdAt: "2026-11-15T08:00:01.000Z" },
+        ],
+      },
+    });
+    expect(s.transcript.map((l) => [l.id, l.history])).toEqual([["h1", true], ["h2", true]]);
+    expect(freshCrewLines(s.transcript, 0)).toEqual([]);
+    const before = s.transcript.length;
+    s = checkInReducer(s, { type: "SEND_START", text: "I have chest pain again" });
+    s = checkInReducer(s, { type: "TURN_EVENT", event: { type: "transcript", turnId: "n1", text: "I have chest pain again", language: "en" } });
+    expect(freshCrewLines(s.transcript, before).map((l) => l.text)).toEqual(["I have chest pain again"]);
   });
 
   it("the button says start, continue or results from where the check-up stands", () => {

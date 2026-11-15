@@ -64,14 +64,20 @@ function normalise(text: string): string {
   return text.toLowerCase().replace(/[‘’ʼ`]/gu, "'").replace(/\s+/gu, " ").trim();
 }
 
-/** words before a name that make it a claim ("I'm", "би", "биш,") */
+/** words before a name that make it a claim ("I'm", "би") */
 const CUE_BEFORE =
-  "(?:i'?m|i\\s+am|it'?s|it\\s+is|this\\s+is|that'?s|my\\s+name\\s+is|my\\s+name'?s|call\\s+me|no,?|nope,?|би|бол|миний\\s+нэр|нэр\\s+минь|намайг|биш(?:ээ)?,?|үгүй,?|үгүй\\s+ээ,?)";
+  "(?:i'?m|i\\s+am|it'?s|it\\s+is|this\\s+is|that'?s|my\\s+name\\s+is|my\\s+name'?s|call\\s+me|би|бол|миний\\s+нэр|нэр\\s+минь|намайг)";
+/**
+ * A bare "no," / "биш," before a name ("биш, Сараа", "no, Mira") is a correction only when the name ends the clause:
+ * "no, Bat helped me with the filter" (a day note during the check-up) names a crewmate, not the speaker.
+ */
+const CUE_BEFORE_WEAK = "(?:no,?|nope,?|биш(?:ээ)?,?|үгүй,?|үгүй\\s+ээ,?)";
 /** words after a name that make it a claim ("Бат байна", "Сараа шүү", "Мира гэдэг") */
 const CUE_AFTER = "(?:байна|байгаа|шүү|гэдэг|гэж\\s+дууда|here|speaking)";
 
 function nameRe(names: string): RegExp {
-  return new RegExp(`(?<![${L}])(?:${names})(?![${L}])`, "giu");
+  // a possessive is about that person, never a claim to be them ("it's Alex's turn", "this is Mira's kit")
+  return new RegExp(`(?<![${L}])(?:${names})(?![${L}])(?!'s(?![${L}]))`, "giu");
 }
 
 /** a mention of this name that is negated: "би Бат биш", "not Bat", "I'm not Mira" */
@@ -110,7 +116,8 @@ export function detectIdentityClaim(text: string, opts: { strict: boolean }): Id
       const after = t.slice(end);
       const cued =
         new RegExp(`(?:^|[\\s,.!?])${CUE_BEFORE}\\s*$`, "u").test(before) ||
-        new RegExp(`^\\s*,?\\s*${CUE_AFTER}(?![${L}])`, "u").test(after);
+        new RegExp(`^\\s*,?\\s*${CUE_AFTER}(?![${L}])`, "u").test(after) ||
+        (new RegExp(`(?:^|[\\s,.!?])${CUE_BEFORE_WEAK}\\s*$`, "u").test(before) && /^\s*(?:[,.!?;]|$)/u.test(after));
       // the bare name only when it is (nearly) all that was said, in the loose mode
       const bare = !opts.strict && t.replace(m[0], "").replace(/[\p{P}\s]/gu, "").length <= 12;
       if (!cued && !bare) continue;

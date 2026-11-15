@@ -95,6 +95,18 @@ describe("identity: corrections by voice", () => {
     expect(detectIdentityClaim("би бат бөх байна", { strict: true }).crewId).toBeNull();
     expect(detectIdentityClaim("I slept 7 hours", { strict: true })).toEqual({ crewId: null, notCrew: [] });
   });
+
+  it("a crewmate named in a check-up answer is not a claim (no switch in the middle of someone's check-up)", () => {
+    // a possessive is about that person
+    expect(detectIdentityClaim("it's Alex's turn on the treadmill", { strict: true }).crewId).toBeNull();
+    expect(detectIdentityClaim("this is Mira's kit", { strict: true }).crewId).toBeNull();
+    // "no," / "биш," before a name corrects only when the name ends the clause
+    expect(detectIdentityClaim("no, Bat helped me fix the filter", { strict: true }).crewId).toBeNull();
+    expect(detectIdentityClaim("үгүй, Сараа надад тусалсан", { strict: true }).crewId).toBeNull();
+    expect(detectIdentityClaim("no, Mira.", { strict: true }).crewId).toBe("mira");
+    expect(detectIdentityClaim("биш, Сараа", { strict: true }).crewId).toBe("saraa");
+    expect(detectIdentityClaim("no, Bat, it's me", { strict: true }).crewId).toBe("bat");
+  });
 });
 
 /* ───────────── the pitch estimator ───────────── */

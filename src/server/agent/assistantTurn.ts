@@ -22,6 +22,7 @@ import { loadHistory, loadTodayValues, saveMachineCtx } from "@/server/checkin/s
 import type { Agent, Emotion } from "./agent";
 import {
   LINES,
+  assistantCrisis,
   asksAboutOwnData,
   backToAssistantLine,
   buildAssistantDirective,
@@ -150,11 +151,15 @@ async function resumeCheckupLine(
 export async function assistantTurn(p: AssistantTurnArgs): Promise<{ events: TurnEvent[]; llmMs: number } | null> {
   const { crewId, checkIn, crew, ctx0, text, lang } = p;
 
-  /* ── who is speaking: "би Бат", "I'm Mira", "биш, Сараа" (a strict claim of someone else, in either mode) ── */
-  const claim = detectIdentityClaim(text, { strict: true });
-  const claimed = claim.crewId && claim.crewId !== crewId ? claim.crewId : null;
+  // crisis words always win over a command or a name: during the check-up its own crisis path answers them (friend mode
+  // in turn.ts), in assistant mode the crisis reply below
+  const crisisWords = detectCrisis(text, false) !== null;
 
-  if (!ctx0.assistant && !claimed && !isBackToAssistant(text, ctx0.companion)) return null;
+  /* ── who is speaking: "би Бат", "I'm Mira", "биш, Сараа" (a strict claim of someone else, in either mode) ── */
+  const claim = crisisWords ? null : detectIdentityClaim(text, { strict: true });
+  const claimed = claim?.crewId && claim.crewId !== crewId ? claim.crewId : null;
+
+  if (!ctx0.assistant && (crisisWords || (!claimed && !isBackToAssistant(text, ctx0.companion)))) return null;
 
   let ctx: MachineCtx = ctx0;
   let reply = "";
@@ -243,6 +248,14 @@ async function answerInAssistantMode(p: AssistantTurnArgs, loadLatest: () => Pro
   };
   const base: MachineCtx = { ...ctx0, assistantOffer: null };
 
+  /* ── crisis words first: the code-written reply and a red alert (as in friend mode), whatever else was said or
+        offered ("no, I want to die" to "shall I add it?" is not a "no"); a clear denial of a symptom is not one ── */
+  const crisis = assistantCrisis(text);
+  if (crisis) {
+    out.crisis = crisis;
+    return say(crisisReply(lang, crisis), "concerned", { ...base, companionCrisis: true, assistantTalkTurns: base.assistantTalkTurns + 1 });
+  }
+
   /* ── the commands ── */
   if (isSwitchPerson(text)) {
     out.action = { kind: "identity", crewId: null };
@@ -270,13 +283,6 @@ async function answerInAssistantMode(p: AssistantTurnArgs, loadLatest: () => Pro
     if (yes === true && offer.kind === "record") return recordOffer(p, offer, out, say, base);
     if (yes === false) return say(offer.kind === "checkup" ? LINES.notNow[lang] : LINES.declined[lang], "neutral", base);
     // neither: the offer lapses and the words are answered as they are
-  }
-
-  /* ── crisis words: always the code-written reply and a red alert (as in friend mode) ── */
-  const crisis = detectCrisis(text, true);
-  if (crisis) {
-    out.crisis = crisis;
-    return say(crisisReply(lang, crisis), "concerned", { ...base, companionCrisis: true, assistantTalkTurns: base.assistantTalkTurns + 1 });
   }
 
   const data = await loadLatest();

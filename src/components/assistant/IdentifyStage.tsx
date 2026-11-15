@@ -47,7 +47,7 @@ export interface Resolved {
 type Phase = "idle" | "identifying" | "ask" | "welcome";
 
 export function IdentifyStage({ onResolved }: { onResolved: (r: Resolved) => void }) {
-  const { t, lang: uiLang } = useI18n();
+  const { t, lang: uiLang, setLang } = useI18n();
   const viewport = useViewport();
   const layout = computeStageLayout(viewport.width, viewport.height, 0);
   const { mascot } = layout;
@@ -92,10 +92,12 @@ export function IdentifyStage({ onResolved }: { onResolved: (r: Resolved) => voi
         return;
       }
       pendingText.current ??= r.transcript;
+      // the whole screen follows the language just heard (the hint, the typing field), not only the question
+      setLang(r.language);
       setAsk({ language: r.language, candidates: r.candidates });
       setPhase("ask");
     },
-    [finish],
+    [finish, setLang],
   );
 
   const fail = useCallback((err: unknown) => {

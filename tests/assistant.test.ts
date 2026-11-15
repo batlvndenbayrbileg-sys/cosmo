@@ -280,6 +280,29 @@ describe.each<[Lang, string, string]>([
     expect((await listAlerts(crewId)).length).toBe(before + 1);
   });
 
+  it("crisis words win over a pending offer: no 'okay, I won't note it', the crisis reply and a red alert", async () => {
+    const id = await openAssistant(crewId, lang);
+    await playTurn(crewId, id, lang === "en" ? "my pulse is 72" : "пульс 72");
+    expect((await ctxOf(crewId, id)).assistantOffer).not.toBeNull();
+    const before = (await listAlerts(crewId)).length;
+    const events = await playTurn(crewId, id, lang === "en" ? "no, I want to die" : "үгүй, би үхмээр байна");
+    expect(assistantText(events)).toMatch(lang === "en" ? /medical officer/u : /эмнэлгийн офицер/u);
+    expect((await listAlerts(crewId)).length).toBe(before + 1);
+    expect(await listMeasurements(crewId, id)).toEqual([]);
+    expect((await ctxOf(crewId, id)).assistantOffer).toBeNull();
+  });
+
+  it("a clearly denied symptom raises no red alert; a stated one does", async () => {
+    const id = await openAssistant(crewId, lang);
+    const before = (await listAlerts(crewId)).length;
+    const denied = await playTurn(crewId, id, lang === "en" ? "I don't have chest pain, just tired" : "цээж өвдөхгүй, зүгээр ядарсан");
+    expect(assistantText(denied)).not.toMatch(lang === "en" ? /medical officer/u : /эмнэлгийн офицер/u);
+    expect((await listAlerts(crewId)).length).toBe(before);
+    const stated = await playTurn(crewId, id, lang === "en" ? "I have chest pain" : "цээж өвдөж байна");
+    expect(assistantText(stated)).toMatch(lang === "en" ? /medical officer/u : /эмнэлгийн офицер/u);
+    expect((await listAlerts(crewId)).length).toBe(before + 1);
+  });
+
   it("greets by name in the first reply after the speaker was recognised", async () => {
     const id = (await createOrResumeAssistant(crewId, { language: lang, welcome: "quiet" })).checkInId;
     const crew = await getCrewPublic(crewId);
@@ -287,6 +310,37 @@ describe.each<[Lang, string, string]>([
     const { runTurn } = await import("@/server/agent/turn");
     const events = await collect(runTurn({ crewId, checkInId: id, input: { kind: "typed", text: hello, greet: true } }));
     expect(assistantText(events)).toMatch(lang === "mn" ? /^Сайн уу, Сараа!/u : new RegExp(`^Hi ${crew.name}!`, "u"));
+  });
+});
+
+describe("assistant mode: during the check-up", () => {
+  async function toFirstQuestion(crewId: string): Promise<string> {
+    const id = await openAssistant(crewId, "en");
+    await playTurn(crewId, id, "Start my daily check-up");
+    await playTurn(crewId, id, "pretty good");
+    const r = await playTurn(crewId, id, "yes let's start");
+    if (stateOf(r).state !== "KPI_CAPTURE") await playTurn(crewId, id, "yes let's start");
+    expect(await ctxOf(crewId, id)).toMatchObject({ assistant: false, state: "KPI_CAPTURE" });
+    return id;
+  }
+
+  it("crisis words with 'back' are the check-up's crisis reply, not a quiet switch to the assistant", async () => {
+    const id = await toFirstQuestion("alex");
+    const before = (await listAlerts("alex")).length;
+    const events = await playTurn("alex", id, "back to assistant, I want to hurt myself");
+    expect(eventsOf(events, "action")).toEqual([]);
+    expect(assistantText(events)).toMatch(/medical officer/u);
+    expect((await listAlerts("alex")).length).toBe(before + 1);
+    expect(await ctxOf("alex", id)).toMatchObject({ assistant: false });
+  });
+
+  it("a crewmate named in an answer does not switch the person", async () => {
+    const id = await toFirstQuestion("alex");
+    for (const line of ["no, Mira helped me with the filter", "it's Mira's turn on the bike"]) {
+      const events = await playTurn("alex", id, line);
+      expect(eventsOf(events, "action"), line).toEqual([]);
+    }
+    expect(await ctxOf("alex", id)).toMatchObject({ assistant: false, state: "KPI_CAPTURE" });
   });
 });
 

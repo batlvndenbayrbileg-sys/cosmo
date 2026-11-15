@@ -31,6 +31,18 @@ export interface TranscriptLine {
   speaker: "crew" | "cosmo";
   text: string;
   language: Lang;
+  /** loaded from the stored history of a resumed conversation (said earlier, not just now) */
+  history?: boolean;
+}
+
+/**
+ * The crew lines said in this visit, from index `from` on: what may open an emergency guide by itself. Lines loaded from
+ * a resumed conversation's history were already acted on when they were said; the assistant screen resumes today's
+ * conversation on every visit and every switch of person, so re-reading them would reopen a guide and raise its alert
+ * to the ground again and again.
+ */
+export function freshCrewLines(lines: readonly TranscriptLine[], from: number): TranscriptLine[] {
+  return lines.slice(Math.max(0, from)).filter((l) => l.speaker === "crew" && l.history !== true);
 }
 
 /** A measurement card on the right-hand rail. */
@@ -285,6 +297,7 @@ export function checkInReducer(state: CheckInState, action: CheckInAction): Chec
           speaker: t.speaker === "crew" ? "crew" : "cosmo",
           text: t.text,
           language: t.language,
+          history: true,
         }));
       const cards: CaptureCard[] = [...snapshot.measurements]
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt))

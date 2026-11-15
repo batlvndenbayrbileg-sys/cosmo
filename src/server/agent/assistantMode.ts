@@ -1,7 +1,8 @@
 import type { CrewPublic, KpiKey, Lang, MeasurementValue, QuestionId } from "@/lib/types";
 import { KPI_DEFS, formatValue } from "@/lib/kpi/registry";
-import { namesConditionOrDrug } from "./companion";
-import { cursorQuestion, type MachineCtx } from "./machine";
+import { findSeriousWords } from "@/lib/health/flags";
+import { detectCrisis, namesConditionOrDrug } from "./companion";
+import { cursorQuestion, type CrisisKind, type MachineCtx } from "./machine";
 import { greetingName } from "./templates";
 import { detectAskedQuestion, isHealthTopic } from "./questions";
 
@@ -94,6 +95,43 @@ const RESULTS_WORDS =
 
 export function asksAboutOwnData(text: string): boolean {
   return RESULTS_WORDS.test(text);
+}
+
+/* ───────────── crisis words ───────────── */
+
+function denied(t: string, start: number, end: number): boolean {
+  // Mongolian: the verb carries the negation ("цээж өвдөхгүй", "өвдөөгүй") or the next word does ("... биш", "... үгүй")
+  const rest = t.slice(end);
+  const word = /^[\p{L}]*/u.exec(rest)?.[0] ?? "";
+  if (/гүй/u.test(word)) return true;
+  if (/^[\p{L}]*\s+(?:биш|үгүй)(?![\p{L}])/u.test(rest)) return true;
+  // English: a negation earlier in the same clause ("I don't have chest pain", "no fainting")
+  const before = t.slice(0, start);
+  const cut = Math.max(before.search(/[,.;!?](?!.*[,.;!?])/u), before.lastIndexOf(" but "));
+  const clause = before.slice(cut < 0 ? 0 : cut + 1);
+  return /(?<![\p{L}])(?:no|not|never|without|nothing\s+like)(?![\p{L}])|n't(?![\p{L}])/u.test(clause);
+}
+
+/**
+ * Crisis words in assistant mode: self-harm / harming others always; the serious medical words ("chest pain", "цээж
+ * өвдөж байна") as in friend mode, except when they are clearly denied ("I don't have chest pain", "цээж өвдөхгүй"),
+ * which is not an emergency and must not raise a red alert to the ground. A question about them still counts: when in
+ * doubt the alert goes out.
+ */
+export function assistantCrisis(text: string): CrisisKind | null {
+  const self = detectCrisis(text, false);
+  if (self) return self;
+  const t = text.toLowerCase().replace(/[‘’ʼ`]/gu, "'").replace(/\s+/gu, " ").trim();
+  for (const word of findSeriousWords(t)) {
+    let from = 0;
+    for (;;) {
+      const at = t.indexOf(word, from);
+      if (at < 0) break;
+      if (!denied(t, at, at + word.length)) return "medical";
+      from = at + word.length;
+    }
+  }
+  return null;
 }
 
 /* ───────────── the two switches ───────────── */

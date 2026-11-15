@@ -46,7 +46,7 @@ import { matchEmergency } from "@/lib/emergency";
 import { SosStatus, sendSosToEarth } from "@/components/sos";
 import { ShieldAlert } from "lucide-react";
 import { bubbleItems, computeStageLayout } from "./bubbles";
-import type { CheckInError } from "./state";
+import { freshCrewLines, type CheckInError } from "./state";
 import { useDemoRunner } from "./useDemoRunner";
 import { faceFollowPref } from "./face-follow-pref";
 import type { FaceTrackFailure } from "./face-tracker";
@@ -641,9 +641,8 @@ export function CheckInExperience({ entry, assistant: entryProps }: { entry?: "a
   const checkedLines = useRef(0);
   useEffect(() => {
     const lines = state.transcript;
-    for (let i = checkedLines.current; i < lines.length; i++) {
-      const line = lines[i];
-      if (line.speaker !== "crew") continue;
+    // only what was said in this visit: a resumed conversation's history does not reopen a guide (or alert again)
+    for (const line of freshCrewLines(lines, checkedLines.current)) {
       const hit = matchEmergency(line.text, emergencyLib);
       if (hit && !emergency.open) {
         openEmergency(hit.scenarioId);
@@ -791,8 +790,10 @@ export function CheckInExperience({ entry, assistant: entryProps }: { entry?: "a
         className={cn(
           "fixed z-[60]",
           placement === "dashboard"
-            ? "right-4 bottom-[5.5rem] sm:top-20 sm:right-6 sm:bottom-auto"
-            : "right-4 bottom-[7.5rem] sm:right-6 sm:bottom-44",
+            ? // phones: on the left, which stays on screen even when the dashboard is wider than the phone
+              "left-4 bottom-[5.5rem] sm:top-20 sm:right-6 sm:bottom-auto sm:left-auto"
+            : // phones: above the typing field while it is open (it would cover the field)
+              cn("right-4 sm:right-6 sm:bottom-44", keyboardOpen ? "bottom-[10.5rem]" : "bottom-[7.5rem]"),
         )}
       >
         <ModeControl
@@ -912,7 +913,7 @@ export function CheckInExperience({ entry, assistant: entryProps }: { entry?: "a
           data-phase={phase}
           className="aegis-bg fixed inset-0 z-50 overflow-x-hidden overflow-y-auto"
         >
-          <h1 className="sr-only">{t("checkin.page.label")}</h1>
+          <h1 className="sr-only">{t(assistantEntry && state.assistant ? "checkin.assistant.stage.label" : "checkin.page.label")}</h1>
           <p role="status" className="sr-only">
             {preparing ? t("checkin.preparing") : t(`checkin.status.${statusKey}`)}
           </p>
