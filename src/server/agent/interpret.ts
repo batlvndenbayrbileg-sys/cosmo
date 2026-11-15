@@ -17,7 +17,7 @@
 import type { KpiKey, Lang, MeasurementValue, QuestionDef, QuestionId } from "@/lib/types";
 import { KPI_DEFS, MAX_TEXT_LENGTH, getQuestion, validateValue } from "@/lib/kpi/registry";
 import { extractNumbers } from "@/lib/numbers/extract";
-import { MGDL_PER_MMOL, readContainers } from "@/lib/numbers/units";
+import { MGDL_PER_MMOL, isAgeOrCount, readContainers } from "@/lib/numbers/units";
 
 /* ───────────── public types ───────────── */
 
@@ -246,6 +246,8 @@ function mergeThousands(text: string, qs: Qty[]): Qty[] {
 function numberQtys(text: string): Qty[] {
   const base = extractNumbers(text)
     .filter((n) => !(isLoneNeg(text, n) && NEG_QUANTIFIER_RE.test(text.slice(n.end))))
+    // an age or a count of times is never a measurement ("a normal pulse for a 30 year old?", "woke up 2 or 3 times")
+    .filter((n) => !isAgeOrCount(text, n))
     .map((n): Qty => {
       const u = unitAfter(text, n.end);
       return {
@@ -272,7 +274,8 @@ const SPECIAL_PHRASES: ReadonlyArray<readonly [RegExp, number, UnitKind, boolean
   [rx(`${NB}an?\\s+hour${NA}`), 1, "hour"],
   [rx(`${NB}(?:нэг\\s+)?цаг\\s+хагас${NA}`), 1.5, "hour"],
   [rx(`${NB}half\\s+an?\\s+(?:litre|liter)${NA}`), 0.5, "litre"],
-  [rx(`${NB}an?\\s+(?:litre|liter)\\s+and\\s+(?:a\\s+)?half${NA}`), 1.5, "litre"],
+  // "a litre and a half", and the article-less "litre and a half" (never the bare "litre" below, which is 1 L)
+  [rx(`${NB}(?:an?\\s+|one\\s+)?(?:litre|liter)\\s+and\\s+(?:a\\s+)?half${NA}`), 1.5, "litre"],
   [rx(`${NB}an?\\s+(?:litre|liter)${NA}`), 1, "litre"],
   // "литр хагас" is a litre and a half (1.5 L), never half a litre ("хагас литр")
   [rx(`${NB}(?:нэг\\s+)?литр\\s+хагас${NA}`), 1.5, "litre"],
@@ -1050,6 +1053,8 @@ function interpretBloodPressure(text: string): InterpretResult {
 
 /* ───────────── heart rate, temperature, glucose ───────────── */
 
+const HEART_RATE_RANGE_MAX_SPAN = 20;
+
 function interpretHeartRate(text: string): InterpretResult {
   // "70-75", "seventy or eighty": the middle, said out loud in the acknowledgement
   const range = rangeOf(
@@ -1057,7 +1062,11 @@ function interpretHeartRate(text: string): InterpretResult {
     numberQtys(text).filter((q) => q.unit === null || q.unit === "bpm"),
     (u) => u === null || u === "bpm",
   );
-  if (range && range.lo >= 30) return resolveSingle("heart_rate", [{ value: Math.round((range.lo + range.hi) / 2), src: range.src, weak: true }]);
+  // a pulse reading spans a few beats ("70-75"); "60 to 100" is the normal range being quoted, not a reading
+  if (range && range.lo >= 30) {
+    if (range.hi - range.lo > HEART_RATE_RANGE_MAX_SPAN) return unclearResult("ambiguous");
+    return resolveSingle("heart_rate", [{ value: Math.round((range.lo + range.hi) / 2), src: range.src, weak: true }]);
+  }
   return resolveSingle("heart_rate", plainCands(text, [null, "bpm"], KW.heart_rate, ["bpm"]));
 }
 
@@ -1470,6 +1479,11 @@ const CHANGE_WORD_RE = new RegExp(
   `${NB}(?:change|changed|wrong|incorrect|mistake|mistaken|fix|different|actually|засах|буруу|өөрчил[\\p{L}]*|алдаа[\\p{L}]*)${NA}`,
   "iu",
 );
+
+/** true when the words say a value is wrong or has to change ("no, ...", "actually ...", "засах", "буруу") */
+export function isCorrectionWorded(text: string): boolean {
+  return CORRECTION_LEAD_RE.test(text) || CHANGE_WORD_RE.test(text);
+}
 
 /** a yes followed by "but / except ..." that names a value or a measurement takes the yes back */
 function carriesCorrection(tail: string): boolean {

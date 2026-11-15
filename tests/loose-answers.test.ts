@@ -75,6 +75,12 @@ const ROWS: Row[] = [
   // heart rate: a range is its middle
   ["heart_rate", "en", "70-75", { heart_rate: 73 }, "assumed"],
   ["heart_rate", "mn", "жаран тав орчим", { heart_rate: 65 }, "literal"],
+  // review fixes: an article-less "litre and a half" is 1.5 L (was 1 L from the bare "litre"); a count of times or an
+  // age is never the value ("woke up 2 or 3 times" was recorded as 2.5 hours of sleep)
+  ["water", "en", "litre and a half", { water_ml: 1500 }, "literal"],
+  ["sleep", "en", "woke up 2 or 3 times, slept 7 hours", { sleep_hours: 7 }, "literal"],
+  ["sleep", "mn", "2 жил болж байна, 7 цаг унтсан", { sleep_hours: 7 }, "literal"],
+  ["exercise", "en", "3 times on the bike, 40 minutes", { exercise_min: 40 }, "literal"],
 ];
 
 const valuesOf = (records: Array<{ key: KpiKey; value: unknown }>) =>
@@ -147,6 +153,11 @@ describe("still asks again when nothing sensible can be read", () => {
     ["glucose", "en", "20"],
     ["temperature", "en", "50"],
     ["heart_rate", "en", "hmm banana"],
+    // review fixes: an age is never a pulse; a wide span is the normal range quoted, not a reading
+    ["heart_rate", "en", "what's a normal heart rate for a 30 year old?"],
+    ["heart_rate", "mn", "30 настай хүний пульс хэд байх ёстой вэ?"],
+    ["heart_rate", "en", "aged 45, what should it be?"],
+    ["heart_rate", "en", "60 to 100"],
   ])("%s (%s): %j", (id, lang, text) => {
     expect(interpretAnswer(getQuestion(id), text, lang).records).toEqual([]);
   });

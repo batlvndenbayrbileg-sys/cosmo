@@ -123,6 +123,42 @@ describe("answerReferenceQuestion", () => {
     );
   });
 
+  it("never judges an age or a time span as the vital (no false 'urgent')", () => {
+    for (const [text, lang] of [
+      ["what's a normal heart rate for a 30 year old?", "en"],
+      ["30 настай хүний пульс хэд байх ёстой вэ?", "mn"],
+      ["what should my temperature be after 30 minutes of exercise?", "en"],
+      ["is my pulse ok after 45 minutes of running?", "en"],
+    ] as Array<[string, Lang]>) {
+      const a = answerReferenceQuestion(text, lang, { baselines, today: {} });
+      expect(a?.text, text).not.toMatch(/urgent threshold|яаралтай босгоос/u);
+      expect(a?.text, text).not.toMatch(/(?:^|\s)(?:30|45) (?:bpm|°C|удаа)/u);
+    }
+  });
+
+  it("a number said in °F or mmol/L is judged in the registry's unit, as the check-in reads it", () => {
+    expect(answerReferenceQuestion("is 98.6 a normal temperature?", "en", { baselines, today: {} })?.text).toMatch(
+      /37 °C \(98\.6 °F\): which is within that general range/,
+    );
+    expect(answerReferenceQuestion("is 100 a high temperature?", "en", { baselines, today: {} })?.text).toMatch(
+      /37\.8 °C \(100 °F\): which is outside that general range/,
+    );
+    expect(answerReferenceQuestion("is 5.5 good for blood sugar?", "en", { baselines, today: {} })?.text).toMatch(
+      /99 mg\/dL \(5\.5 mmol\/L\): which is within that general range/,
+    );
+    expect(answerReferenceQuestion("сахар 5.5 хэвийн үү?", "mn", { baselines, today: {} })?.text).toMatch(/\(5\.5 ммоль\/л\)/u);
+  });
+
+  it("'is 120 over 80 ok?' is a blood-pressure question without the words", () => {
+    expect(referenceQuestionTopic("is 120 over 80 ok?", "en")).toBe("blood_pressure");
+    expect(referenceQuestionTopic("120/80 хэвийн үү?", "mn")).toBe("blood_pressure");
+  });
+
+  it("the brief form (after a value recorded from the same words) keeps 'not a diagnosis'", () => {
+    expect(answerReferenceQuestion("Is 85 a good pulse?", "en", { baselines, today: {} })?.brief).toMatch(/not a diagnosis\.$/);
+    expect(answerReferenceQuestion("пульс 85 хэвийн үү?", "mn", { baselines, today: {} })?.brief).toMatch(/онош биш\.$/u);
+  });
+
   it("in Mongolian", () => {
     const a = answerReferenceQuestion("зүрхний цохилт хэд байх ёстой вэ?", "mn", { baselines, today: {} });
     expect(a?.text).toMatch(/минутад 60-100 бол хэвийн/u);
@@ -183,8 +219,50 @@ describe("asked at any point", () => {
     const events = await playTurn("bat", id, "is 85 a good pulse?");
     expect(eventsOf(events, "measurement").map((e) => [e.key, e.value])).toEqual([["heart_rate", 85]]);
     expect(assistantText(events)).toMatch(
-      /^Got it, 85 beats per minute\. For a resting adult, a heart rate of 60-100 .* 85 bpm: which is within that general range\. What is your body temperature\?$/u,
+      /^Got it, 85 beats per minute\. For a resting adult, a heart rate of 60-100 .* 85 bpm: which is within that general range\. General reference, not a diagnosis\. What is your body temperature\?$/u,
     );
+  });
+
+  it("an age in a pulse question is neither recorded nor judged as a pulse", async () => {
+    const id = await startCheckIn("bat", "en");
+    for (const line of FLOW.en.slice(0, 6)) await playTurn("bat", id, line);
+    const events = await playTurn("bat", id, "what's a normal heart rate for a 30 year old?");
+    expect(eventsOf(events, "measurement")).toEqual([]);
+    const text = assistantText(events);
+    expect(text).toMatch(/60-100 beats per minute/);
+    expect(text).not.toMatch(/30 bpm|crew medical officer/);
+    expect(text).toMatch(/What is your pulse\?$/);
+  });
+
+  it.each<Lang>(["en", "mn"])("at the read-back (%s): answered, the read-back asked again, nothing confirmed or changed", async (lang) => {
+    const id = await startCheckIn("bat", lang);
+    for (const line of FLOW[lang].slice(0, -1)) await playTurn("bat", id, line);
+    expect((await ctxOf("bat", id)).state).toBe("CONFIRM");
+    const q = lang === "en" ? "what's a normal blood pressure?" : "даралт хэд байх ёстой вэ?";
+    const events = await playTurn("bat", id, q);
+    const text = assistantText(events);
+    expect(text).toMatch(lang === "en" ? /below 120 over 80 is normal/ : /120 дээр 80-аас доош бол хэвийн/u);
+    expect(text).toMatch(lang === "en" ? /not a diagnosis.*Is everything in the read-back correct\?$/u : /онош биш.*Тэмдэглэсэн зүйлс бүгд зөв үү\?$/u);
+    expect((await ctxOf("bat", id)).state).toBe("CONFIRM");
+  });
+
+  it("at the read-back, 'is my blood pressure ok?' is a question, never the yes that confirms the check-in", async () => {
+    const id = await startCheckIn("bat", "en");
+    for (const line of FLOW.en.slice(0, -1)) await playTurn("bat", id, line);
+    const events = await playTurn("bat", id, "is my blood pressure ok?");
+    expect(eventsOf(events, "summary")).toEqual([]);
+    expect(assistantText(events)).toMatch(/Today you told me 124 over 82/);
+    expect((await ctxOf("bat", id)).state).toBe("CONFIRM");
+  });
+
+  it("at the read-back, a number in a question does not overwrite the stored value; a worded correction still does", async () => {
+    const id = await startCheckIn("bat", "en");
+    for (const line of FLOW.en.slice(0, -1)) await playTurn("bat", id, line);
+    const asked = await playTurn("bat", id, "is 98.6 a normal temperature?");
+    expect(eventsOf(asked, "measurement")).toEqual([]);
+    expect(assistantText(asked)).toMatch(/37 °C \(98\.6 °F\): which is within that general range/);
+    const corrected = await playTurn("bat", id, "no, my pulse was 72, is that ok?");
+    expect(eventsOf(corrected, "measurement").map((e) => [e.key, e.value])).toEqual([["heart_rate", 72]]);
   });
 
   it.each<Lang>(["en", "mn"])("after the check-in (%s), offline: the general range and today's value", async (lang) => {

@@ -100,6 +100,29 @@ export function readContainers(text: string): ContainerReading[] {
   return out;
 }
 
+/* ───────────── numbers that count something else ───────────── */
+
+/** the word after a number that makes it an age or a count of times ("30 year old", "30 настай", "2 or 3 times") */
+const AGE_OR_TIMES_AFTER =
+  /^[\s-]*(?:years?|yrs?|year-olds?|y\.?o\.?|times|нас|настай|насны|насанд|насандаа|жил|жилийн|жилд)(?![\p{L}])/iu;
+const AGE_BEFORE = /(?<![\p{L}])(?:aged?|age\s+of)\s+$/iu;
+/** a time span, a distance or steps after a number ("after 30 minutes", "45 мин", "5 km"): not a vital sign */
+const SPAN_AFTER =
+  /^[\s-]*(?:sec(?:ond)?s?|min(?:ute)?s?|h|hrs?|hours?|days?|weeks?|months?|km|kilomet(?:re|er)s?|miles?|steps?|сек[\p{L}]*|мин[\p{L}]*|цаг[\p{L}]*|өдөр[\p{L}]*|хоног[\p{L}]*|сар[\p{L}]*|км|алхам[\p{L}]*)(?![\p{L}])/iu;
+
+/**
+ * True when the number at [start, end) is an age or a count of times ("a normal heart rate for a 30 year old?",
+ * "30 настай хүний пульс", "woke up 2 or 3 times"): it is never a measurement, so it is never recorded or judged.
+ */
+export function isAgeOrCount(text: string, n: { start: number; end: number }): boolean {
+  return AGE_OR_TIMES_AFTER.test(text.slice(n.end)) || AGE_BEFORE.test(text.slice(0, n.start));
+}
+
+/** isAgeOrCount, or a time span / distance ("after 30 minutes of running"): not a vital-sign value in a question */
+export function isNotAVitalValue(text: string, n: { start: number; end: number }): boolean {
+  return isAgeOrCount(text, n) || SPAN_AFTER.test(text.slice(n.end));
+}
+
 /** true when the words name a drink container */
 export function mentionsContainer(text: string): boolean {
   for (const m of text.matchAll(WORD_RE)) if (kindOf(m[0])) return true;

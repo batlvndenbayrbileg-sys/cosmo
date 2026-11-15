@@ -55,6 +55,7 @@ import { localLlmConfig } from "./localLlmConfig";
 import { TieredAgent, logTier, type Tier } from "./tieredAgent";
 import { answerAskedQuestion, detectAskedQuestion, isHealthTopic, questionFacts, questionTopicOf, type AskedKind } from "./questions";
 import { answerReferenceQuestion, withReferenceCaveat } from "./questions";
+import { readBackReferenceReply } from "./readBackQuestion";
 import type { Baseline } from "@/lib/health/baseline";
 import { buildResultsFacts, numeralsAreGrounded, type ResultsFacts } from "./resultsFacts";
 import { answerSignatureQuestion, insertBeforeDisclaimer, panelClockDay, signatureFollowUp } from "./signature";
@@ -852,6 +853,13 @@ async function* runTurnInner(args: RunTurnArgs, started: number): AsyncGenerator
       break;
     }
     case "CONFIRM": {
+      // "is my blood pressure ok?" at the read-back: answered, then the read-back asked again (readBackQuestion.ts)
+      const readBackAnswer = readBackReferenceReply(text, lang, reference?.text ?? null);
+      if (readBackAnswer) {
+        send({ type: "CONFIRMATION", confirmed: null });
+        askedReply = readBackAnswer;
+        break;
+      }
       const attempted = decision.correction ?? [];
       const corrected = attempted.length > 0 ? await apply(attempted, "correct_measurement") : [];
       for (const key of corrected) correctedNow.add(key);

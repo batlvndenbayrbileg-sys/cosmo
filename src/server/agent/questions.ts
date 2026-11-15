@@ -10,6 +10,7 @@ import {
   type ReferenceTopic,
 } from "@/lib/health/vitalReference";
 import { extractNumbers } from "@/lib/numbers/extract";
+import { MGDL_PER_MMOL, isNotAVitalValue } from "@/lib/numbers/units";
 // (rangeText is the dashboard card's "Normal ... · demo parameter" text; bareRange below drops the card suffix)
 
 /**
@@ -205,7 +206,8 @@ const QUESTION_OF: Partial<Record<ReferenceTopic, QuestionId>> = {
 
 /** which vital a question names, including the two the check-in does not ask (breathing, oxygen); first match wins */
 const REFERENCE_TOPICS: Array<{ topic: ReferenceTopic; re: RegExp }> = [
-  { topic: "blood_pressure", re: /blood\s+pressure|\bbp\b|даралт/iu },
+  // "is 120 over 80 ok?", "120/80 хэвийн үү?": a pair said the blood-pressure way names it without the word
+  { topic: "blood_pressure", re: /blood\s+pressure|\bbp\b|даралт|\d{2,3}\s*(?:\/|over|дээр)\s*\d{2,3}/iu },
   { topic: "spo2", re: /spo2|sp\s*o2|oxygen|saturation|хүчилтөрөгч|сатураци/iu },
   { topic: "breathing_rate", re: /\bbreath\w*|respirat\w*|амьсгал/iu },
   { topic: "glucose", re: /blood\s+sugar|glucose|\bsugar|сахар|глюкоз/iu },
@@ -261,6 +263,26 @@ const OTHER_UNITS: Partial<Record<ReferenceTopic, { en: string; mn: string }>> =
   spo2: { en: "%", mn: "%" },
 };
 
+/** a bare body temperature this high is Fahrenheit (as in interpret.ts) */
+const FAHRENHEIT_MIN = 86;
+const FAHRENHEIT_MAX = 113;
+
+/**
+ * A number in a question, in the registry's unit: "is 98.6 a normal temperature?" is 37 °C (from 98.6 °F) and "is 5.5
+ * good for blood sugar?" is 99 mg/dL (from 5.5 mmol/L), the same readings the check-in takes (interpret.ts).
+ */
+function inRegistryUnit(topic: ReferenceTopic, value: number, text: string, lang: Lang): { value: number; from: string | null } {
+  if (topic === "temperature" && value >= FAHRENHEIT_MIN && value <= FAHRENHEIT_MAX) {
+    return { value: Math.round((((value - 32) * 5) / 9) * 10) / 10, from: `${formatNumber(value, 1)} °F` };
+  }
+  if (topic === "glucose" && !/mg|мг/iu.test(text)) {
+    const mmol =
+      /mmol|ммоль/iu.test(text) || (Number.isInteger(value) ? value >= 2 && value <= 15 : value > 1 && value <= 33);
+    if (mmol) return { value: Math.round(value * MGDL_PER_MMOL), from: `${formatNumber(value, 2)} ${lang === "mn" ? "ммоль/л" : "mmol/L"}` };
+  }
+  return { value, from: null };
+}
+
 /** "Today you told me 68 bpm, which is within that general range." / the number in the question, judged the same way */
 function valueSentence(
   topic: ReferenceTopic,
@@ -268,11 +290,14 @@ function valueSentence(
   text: string,
   today: Partial<Record<KpiKey, MeasurementValue>>,
 ): string | null {
-  // only numbers that can be this vital count ("is my pulse ok after 2 hours of exercise?" asks about today's value)
+  // only numbers that can be this vital count ("is my pulse ok after 2 hours of exercise?" asks about today's value):
+  // never an age, a count of times or a time span ("a normal pulse for a 30 year old?", "after 30 minutes")
   const [lo, hi] = PLAUSIBLE[topic];
-  const nums = extractNumbers(text)
-    .map((n) => n.value)
-    .filter((n) => n >= lo && n <= hi);
+  const read = extractNumbers(text)
+    .filter((n) => !isNotAVitalValue(text, n))
+    .map((n) => inRegistryUnit(topic, n.value, text, lang))
+    .filter((r) => r.value >= lo && r.value <= hi);
+  const nums = read.map((r) => r.value);
   const asked = nums.length > 0;
   let shown: string;
   let band: ReferenceBand;
@@ -289,7 +314,9 @@ function valueSentence(
       topic === "heart_rate" ? "heart_rate" : topic === "temperature" ? "temperature_c" : topic === "glucose" ? "glucose_mgdl" : null;
     const n = asked ? nums[0] : key ? asNumber(today[key]) : null;
     if (n === null) return null;
+    const from = asked ? read[0].from : null;
     shown = key ? formatValue(key, n, lang) : `${formatNumber(n, 1)} ${OTHER_UNITS[topic]?.[lang] ?? ""}`.trim();
+    if (from) shown = `${shown} (${from})`;
     band = referenceBand(topic, n);
   }
   const words = BAND_WORDS[band][lang];
@@ -315,8 +342,9 @@ export function answerReferenceQuestion(
   return {
     topic,
     questionId,
-    // after a value that was recorded from the same words ("is 85 a good pulse?"): the range and the judgement only
-    brief: join([referenceSentence(topic, lang), value]),
+    // after a value that was recorded from the same words ("is 85 a good pulse?"): the range, the judgement and a
+    // short form of the caveat (a judgement is never said without "not a diagnosis")
+    brief: join([referenceSentence(topic, lang), value, REFERENCE_CAVEAT_SHORT[lang]]),
     text: join([
       referenceSentence(topic, lang),
       value,
@@ -326,6 +354,11 @@ export function answerReferenceQuestion(
     ]),
   };
 }
+
+const REFERENCE_CAVEAT_SHORT: Readonly<Record<Lang, string>> = {
+  en: "General reference, not a diagnosis.",
+  mn: "Ерөнхий лавлагаа, онош биш.",
+};
 
 /** a model-worded answer to a general reference question gets the caveat when it does not carry one */
 export function withReferenceCaveat(answer: string, userText: string, lang: Lang): string {
