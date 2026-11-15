@@ -33,14 +33,14 @@ function TrendTile({ stat }: { stat: KpiStat }) {
   return (
     <li className="glass-card flex min-h-0 min-w-0 flex-col gap-1.5 px-4 py-3 lg:gap-[clamp(2px,0.6vh,8px)] lg:px-[clamp(12px,1vw,18px)] lg:py-[clamp(8px,1.3vh,14px)]">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="min-w-0 truncate text-[13.5px] leading-tight font-medium text-[var(--aegis-label)]">{label}</h3>
+        <h3 className="min-w-0 truncate text-[13.5px] leading-tight font-medium text-[var(--cosmo-label)]">{label}</h3>
         <StatusGlyph status={stat.status} size={13} />
       </div>
       <p className="flex items-baseline gap-1">
-        <span className="tnum text-[clamp(20px,2.8vh,28px)] leading-none font-normal text-[var(--aegis-ink)]">
+        <span className="tnum text-[clamp(20px,2.8vh,28px)] leading-none font-normal text-[var(--cosmo-ink)]">
           {shown ? shown.main : "–"}
         </span>
-        {shown?.unit ? <span className="text-[12px] text-[var(--aegis-label)]">{shown.unit}</span> : null}
+        {shown?.unit ? <span className="text-[12px] text-[var(--cosmo-label)]">{shown.unit}</span> : null}
       </p>
       {history.length > 0 || today !== null ? (
         <Sparkline
@@ -55,9 +55,9 @@ function TrendTile({ stat }: { stat: KpiStat }) {
           className="mt-auto max-w-none"
         />
       ) : (
-        <p className="mt-auto text-[12px] text-[var(--aegis-label)]">{t("dashboard.highlight.noHistory")}</p>
+        <p className="mt-auto text-[12px] text-[var(--cosmo-label)]">{t("dashboard.highlight.noHistory")}</p>
       )}
-      <p className="tnum truncate text-[11px] leading-tight text-[var(--aegis-label)]">
+      <p className="tnum truncate text-[11px] leading-tight text-[var(--cosmo-label)]">
         {summary ? t("dashboard.trends.avg", { value: formatNumber(summary.avg, digits) }) : " "}
       </p>
     </li>

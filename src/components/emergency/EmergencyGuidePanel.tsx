@@ -13,7 +13,7 @@ import { GuideStepView } from "./GuideStepView";
  * and raises the alert for the crew medical officer and ground) and calls preventDefault() to say it handled it.
  * Where nobody listens (the /dev/dashboard playground, the Earth console) the tab opens "get help now" in place.
  */
-export const EMERGENCY_REQUEST_EVENT = "aegis:emergency-request";
+export const EMERGENCY_REQUEST_EVENT = "cosmo:emergency-request";
 
 export function requestEmergency(scenarioId: string): boolean {
   const e = new CustomEvent(EMERGENCY_REQUEST_EVENT, { detail: { scenarioId }, cancelable: true });
@@ -66,7 +66,7 @@ export function EmergencyGuidePanel({
   return (
     <section aria-labelledby="guide-title" data-slot="emergency-guide" className="flex flex-col gap-3 lg:h-full lg:min-h-0">
       <div className="flex flex-col gap-0.5 lg:flex-row lg:flex-wrap lg:items-baseline lg:gap-x-4">
-        <h2 id="guide-title" className="flex items-center gap-2.5 text-[26px] leading-tight text-[var(--aegis-ink)] lg:text-[clamp(20px,2.8vh,26px)]">
+        <h2 id="guide-title" className="flex items-center gap-2.5 text-[26px] leading-tight text-[var(--cosmo-ink)] lg:text-[clamp(20px,2.8vh,26px)]">
           <span className="icon-chip bg-[#C53030]! lg:size-[clamp(28px,3.8vh,38px)]!" aria-hidden="true">
             <LifeBuoy className="size-[18px]" strokeWidth={1.8} />
           </span>
@@ -75,7 +75,7 @@ export function EmergencyGuidePanel({
             <span className="font-medium">{t("dashboard.guide.titleStrong")}</span>
           </span>
         </h2>
-        <p className="text-[13px] text-[var(--aegis-label)] lg:text-[12px]">{t("dashboard.guide.subtitle")}</p>
+        <p className="text-[13px] text-[var(--cosmo-label)] lg:text-[12px]">{t("dashboard.guide.subtitle")}</p>
         <p className="text-[13px] font-medium text-[#975A16] lg:text-[12px]">{t("emergency.pending")}</p>
       </div>
 
@@ -96,7 +96,7 @@ export function EmergencyGuidePanel({
         </div>
       ) : (
         <div className="flex flex-col gap-2 lg:min-h-0 lg:flex-1">
-          <p className="text-[13px] text-[var(--aegis-label)]">{t("emergency.grid.hint")}</p>
+          <p className="text-[13px] text-[var(--cosmo-label)]">{t("emergency.grid.hint")}</p>
           <div className="lg:min-h-0 lg:flex-1">
             <GuideGrid scenarios={scenarios} lang={lang} onOpen={(id) => onOpenId(id)} suggested={suggested} scope="tab" dense />
           </div>

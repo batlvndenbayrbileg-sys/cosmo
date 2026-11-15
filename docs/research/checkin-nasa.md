@@ -7,15 +7,15 @@ answer, including a short wellbeing (mental-health) check.
 
 **Honesty notes**
 
-- AEGIS is a hackathon prototype. Nothing here is a clinical instrument.
+- Cosmo is a hackathon prototype. Nothing here is a clinical instrument.
 - The wellbeing items are **adapted** from NASA self-report tools (see below). They are not those tools, and they are
   not validated. The 1-5 wording and the "watch" thresholds are demo parameters.
-- The sensor feed in AEGIS is **simulated**. It is deterministic and built from each crew member's own recent records.
+- The sensor feed in Cosmo is **simulated**. It is deterministic and built from each crew member's own recent records.
   Every such value is labelled "from your sensors" and "simulated" in the UI.
 
 ## Measured by a sensor vs asked
 
-| Item | Where it comes from on the ISS | In AEGIS now |
+| Item | Where it comes from on the ISS | In Cosmo now |
 |---|---|---|
 | Heart rate, ECG | Bio-Monitor smart shirt and headband (CSA) | sensor (simulated), not asked |
 | Blood pressure | Bio-Monitor | sensor (simulated), not asked |

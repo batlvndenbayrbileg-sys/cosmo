@@ -13,8 +13,8 @@ export function EarthTitle() {
         <Satellite className="size-4" aria-hidden="true" />
       </span>
       <span className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 leading-tight">
-        <span className="text-[15px] font-medium text-[color:var(--aegis-ink)]">{t("earth.topbar.title")}</span>
-        <span className="text-[13px] text-[color:var(--aegis-label)]">· {t("earth.topbar.sub")}</span>
+        <span className="text-[15px] font-medium text-[color:var(--cosmo-ink)]">{t("earth.topbar.title")}</span>
+        <span className="text-[13px] text-[color:var(--cosmo-label)]">· {t("earth.topbar.sub")}</span>
       </span>
     </TopBarTrack>
   );

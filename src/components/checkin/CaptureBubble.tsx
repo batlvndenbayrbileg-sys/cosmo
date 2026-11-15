@@ -160,11 +160,11 @@ export const CaptureBubble = memo(function CaptureBubble({
           className="flex size-full items-center gap-2.5 rounded-[20px] border border-white/85 bg-white/72 pr-3 pl-2 shadow-[0_14px_34px_-16px_rgba(40,80,160,0.35)] backdrop-blur-xl backdrop-saturate-150"
           style={{ WebkitBackdropFilter: "blur(24px) saturate(150%)" }}
         >
-          <span className="inline-flex size-[34px] shrink-0 items-center justify-center rounded-full bg-[var(--aegis-ink)] text-white">
+          <span className="inline-flex size-[34px] shrink-0 items-center justify-center rounded-full bg-[var(--cosmo-ink)] text-white">
             <Icon className="size-[17px]" strokeWidth={1.9} aria-hidden="true" />
           </span>
           <div className="flex min-w-0 flex-1 flex-col justify-center leading-tight">
-            <span className="truncate text-[11.5px] font-medium text-[var(--aegis-label)]">{text.label}</span>
+            <span className="truncate text-[11.5px] font-medium text-[var(--cosmo-label)]">{text.label}</span>
             <motion.span
               key={`type-${item.flash}`}
               className="flex min-w-0 items-baseline gap-1 whitespace-nowrap"
@@ -172,8 +172,8 @@ export const CaptureBubble = memo(function CaptureBubble({
               animate={{ clipPath: "inset(0 0% 0 0)" }}
               transition={{ duration: typeSeconds, delay: reduce ? 0 : 0.32, ease: steps(chars) }}
             >
-              <span className="tnum truncate text-[17px] font-medium text-[var(--aegis-ink)]">{text.value}</span>
-              {text.unit ? <span className="text-[11px] text-[var(--aegis-label)]">{text.unit}</span> : null}
+              <span className="tnum truncate text-[17px] font-medium text-[var(--cosmo-ink)]">{text.value}</span>
+              {text.unit ? <span className="text-[11px] text-[var(--cosmo-label)]">{text.unit}</span> : null}
             </motion.span>
           </div>
           <StatusGlyph status={item.status} size={15} labelled={false} />

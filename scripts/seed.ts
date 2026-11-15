@@ -1,6 +1,6 @@
 /**
  * pnpm db:seed — (re)creates the demo database: 4 crew members, 14 simulated confirmed check-ins
- * each. Writes to DATABASE_URL (Postgres) when set, else AEGIS_DB_PATH (default data/aegis.db), and prints the
+ * each. Writes to DATABASE_URL (Postgres) when set, else COSMO_DB_PATH (default data/cosmo.db), and prints the
  * crew with their last day.
  * WARNING: wipes every existing row first.
  */

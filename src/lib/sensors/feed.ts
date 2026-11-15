@@ -4,7 +4,7 @@
  * On the station these values come from devices, not from questions: the Bio-Monitor shirt and headband (heart rate,
  * blood pressure, skin temperature, breathing, SpO2, activity), a wrist actigraph (sleep timing and duration), the
  * exercise devices (minutes of exercise), the drink dispenser log (water) and, on recent commercial missions, a
- * continuous glucose patch. AEGIS has no hardware, so this module SIMULATES that feed: deterministic (the same crew
+ * continuous glucose patch. Cosmo has no hardware, so this module SIMULATES that feed: deterministic (the same crew
  * member and date always give the same readings) and plausible (centred on the person's own recent records, with a
  * small day-to-day wobble). Every value it produces is labelled "simulated" wherever it is shown.
  *

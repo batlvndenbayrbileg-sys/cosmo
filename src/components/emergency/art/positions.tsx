@@ -52,7 +52,7 @@ export function SitSupportedArt() {
   return (
     <Canvas>
       <Pad x={52} y={80} w={24} h={66} />
-      <Pad x={120} y={FLOOR_Y - 26} w={34} h={22} fill="var(--aegis-pastel-mint)" />
+      <Pad x={120} y={FLOOR_Y - 26} w={34} h={22} fill="var(--cosmo-pastel-mint)" />
       <Sitter x={96} recline={12} />
     </Canvas>
   );

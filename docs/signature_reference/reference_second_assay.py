@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""AEGIS - Second-assay cross-check: REFERENCE IMPLEMENTATION (Python 3 stdlib only).
+"""Cosmo - Second-assay cross-check: REFERENCE IMPLEMENTATION (Python 3 stdlib only).
 
 OSD-575 measured the same serum samples on two independent platforms:
   primary  = Eve Technologies bead multiplex (pg/mL)   -> file name contains 'serum_immune'

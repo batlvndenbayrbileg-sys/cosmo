@@ -11,16 +11,16 @@ import {
 
 /**
  * The emergency library: the built-in guides that ship with the app (src/lib/emergency/guides), plus the team's
- * optional content from AEGIS_EMERGENCY_DIR (default: the sibling folder
- * ../aegis-assets/emergency next to the repo, i.e. C:/dev/aegis-assets/emergency). Read on every request (a handful of
+ * optional content from COSMO_EMERGENCY_DIR (default: the sibling folder
+ * ../cosmo-assets/emergency next to the repo, i.e. C:/dev/cosmo-assets/emergency). Read on every request (a handful of
  * small files) so the team can drop in new content without restarting the app. A team folder whose id equals a built-in
  * guide replaces that guide. Invalid folders are skipped and
  * reported in `problems`, never shown half-broken.
  */
 
 export function emergencyDir(): string {
-  const fromEnv = process.env.AEGIS_EMERGENCY_DIR?.trim();
-  return fromEnv ? path.resolve(fromEnv) : path.resolve(process.cwd(), "..", "aegis-assets", "emergency");
+  const fromEnv = process.env.COSMO_EMERGENCY_DIR?.trim();
+  return fromEnv ? path.resolve(fromEnv) : path.resolve(process.cwd(), "..", "cosmo-assets", "emergency");
 }
 
 export interface EmergencyLibrary {

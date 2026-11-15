@@ -24,7 +24,7 @@ export function PrototypeRibbon({ className }: { className?: string }) {
       <p
         className={cn(
           "pointer-events-auto flex max-w-[min(100%,56rem)] items-center gap-2 rounded-full px-3.5 py-1",
-          "border border-white/70 bg-white/55 text-[11px] leading-snug text-[color:var(--aegis-label)]",
+          "border border-white/70 bg-white/55 text-[11px] leading-snug text-[color:var(--cosmo-label)]",
           "shadow-[0_6px_20px_-12px_rgba(40,80,160,0.35)] backdrop-blur-md backdrop-saturate-150",
         )}
       >

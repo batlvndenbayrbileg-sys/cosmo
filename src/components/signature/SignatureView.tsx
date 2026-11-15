@@ -54,14 +54,14 @@ export function SignatureView({
         <TopBar
           center={
             <TopBarTrack>
-              <span className="px-3 text-[15px] font-medium text-[var(--aegis-ink)]">{t("dashboard.signature.title")}</span>
+              <span className="px-3 text-[15px] font-medium text-[var(--cosmo-ink)]">{t("dashboard.signature.title")}</span>
             </TopBarTrack>
           }
           right={
             backHref ? (
               <Link
                 href={backHref}
-                className="inline-flex h-11 items-center gap-1.5 rounded-full bg-white px-4 text-[14px] text-[var(--aegis-ink)] ring-1 ring-[var(--aegis-hairline)] outline-none focus-visible:ring-3 focus-visible:ring-ring/60"
+                className="inline-flex h-11 items-center gap-1.5 rounded-full bg-white px-4 text-[14px] text-[var(--cosmo-ink)] ring-1 ring-[var(--cosmo-hairline)] outline-none focus-visible:ring-3 focus-visible:ring-ring/60"
               >
                 <ArrowLeft aria-hidden="true" className="size-4" />
                 <span className="hidden sm:inline">{t("dashboard.signature.back")}</span>
@@ -73,10 +73,10 @@ export function SignatureView({
 
         <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
           <div className="flex min-w-0 flex-col gap-1.5">
-            <h1 className="text-[28px] leading-tight font-light tracking-tight text-[var(--aegis-ink)] sm:text-[32px]">
+            <h1 className="text-[28px] leading-tight font-light tracking-tight text-[var(--cosmo-ink)] sm:text-[32px]">
               {t("dashboard.signature.title")}
             </h1>
-            <p className="max-w-2xl text-[15px] text-[var(--aegis-label)]">{t("dashboard.signature.subtitle")}</p>
+            <p className="max-w-2xl text-[15px] text-[var(--cosmo-label)]">{t("dashboard.signature.subtitle")}</p>
           </div>
           <div className="flex flex-col items-start gap-1.5 lg:items-end">
             <span className="unit-label">{t("dashboard.signature.crewLabel")}</span>
@@ -93,7 +93,7 @@ export function SignatureView({
                 <ToggleGroupItem
                   key={c}
                   value={c}
-                  className="h-9 rounded-full px-3.5 text-[14px] text-[var(--aegis-label)] aria-pressed:bg-white aria-pressed:text-[var(--aegis-ink)] aria-pressed:shadow-sm"
+                  className="h-9 rounded-full px-3.5 text-[14px] text-[var(--cosmo-label)] aria-pressed:bg-white aria-pressed:text-[var(--cosmo-ink)] aria-pressed:shadow-sm"
                 >
                   {c}
                 </ToggleGroupItem>
@@ -109,7 +109,7 @@ export function SignatureView({
           <EvidenceCard />
         </div>
 
-        <p className="text-center text-[13px] text-[var(--aegis-label)]">{SIGNATURE_DISCLAIMER[lang]}</p>
+        <p className="text-center text-[13px] text-[var(--cosmo-label)]">{SIGNATURE_DISCLAIMER[lang]}</p>
     </PageFrame>
   );
 }

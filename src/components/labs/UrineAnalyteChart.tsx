@@ -7,9 +7,9 @@ import { useI18n } from "@/i18n/I18nProvider";
 import { formatDecimal, type UrineAnalyte, type UrinePointKind } from "@/lib/labs/urine";
 import { cn } from "@/lib/utils";
 
-const INK = "var(--aegis-ink)";
+const INK = "var(--cosmo-ink)";
 const LABEL = "#5b6678";
-const BAND = "var(--aegis-accent)";
+const BAND = "var(--cosmo-accent)";
 /** dot colours per kind; pre-flight samples are hollow (they set the baseline) */
 const KIND_FILL: Record<UrinePointKind, string> = {
   baseline: "#ffffff",
@@ -167,17 +167,17 @@ export function UrineAnalyteChart({
           </ComposedChart>
         </ChartContainer>
       </div>
-      <ul aria-hidden="true" className="flex flex-wrap gap-x-3.5 gap-y-1 text-[11px] leading-tight text-[var(--aegis-label)]">
+      <ul aria-hidden="true" className="flex flex-wrap gap-x-3.5 gap-y-1 text-[11px] leading-tight text-[var(--cosmo-label)]">
         <li className="flex items-center gap-1.5">
-          <span className="h-2.5 w-4 rounded-[3px] bg-[var(--aegis-accent)]/15 ring-1 ring-[var(--aegis-accent)]/25" />
+          <span className="h-2.5 w-4 rounded-[3px] bg-[var(--cosmo-accent)]/15 ring-1 ring-[var(--cosmo-accent)]/25" />
           {t("dashboard.labs.chart.band")}
         </li>
         <li className="flex items-center gap-1.5">
-          <span className="w-4 border-t-[1.5px] border-dashed border-[var(--aegis-label)]" />
+          <span className="w-4 border-t-[1.5px] border-dashed border-[var(--cosmo-label)]" />
           {t("dashboard.labs.chart.baseline")}
         </li>
         <li className="flex items-center gap-1.5">
-          <span className="size-2.5 rounded-full border-[1.5px] border-[var(--aegis-label)] bg-white" />
+          <span className="size-2.5 rounded-full border-[1.5px] border-[var(--cosmo-label)] bg-white" />
           {t("dashboard.labs.chart.pre")}
         </li>
         <li className="flex items-center gap-1.5">

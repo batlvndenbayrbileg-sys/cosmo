@@ -1,5 +1,5 @@
 /**
- * AEGIS shared contract — types only, no logic.
+ * Cosmo shared contract — types only, no logic.
  * Imported by server code, client code and tests. Do NOT import server-only modules here.
  * Source of truth for the question set and the dashboard: docs/DASHBOARD_PLAN.md
  */

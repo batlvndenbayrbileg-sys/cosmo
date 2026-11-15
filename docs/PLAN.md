@@ -1,4 +1,4 @@
-# AEGIS Phase 1 — "Cosmo" daily check-in + light dashboard: implementation plan
+# Cosmo Phase 1 — "Cosmo" daily check-in + light dashboard: implementation plan
 
 Status: plan only, no code written. Date: 2026-11-14.
 Input: `PROMPT_PHASE1_COSMO.md` (the brief). There is no separate `CLAUDE.md`: the team confirmed on 2026-11-14 that the brief is the only source document, so this plan is built from it alone.
@@ -35,7 +35,7 @@ The five ElevenLabs pages were fetched by a sub-agent and reported back; EL-STT 
 |---|---|---|---|
 | F1 | No `CLAUDE.md` in the working folder, Desktop, Downloads or Documents (search depth 4). | `[proof: ENV]` | Resolved: the team confirmed the brief is the single source. S0 copies it into the repo as `docs/BRIEF.md`. |
 | F2 | The working folder contains only three `.mp4` files and sits inside a git repository whose root is the whole Desktop. | `[proof: ENV]` | "Commit after each step" would commit into a Desktop-wide repo. S0 creates a dedicated project folder with its own `git init`. |
-| F3 | The working folder is under OneDrive. | `[proof: ENV]` | OneDrive syncing `node_modules` and a live SQLite file is a known source of file locks `{unverified}`. S0 puts the project outside OneDrive (e.g. `C:\dev\aegis`). |
+| F3 | The working folder is under OneDrive. | `[proof: ENV]` | OneDrive syncing `node_modules` and a live SQLite file is a known source of file locks `{unverified}`. S0 puts the project outside OneDrive (e.g. `C:\dev\cosmo`). |
 | F4 | Installed Node is v20.10.0. Required: shadcn CLI 4.23.0 `>=20.18.1`; `@prisma/client` 7.10.1 `^20.19 \|\| ^22.12 \|\| >=24`; `better-sqlite3` 13.2.0 `>=22`; `vitest` 5.1.0 `^22.12 \|\| ^24 \|\| >=26`; `next` 16.4.6 `>=20.9.0`. | `[proof: ENV]`, `[proof: NPM]` | Node 20.10 fails four of five. S0 installs Node 22 LTS (≥ 22.18) or 24. |
 | F5 | `pnpm` is not installed; `corepack` 0.22.0 and `npm` 10.9.1 are. | `[proof: ENV]` | S0 enables pnpm. |
 
@@ -95,11 +95,11 @@ Design rules that hold everywhere:
 ## 2. Folder structure
 
 ```
-aegis/
+cosmo/
 ├─ README.md
 ├─ .env.example
 ├─ package.json  pnpm-lock.yaml  tsconfig.json  next.config.ts  vitest.config.ts  components.json
-├─ data/                         # aegis.db — gitignored
+├─ data/                         # cosmo.db — gitignored
 ├─ docs/
 │  ├─ BRIEF.md                   # copy of PROMPT_PHASE1_COSMO.md — the single source document
 │  ├─ PLAN.md
@@ -198,7 +198,7 @@ MISSION_START_DATE=2026-10-01
 
 ## 3. Data model
 
-SQLite file `data/aegis.db`, accessed through better-sqlite3 behind a repo layer (D3). Reason for the default: the repo layer is where the `crewId` rule is enforced and tested, there is no code-generation step, and the schema is four tables. Prisma remains a drop-in alternative behind the same repo functions.
+SQLite file `data/cosmo.db`, accessed through better-sqlite3 behind a repo layer (D3). Reason for the default: the repo layer is where the `crewId` rule is enforced and tested, there is no code-generation step, and the schema is four tables. Prisma remains a drop-in alternative behind the same repo functions.
 
 ```sql
 CREATE TABLE crew_member (
@@ -342,7 +342,7 @@ All routes run on the Node runtime. JSON errors use `{ "error": { "code": string
 |---|---|---|
 | `GET /api/health` | — | `{ mode, llm: {model}, stt: {model, available}, tts: {mn: {model, available}, en: {model, available}}, rive: boolean }` |
 | `GET /api/crew` | — | `CrewPublic[]` — `{ id, name, role, preferredLanguage, mascotVariant, avatarSeed }`. No health data. |
-| `POST /api/session` | `{ crewId }` | `204`, sets httpOnly, SameSite=Lax, HMAC-signed cookie `aegis_session`. |
+| `POST /api/session` | `{ crewId }` | `204`, sets httpOnly, SameSite=Lax, HMAC-signed cookie `cosmo_session`. |
 | `DELETE /api/session` | — | `204` |
 | `POST /api/checkins` | `{ language? }` | `{ checkInId, state: "GREETING", language, greeting: { turnId, text } }`. Resumes today's unconfirmed check-in if one exists. |
 | `GET /api/checkins/:id` | — | `{ checkIn, measurements[], turns[] }` for reload/resume. |
@@ -579,6 +579,6 @@ Out of scope for Phase 1: authentication, wearable or device ingestion, multi-da
 
 ## 11. Progress log
 
-- **S0 — done 2026-11-14.** Node v24.22.1 replaced Node 20.10.0 system-wide, installed with `winget` from the official nodejs.org MSI; winget lists no 22.x, only 24.x and 26.x, and the plan allowed 22 or 24. pnpm 12.18.0 is installed in `%APPDATA%\npm` (`corepack enable` needs admin rights, so it was not used). The project lives in `C:\dev\aegis`, outside OneDrive, in its own git repo with `docs/BRIEF.md` and `docs/PLAN.md`. Node 24.22.1 satisfies the engine ranges of next, shadcn, @prisma/client, better-sqlite3, vitest, vite, recharts, pnpm and @elevenlabs/elevenlabs-js. `[proof: S0 run 2026-11-14 — node -v, pnpm -v from a clean PATH, git rev-parse --show-toplevel, semver check against the engine ranges in §2]`
-- **Environment trap for S1+:** `C:\Users\Dell\package.json` pins `packageManager: yarn@3.6.4`, and pnpm 12 refuses to run in any folder beneath `C:\Users\Dell` (`ERR_PNPM_OTHER_PM_EXPECTED`). Keep the project at `C:\dev\aegis`. `[proof: pnpm -v failed from the old working folder with that error; the ancestor walk found C:\Users\Dell\package.json]`
+- **S0 — done 2026-11-14.** Node v24.22.1 replaced Node 20.10.0 system-wide, installed with `winget` from the official nodejs.org MSI; winget lists no 22.x, only 24.x and 26.x, and the plan allowed 22 or 24. pnpm 12.18.0 is installed in `%APPDATA%\npm` (`corepack enable` needs admin rights, so it was not used). The project lives in `C:\dev\cosmo`, outside OneDrive, in its own git repo with `docs/BRIEF.md` and `docs/PLAN.md`. Node 24.22.1 satisfies the engine ranges of next, shadcn, @prisma/client, better-sqlite3, vitest, vite, recharts, pnpm and @elevenlabs/elevenlabs-js. `[proof: S0 run 2026-11-14 — node -v, pnpm -v from a clean PATH, git rev-parse --show-toplevel, semver check against the engine ranges in §2]`
+- **Environment trap for S1+:** `C:\Users\Dell\package.json` pins `packageManager: yarn@3.6.4`, and pnpm 12 refuses to run in any folder beneath `C:\Users\Dell` (`ERR_PNPM_OTHER_PM_EXPECTED`). Keep the project at `C:\dev\cosmo`. `[proof: pnpm -v failed from the old working folder with that error; the ancestor walk found C:\Users\Dell\package.json]`
 - Terminals opened before S0 keep the old PATH; open a new terminal to see Node 24 and `pnpm`.

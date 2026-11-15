@@ -96,7 +96,7 @@ function signatureFor(crewId: string, lang: Lang, localDate: string): SignatureI
     return { cls: facts.class, fri: facts.fri, crew: facts.crew, daysSinceLanding: facts.daysSinceLanding };
   } catch (err) {
     // the lab files are missing in this deployment: the pain check goes on without the panel
-    console.warn("[aegis] pain: Signature Triage panel unavailable:", (err as Error).message);
+    console.warn("[cosmo] pain: Signature Triage panel unavailable:", (err as Error).message);
     return null;
   }
 }
@@ -256,7 +256,7 @@ async function respond(p: PainTurnInput, d: Decision): Promise<TurnEvent[]> {
       sos = duplicate ? "duplicate" : "sent";
       sosAlertId = alert.id;
     } catch (err) {
-      console.error("[aegis] pain: the urgent alert could not be stored:", err);
+      console.error("[cosmo] pain: the urgent alert could not be stored:", err);
       sosEvent = { type: "sos", ok: false, alertId: null, createdAt: null, duplicate: false, photoStatus: null };
       sos = "failed";
     }
@@ -278,7 +278,7 @@ async function respond(p: PainTurnInput, d: Decision): Promise<TurnEvent[]> {
   try {
     report = d.pending ? await updatePainReport(crewId, d.pending.id, input) : await createPainReport(crewId, checkInId, input);
   } catch (err) {
-    console.error("[aegis] pain: the report could not be stored:", err);
+    console.error("[cosmo] pain: the report could not be stored:", err);
   }
   const reportSent = report?.sentAt != null;
 
@@ -303,7 +303,7 @@ async function respond(p: PainTurnInput, d: Decision): Promise<TurnEvent[]> {
     try {
       await setPainAskedTurn(crewId, report.id, cosmoTurn.id);
     } catch (err) {
-      console.error("[aegis] pain: remembering the question failed:", err);
+      console.error("[cosmo] pain: remembering the question failed:", err);
     }
   }
 

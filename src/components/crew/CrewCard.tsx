@@ -58,10 +58,10 @@ export function CrewCard({
         "glass-card group flex w-full flex-col gap-4 p-3 pb-4 text-left outline-none sm:p-3.5 sm:pb-5",
         "transition-shadow duration-300",
         "hover:shadow-[0_26px_50px_-24px_rgba(40,80,160,0.45)]",
-        "focus-visible:ring-4 focus-visible:ring-[color:var(--aegis-accent)]/45",
+        "focus-visible:ring-4 focus-visible:ring-[color:var(--cosmo-accent)]/45",
         "disabled:cursor-not-allowed",
         disabled && !busy && "opacity-55",
-        busy && "ring-2 ring-[color:var(--aegis-accent)]",
+        busy && "ring-2 ring-[color:var(--cosmo-accent)]",
       )}
     >
       {/* pastel stage with the render */}
@@ -96,23 +96,23 @@ export function CrewCard({
           className="pill absolute top-3 left-3 !min-h-8 gap-1.5 !px-3 text-[13px]"
           title={t("crew.card.language", { language })}
         >
-          <Languages className="size-3.5 text-[color:var(--aegis-label)]" aria-hidden="true" />
+          <Languages className="size-3.5 text-[color:var(--cosmo-label)]" aria-hidden="true" />
           <span lang={crew.preferredLanguage}>{language}</span>
         </span>
       </div>
 
       <div className="flex min-w-0 flex-col gap-0.5 px-1.5">
-        <span className="truncate text-[26px] leading-tight font-medium tracking-tight text-[color:var(--aegis-ink)]">
+        <span className="truncate text-[26px] leading-tight font-medium tracking-tight text-[color:var(--cosmo-ink)]">
           {crew.name}
         </span>
-        <span className="truncate text-[15px] text-[color:var(--aegis-label)]">{role}</span>
+        <span className="truncate text-[15px] text-[color:var(--cosmo-label)]">{role}</span>
       </div>
 
       <span
         aria-hidden="true"
         className={cn(
-          "mx-1 inline-flex h-12 items-center justify-between gap-2 rounded-full bg-[color:var(--aegis-ink)] pr-1.5 pl-5 text-[15px] font-medium text-white",
-          "transition-[background-color] duration-300 group-hover:bg-[color:var(--aegis-accent-deep)]",
+          "mx-1 inline-flex h-12 items-center justify-between gap-2 rounded-full bg-[color:var(--cosmo-ink)] pr-1.5 pl-5 text-[15px] font-medium text-white",
+          "transition-[background-color] duration-300 group-hover:bg-[color:var(--cosmo-accent-deep)]",
         )}
       >
         <span className="truncate">{busy ? t("crew.card.starting") : t("crew.card.start")}</span>

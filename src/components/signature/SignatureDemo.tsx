@@ -18,7 +18,7 @@ import { TriageCard } from "./TriageCard";
 import { panelOf } from "./logic";
 
 const PILL =
-  "inline-flex h-10 items-center gap-1.5 rounded-full bg-white px-4 text-[14px] text-[var(--aegis-ink)] ring-1 ring-[var(--aegis-hairline)] outline-none hover:bg-white/80 focus-visible:ring-3 focus-visible:ring-ring/60 disabled:opacity-40";
+  "inline-flex h-10 items-center gap-1.5 rounded-full bg-white px-4 text-[14px] text-[var(--cosmo-ink)] ring-1 ring-[var(--cosmo-hairline)] outline-none hover:bg-white/80 focus-visible:ring-3 focus-visible:ring-ring/60 disabled:opacity-40";
 
 /** m:ss of a time slot */
 function clock(sec: number): string {
@@ -139,7 +139,7 @@ export function SignatureDemo({
       <TopBar
         center={
           <TopBarTrack>
-            <span className="px-3 text-[15px] font-medium text-[var(--aegis-ink)]">{t("dashboard.signature.demo.title")}</span>
+            <span className="px-3 text-[15px] font-medium text-[var(--cosmo-ink)]">{t("dashboard.signature.demo.title")}</span>
           </TopBarTrack>
         }
       />
@@ -150,10 +150,10 @@ export function SignatureDemo({
             {t("dashboard.signature.demo.beat", { n: index + 1, total: beats.length })} ·{" "}
             {t("dashboard.signature.demo.slot", { from: clock(beat.start), to: clock(beat.end) })}
           </p>
-          <h1 className="text-[28px] leading-tight font-light tracking-tight text-[var(--aegis-ink)] sm:text-[32px]">
+          <h1 className="text-[28px] leading-tight font-light tracking-tight text-[var(--cosmo-ink)] sm:text-[32px]">
             {t(`dashboard.signature.demo.beatName.${beat.id}`)}
           </h1>
-          <p className="max-w-2xl text-[14px] text-[var(--aegis-label)]">{t("dashboard.signature.demo.subtitle")}</p>
+          <p className="max-w-2xl text-[14px] text-[var(--cosmo-label)]">{t("dashboard.signature.demo.subtitle")}</p>
         </div>
         <div className="flex flex-col items-start gap-2 lg:items-end">
           <span className="unit-label">{t("dashboard.signature.demo.crew")}</span>
@@ -163,15 +163,15 @@ export function SignatureDemo({
                 key={c}
                 aria-current={c === beat.crew ? "true" : undefined}
                 className={cn(
-                  "flex h-9 items-center rounded-full px-3.5 text-[14px] text-[var(--aegis-label)]",
-                  c === beat.crew && "bg-white text-[var(--aegis-ink)] shadow-sm",
+                  "flex h-9 items-center rounded-full px-3.5 text-[14px] text-[var(--cosmo-label)]",
+                  c === beat.crew && "bg-white text-[var(--cosmo-ink)] shadow-sm",
                 )}
               >
                 {c}
               </li>
             ))}
           </ul>
-          <p data-slot="signature-demo-clock" className="flex items-center gap-1.5 text-[14px] text-[var(--aegis-ink)]">
+          <p data-slot="signature-demo-clock" className="flex items-center gap-1.5 text-[14px] text-[var(--cosmo-ink)]">
             <Clock aria-hidden="true" className="size-4" />
             {t("dashboard.signature.demo.clock", { day: beat.clockDay })} (R+{beat.clockDay})
           </p>
@@ -191,33 +191,33 @@ export function SignatureDemo({
       <section
         aria-live="polite"
         data-slot="signature-demo-captions"
-        className="flex flex-col gap-3 rounded-2xl bg-white/70 p-4 ring-1 ring-[var(--aegis-hairline)] sm:p-5"
+        className="flex flex-col gap-3 rounded-2xl bg-white/70 p-4 ring-1 ring-[var(--cosmo-hairline)] sm:p-5"
       >
         {beat.cosmo ? (
           <div className="flex flex-col gap-1">
-            <p className="flex flex-wrap items-center gap-x-2 text-[12px] text-[var(--aegis-label)]">
+            <p className="flex flex-wrap items-center gap-x-2 text-[12px] text-[var(--cosmo-label)]">
               <Mic aria-hidden="true" className="size-3.5" />
-              <span className="font-medium text-[var(--aegis-ink)]">{t("dashboard.signature.demo.cosmo")}</span>
+              <span className="font-medium text-[var(--cosmo-ink)]">{t("dashboard.signature.demo.cosmo")}</span>
               <span>{t(`dashboard.signature.demo.lang.${beat.cosmo.lang}`)}</span>
               <span>· {hasAudio ? t("dashboard.signature.demo.audio") : t("dashboard.signature.demo.captionsOnly")}</span>
             </p>
             {beat.cosmo.lang !== "en" ? (
-              <p lang={beat.cosmo.lang} className="text-[13px] leading-snug text-[var(--aegis-label)]">
+              <p lang={beat.cosmo.lang} className="text-[13px] leading-snug text-[var(--cosmo-label)]">
                 {beat.cosmo.text}
               </p>
             ) : null}
-            <p lang="en" className="text-[16px] leading-relaxed text-[var(--aegis-ink)]">
+            <p lang="en" className="text-[16px] leading-relaxed text-[var(--cosmo-ink)]">
               {beat.cosmo.caption}
             </p>
           </div>
         ) : null}
         {beat.presenter ? (
           <div className="flex flex-col gap-1">
-            <p className="flex items-center gap-1.5 text-[12px] font-medium text-[var(--aegis-ink)]">
+            <p className="flex items-center gap-1.5 text-[12px] font-medium text-[var(--cosmo-ink)]">
               <User aria-hidden="true" className="size-3.5" />
               {t("dashboard.signature.demo.presenter")}
             </p>
-            <p lang="en" className="text-[16px] leading-relaxed text-[var(--aegis-ink)] italic">
+            <p lang="en" className="text-[16px] leading-relaxed text-[var(--cosmo-ink)] italic">
               {beat.presenter}
             </p>
           </div>
@@ -276,11 +276,11 @@ export function SignatureDemo({
           <Toggle
             pressed={autoplay}
             onPressedChange={setAutoplay}
-            className="h-10 rounded-full px-4 text-[14px] ring-1 ring-[var(--aegis-hairline)] aria-pressed:bg-[var(--aegis-pastel-blue)]"
+            className="h-10 rounded-full px-4 text-[14px] ring-1 ring-[var(--cosmo-hairline)] aria-pressed:bg-[var(--cosmo-pastel-blue)]"
           >
             {t("dashboard.signature.demo.autoplay")}
           </Toggle>
-          <span className="text-[12px] text-[var(--aegis-label)]">
+          <span className="text-[12px] text-[var(--cosmo-label)]">
             {index < last ? t("dashboard.signature.demo.keys") : t("dashboard.signature.demo.end")}
           </span>
         </div>
@@ -294,7 +294,7 @@ export function SignatureDemo({
                 onClick={() => setIndex(i)}
                 className={cn(
                   "block h-2.5 w-7 rounded-full outline-none focus-visible:ring-3 focus-visible:ring-ring/60",
-                  i === index ? "bg-[var(--aegis-ink)]" : i < index ? "bg-[var(--aegis-ink)]/40" : "bg-[rgba(15,27,45,0.12)]",
+                  i === index ? "bg-[var(--cosmo-ink)]" : i < index ? "bg-[var(--cosmo-ink)]/40" : "bg-[rgba(15,27,45,0.12)]",
                 )}
               />
             </li>
@@ -302,7 +302,7 @@ export function SignatureDemo({
         </ol>
       </nav>
 
-      <p className="text-center text-[13px] text-[var(--aegis-label)]">{SIGNATURE_DISCLAIMER[lang]}</p>
+      <p className="text-center text-[13px] text-[var(--cosmo-label)]">{SIGNATURE_DISCLAIMER[lang]}</p>
     </PageFrame>
   );
 }

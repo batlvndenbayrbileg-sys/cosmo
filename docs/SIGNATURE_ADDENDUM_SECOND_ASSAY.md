@@ -151,7 +151,7 @@ MN: "Таны индекс 57 байна. Газардсанаас хойш ий
 | 0:55–1:10 | Recovery card: decay fan, re-test marker at day 22, kit chips | Presenter: "NASA has no sample between day 1 and day 45, so we give an upper bound and schedule the draw that closes the gap." |
 | 1:10–1:25 | Clock R+45, C001: 1, BASELINE | Cosmo (c1), English |
 | 1:25–2:00 | C002 at R+45: 53, UNEXPECTED, "Confirmed by two assays", IL-8 47x / 40x | Cosmo (c2). Presenter: "No flight, same pattern, two independent tests agree. Real Inspiration4 data." |
-| 2:00–2:25 | C003 at R+194: 57, UNEXPECTED, badge "Single assay" | Cosmo (d). Presenter: "Here one test says alarm and the other says no. AEGIS does not escalate on one key." |
+| 2:00–2:25 | C003 at R+194: 57, UNEXPECTED, badge "Single assay" | Cosmo (d). Presenter: "Here one test says alarm and the other says no. Cosmo does not escalate on one key." |
 | 2:25–2:40 | Daily check-in (banner "simulated check-ins"), rule A2 | Cosmo (b) from spec §7.1 |
 | 2:40–3:00 | Evidence card with the "Second assay" column, rejected ideas, QC log | Presenter: "Four people is not a study. We show what held up — IL-6 — and what did not." |
 

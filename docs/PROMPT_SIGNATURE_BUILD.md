@@ -2,7 +2,7 @@
 
 > Entry point is `docs/PROMPT_SIGNATURE_INTEGRATE.md`. This file holds the task definitions and test numbers.
 
-Run inside the AEGIS repo after Phase 1 (Cosmo check-in) and Phase 1B (Blood Panel) work.
+Run inside the Cosmo repo after Phase 1 (Cosmo check-in) and Phase 1B (Blood Panel) work.
 Before starting, make sure these exist:
 
 - `data/` with the five NASA CSV files (any sub-folder is fine; files are found by name fragment);
@@ -16,7 +16,7 @@ Paste everything below the line.
 
 ---
 
-You are implementing one feature of **AEGIS** (NASA Space Apps 2026, astronaut health monitoring):
+You are implementing one feature of **Cosmo** (NASA Space Apps 2026, astronaut health monitoring):
 **Signature Triage**. The design is finished and lives in `docs/SIGNATURE_SPEC.md`. Your job is to implement
 it exactly. Do not redesign, rename or "improve" formulas. Budget: 8 hours, tasks of at most 45 minutes.
 
@@ -235,7 +235,7 @@ Spec §8.1 and §8 item 4b are binding.
   оноо өгсөн" with a popover showing S1–S3.
 - Evidence card: add the row "Different mission, same direction (n = 1)" with the two limiting sentences of
   spec §8 item 4b and reference [9]. Static text; Cosmo does not speak the percentages of that paper.
-- **Tests:** S1–S3 pass both guards in both languages; "AEGIS measures IL-6 in orbit" fails
+- **Tests:** S1–S3 pass both guards in both languages; "Cosmo measures IL-6 in orbit" fails
   `assertNoOrbitClaim`; "I do not measure anything in orbit myself" passes; the tool returns three strings.
 
 ### T9 — Offline scripted demo (45 min)

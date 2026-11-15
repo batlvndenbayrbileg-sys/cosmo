@@ -50,7 +50,7 @@ export async function handle(fn: () => Response | Promise<Response>): Promise<Re
     if (err instanceof HttpError) {
       return jsonError(err.code, err.message, err.status);
     }
-    console.error("[aegis] unhandled error in route handler:", err);
+    console.error("[cosmo] unhandled error in route handler:", err);
     return jsonError("INTERNAL", "Internal error", 500);
   }
 }

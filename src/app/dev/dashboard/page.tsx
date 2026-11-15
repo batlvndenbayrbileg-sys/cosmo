@@ -88,12 +88,12 @@ function Playground() {
 
       <details
         data-slot="dev-fixture-controls"
-        className="group fixed bottom-3 left-3 z-50 max-w-[min(22rem,calc(100vw-1.5rem))] rounded-[20px] border border-white/80 bg-white/85 text-[var(--aegis-ink)] shadow-[0_20px_50px_-24px_rgba(40,80,160,0.5)] backdrop-blur-xl"
+        className="group fixed bottom-3 left-3 z-50 max-w-[min(22rem,calc(100vw-1.5rem))] rounded-[20px] border border-white/80 bg-white/85 text-[var(--cosmo-ink)] shadow-[0_20px_50px_-24px_rgba(40,80,160,0.5)] backdrop-blur-xl"
       >
         <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2 text-[13px] font-medium outline-none focus-visible:ring-3 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
-          <FlaskConical aria-hidden="true" className="size-4 text-[var(--aegis-label)]" />
+          <FlaskConical aria-hidden="true" className="size-4 text-[var(--cosmo-label)]" />
           Dashboard playground
-          <span className="text-[var(--aegis-label)]">· {fixture.label.en}</span>
+          <span className="text-[var(--cosmo-label)]">· {fixture.label.en}</span>
         </summary>
         <section aria-label="Fixture controls" className="flex flex-col gap-3 px-3 pt-1 pb-3">
           <p className="text-xs text-muted-foreground">

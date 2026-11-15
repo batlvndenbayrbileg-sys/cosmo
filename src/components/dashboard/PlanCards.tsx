@@ -37,7 +37,7 @@ export function PlanCards({
           "outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
           grid
             ? "grid grid-cols-1 gap-3 sm:grid-cols-2 lg:min-h-0 lg:flex-1 lg:auto-rows-fr lg:gap-[clamp(8px,1.4vh,14px)]"
-            : "aegis-noscrollbar -mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-smooth px-1 pt-1 pb-2 lg:gap-2.5 lg:pb-1",
+            : "cosmo-noscrollbar -mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-smooth px-1 pt-1 pb-2 lg:gap-2.5 lg:pb-1",
         )}
       >
         {tasks.map((task, i) => {
@@ -56,14 +56,14 @@ export function PlanCards({
                 grid
                   ? "min-w-0 lg:min-h-0 lg:overflow-clip lg:p-[clamp(12px,1.8vh,18px)]"
                   : "w-[calc(50%-6px)] min-w-[9.5rem] shrink-0 snap-start lg:gap-[clamp(4px,0.8vh,8px)] lg:p-[clamp(10px,1.4vh,16px)]",
-                related && "ring-2 ring-[var(--aegis-accent)]",
+                related && "ring-2 ring-[var(--cosmo-accent)]",
               )}
             >
               <div className={cn("flex flex-col gap-2", !grid && "lg:flex-row lg:items-center lg:gap-2")}>
               <span
                 aria-hidden="true"
                 className={cn(
-                  "inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-white text-[var(--aegis-ink)] shadow-[0_4px_10px_-6px_rgba(15,27,45,0.35)]",
+                  "inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-white text-[var(--cosmo-ink)] shadow-[0_4px_10px_-6px_rgba(15,27,45,0.35)]",
                   !grid && "lg:size-[clamp(26px,3.4vh,32px)]",
                 )}
               >
@@ -71,7 +71,7 @@ export function PlanCards({
               </span>
               <p
                 className={cn(
-                  "leading-snug font-semibold text-[var(--aegis-ink)]",
+                  "leading-snug font-semibold text-[var(--cosmo-ink)]",
                   grid ? "text-[16px] lg:text-[clamp(14px,1.9vh,17px)]" : "line-clamp-3 text-[15px] lg:line-clamp-2 lg:text-[clamp(13px,1.7vh,15px)]",
                 )}
               >
@@ -88,14 +88,14 @@ export function PlanCards({
                 <span className="font-medium">{t("dashboard.plan.because")}: </span>
                 {pick(task.why)}
               </p>
-              <span className="mt-auto inline-flex w-fit max-w-full shrink-0 truncate rounded-full bg-white/75 px-2 py-0.5 text-[11px] font-medium text-[var(--aegis-ink)]">
+              <span className="mt-auto inline-flex w-fit max-w-full shrink-0 truncate rounded-full bg-white/75 px-2 py-0.5 text-[11px] font-medium text-[var(--cosmo-ink)]">
                 {task.hazard ? pick(NASA_HAZARDS[task.hazard].name) : t("dashboard.plan.general")}
               </span>
             </li>
           );
         })}
       </ol>
-      <p className={cn("text-[11px] leading-snug text-[var(--aegis-label)]", !grid && "lg:line-clamp-1 lg:text-[10.5px]")}>
+      <p className={cn("text-[11px] leading-snug text-[var(--cosmo-label)]", !grid && "lg:line-clamp-1 lg:text-[10.5px]")}>
         {t("dashboard.plan.note")}
       </p>
     </div>

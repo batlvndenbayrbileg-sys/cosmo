@@ -12,8 +12,8 @@ import { getSession, SESSION_TTL_MS, signSession, verifySession } from "@/server
  * Crew and ground sessions live in SEPARATE cookies so that opening the Earth console in the same
  * browser never destroys a crew member's session (and signing a crew member in never ends the
  * Earth session):
- *   - `aegis_session` (SESSION_COOKIE, owned by src/server/session.ts) holds the crew session;
- *   - `aegis_ground`  (GROUND_COOKIE, here) holds the ground session.
+ *   - `cosmo_session` (SESSION_COOKIE, owned by src/server/session.ts) holds the crew session;
+ *   - `cosmo_ground`  (GROUND_COOKIE, here) holds the ground session.
  * Both are HMAC-signed with the same secret and verified with the same pure helpers.
  *
  * Every crew-only and ground-only route in this lane uses requireCrew / requireGround from here.
@@ -21,11 +21,11 @@ import { getSession, SESSION_TTL_MS, signSession, verifySession } from "@/server
  * FORBIDDEN when the caller only holds the other role.
  */
 
-export const GROUND_COOKIE = "aegis_ground";
+export const GROUND_COOKIE = "cosmo_ground";
 
 /* The same secret as src/server/session.ts: SESSION_SECRET, else the per-process random value that
    module caches on globalThis under this well-known symbol (`??=` keeps both modules on one value). */
-const SECRET_KEY = Symbol.for("aegis.sessionSecret");
+const SECRET_KEY = Symbol.for("cosmo.sessionSecret");
 type GlobalWithSecret = typeof globalThis & { [SECRET_KEY]?: string };
 
 function sessionSecret(): string {
