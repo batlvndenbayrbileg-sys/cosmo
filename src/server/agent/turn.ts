@@ -56,6 +56,7 @@ import { TieredAgent, logTier, type Tier } from "./tieredAgent";
 import { answerAskedQuestion, detectAskedQuestion, questionFacts, type AskedKind } from "./questions";
 import type { Baseline } from "@/lib/health/baseline";
 import { buildResultsFacts, numeralsAreGrounded, type ResultsFacts } from "./resultsFacts";
+import { answerSignatureQuestion, insertBeforeDisclaimer, panelClockDay, signatureFollowUp } from "./signature";
 
 /** without the model: today's headline, the first suggestion, and an invitation to ask about any part */
 export function offlineResultsAnswer(facts: ResultsFacts, lang: Lang): string {
@@ -833,6 +834,23 @@ async function* runTurnInner(args: RunTurnArgs, started: number): AsyncGenerator
     }
     // an overall red status always raises an alert: the astronaut is told, whoever phrased the summary
     spoken = ensureAlertNotice(spoken, findings, lang);
+    // Signature Triage after the daily summary (build prompt T6): the triage offer when a panel arrived since the last
+    // check-in, and draw advice for rules A1-A3, before the closing disclaimer. Only on the live path (an agent that
+    // words signature answers): the scripted demo's summary and its pre-generated audio stay as they are.
+    if (used.answerAboutSignature && used === primary) {
+      spoken = insertBeforeDisclaimer(
+        spoken,
+        signatureFollowUp({
+          crewId,
+          lang,
+          localDate: checkIn.localDate,
+          missionStartDate: env.missionStartDate,
+          history: history14,
+          todayValues: valuesNow,
+        }),
+        findings.disclaimer[lang],
+      );
+    }
     // the summary turn, the confirmation, the alerts and the DONE state are written together or not at all: a failure
     // part-way (a dropped Postgres connection, say) must not leave a confirmed red check-in without its alert, because a
     // confirmed check-in is DONE and the SUMMARY step would never run again
@@ -868,7 +886,28 @@ async function* runTurnInner(args: RunTurnArgs, started: number): AsyncGenerator
     assistantText = template;
     // after the check-in the astronaut can keep talking to Cosmo about today's results (dashboard Q&A)
     const afterCheckIn = ctx0.state === "DONE";
-    if (afterCheckIn) {
+    // a question about the blood panel or a blood draw: Signature Triage answers it (signature.ts); any other question
+    // takes the dashboard Q&A path below unchanged
+    const signature = afterCheckIn
+      ? await answerSignatureQuestion({
+          crewId,
+          text,
+          lang,
+          ctx: {
+            lang,
+            today: panelClockDay(checkIn.localDate, env.missionStartDate),
+            history: history14,
+            todayValues: valuesNow,
+          },
+          history,
+          answer: used.answerAboutSignature && used === primary ? (a) => used.answerAboutSignature!(a) : undefined,
+        })
+      : null;
+    if (signature) {
+      assistantText = signature.text;
+      llmMs += signature.llmMs;
+    }
+    if (afterCheckIn && !signature) {
       const facts = buildResultsFacts(valuesNow, history14, lang);
       let answer: string | null = null;
       if (used.answerAboutResults && used === primary) {

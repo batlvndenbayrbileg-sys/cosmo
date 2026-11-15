@@ -54,6 +54,11 @@ export interface PanelResult {
   borderline: boolean;
   markers: Record<string, MarkerResult>;
   otherLargeChanges: { analyte: string; fold: number }[];
+  /**
+   * second-assay cross-check (addendum T12); present only when the panel was scored with the second-assay matrix
+   * (`scorePanelWithSecondAssay`). Absent = no second assay was looked at, the spec templates apply unchanged.
+   */
+  secondAssay?: SecondAssayResult;
 }
 
 /** one change made by QC-1 / QC-2 (spec section 1.5); `new: null` = value deleted */
@@ -192,4 +197,62 @@ export interface SignatureReference {
     calm_day: FixtureStrainDay;
     strained_day: FixtureStrainDay;
   };
+}
+
+/* ───────────── second assay (docs/SIGNATURE_ADDENDUM_SECOND_ASSAY.md, tasks T11-T13) ───────────── */
+
+/**
+ * The second, independent serum platform of OSD-575 (Alamar NULISAseq, NPQ = log2 units): analyte (bare name of the
+ * `<name>_concentration_npq` column, e.g. 'il6', 'cxcl8') -> crew -> timepoint -> NPQ. Missing samples are absent.
+ */
+export type SecondAssayMatrix = Record<string /* analyte */, Record<string /* crew */, MarkerSeries>>;
+
+/** addendum section 2: the two-key confirmation of one marker */
+export type SecondAssayStatus = "NO_SECOND_ASSAY" | "NOT_APPLICABLE" | "CONFIRMED" | "NOT_CONFIRMED";
+
+/** addendum section 2: panel badge, only for EXPECTED_FLIGHT_RESPONSE and UNEXPECTED_ACTIVATION */
+export type SecondAssayBadge = "TWO_ASSAY_CONFIRMED" | "SINGLE_ASSAY";
+
+export interface SecondAssayCheck {
+  /** 2^d1 = value / own primary pre-flight median; null when d1 is missing */
+  primaryFold: number | null;
+  /** 2^d2, d2 = NPQ - own second-assay pre-flight median; null when d2 is missing */
+  secondFold: number | null;
+  status: SecondAssayStatus;
+}
+
+/** `PanelResult.secondAssay` (addendum T12) */
+export interface SecondAssayResult {
+  il6: SecondAssayCheck;
+  il8: SecondAssayCheck;
+  /** null for classes other than EXPECTED_FLIGHT_RESPONSE / UNEXPECTED_ACTIVATION */
+  badge: SecondAssayBadge | null;
+}
+
+/** one marker of one panel in docs/signature_reference/expected_second_assay.json */
+export interface FixtureSecondAssayMarker {
+  primary_log2: number;
+  second_log2: number;
+  primary_fold: number;
+  second_fold: number;
+  status: string;
+}
+
+/** raw shape of the second fixture (docs/signature_reference/expected_second_assay.json) */
+export interface SecondAssayReference {
+  _readme: string;
+  CONFIRM_LOG2: number;
+  second_assay_analytes: number;
+  missing_second_assay_samples: string[];
+  panels: Record<string, { il_6: FixtureSecondAssayMarker; il_8: FixtureSecondAssayMarker; class: string; badge: string | null }>;
+  signature_cytokines_R1: Record<string, { primary_log2: number[]; second_log2: number[] }>;
+  agreement: {
+    matched_pairs: number;
+    median_within_person_rho: number;
+    "pairs_with_rho_ge_0.5": number;
+    rho: Record<string, number>;
+  };
+  same_direction_4of4_on_both_assays_at_R1: string[];
+  L44_lowest_on_second_assay: { n: number; lowest: number; share: number };
+  il6_16_panels: { spearman: number; same_sign: number };
 }

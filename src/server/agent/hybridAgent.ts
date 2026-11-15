@@ -3,6 +3,7 @@ import type { ResultsFacts } from "./resultsFacts";
 import { getQuestion } from "@/lib/kpi/registry";
 import type { Agent, AgentArgs, AgentDecision, CompanionReplyArgs } from "./agent";
 import { ScriptedAgent } from "./scriptedAgent";
+import type { SignatureAnswerArgs } from "./signature";
 
 /**
  * Live agent with an instant path, for a Siri-like feel without giving up the model where it matters.
@@ -98,6 +99,11 @@ export class HybridAgent implements Agent {
 
   async answerAboutResults(args: { facts: ResultsFacts; question: string; lang: Lang; history: TurnRow[] }): Promise<string | null> {
     return this.live.answerAboutResults ? this.live.answerAboutResults(args) : null;
+  }
+
+  /** Signature Triage: always the live model; the pipeline checks the numbers and falls back to the templates */
+  async answerAboutSignature(args: SignatureAnswerArgs): Promise<string | null> {
+    return this.live.answerAboutSignature ? this.live.answerAboutSignature(args) : null;
   }
 
   /** friend mode: always the live model (warmth is its job); the pipeline falls back to the templates */

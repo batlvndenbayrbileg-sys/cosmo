@@ -3,7 +3,9 @@
 import type { KeyboardEvent } from "react";
 import Link from "next/link";
 import { Activity, Bell, CalendarDays, LayoutGrid, LifeBuoy, ListChecks, Satellite, type LucideIcon } from "lucide-react";
+import { TestTubeDiagonal } from "lucide-react";
 import type { DashboardPayload } from "@/lib/types";
+import { APP_CREW_REFERENCE_PANELS, REFERENCE_CREW } from "@/lib/signature/config";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useI18n } from "@/i18n/I18nProvider";
 import { cn } from "@/lib/utils";
@@ -128,6 +130,15 @@ export function TopBar({
             <span className="text-[15px] font-medium text-[var(--aegis-ink)]">{payload.crew.name}</span>
           </span>
         </div>
+
+        <Link
+          href={`/signature?crew=${APP_CREW_REFERENCE_PANELS[payload.crew.id] ?? REFERENCE_CREW[0]}&checkInId=${encodeURIComponent(payload.checkIn.id)}`}
+          aria-label={t("dashboard.signature.link")}
+          title={t("dashboard.signature.link")}
+          className={ROUND_BTN}
+        >
+          <TestTubeDiagonal aria-hidden="true" className="size-[18px]" strokeWidth={1.8} />
+        </Link>
 
         <Popover>
           <PopoverTrigger
