@@ -6,3 +6,6 @@
 /src/data/signature_reference.json -text
 # the same for the second-assay fixture (addendum T11): a byte copy of docs/signature_reference/expected_second_assay.json
 /src/data/signature_second_assay.json -text
+# the urine panel workbook (Labs tab) and the JSON generated from it stay byte-exact (the JSON records the workbook's SHA-256)
+/data/urine/*.xlsx -text
+/src/data/urine_panel.json -text

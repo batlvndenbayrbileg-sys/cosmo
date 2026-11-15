@@ -189,7 +189,7 @@ describe("signature T8: cards (server render smoke tests)", () => {
     for (const slot of ["signature-triage", "signature-fingerprint", "signature-recovery", "signature-evidence"]) {
       expect(page).toContain(`data-slot="${slot}"`);
     }
-    expect(NAV_ITEMS).toHaveLength(6);
+    expect(NAV_ITEMS).toHaveLength(7);
     const bar = html(createElement(TopBar, { payload: batYellow, viewer: "crew", active: "overview", onNavigate: () => {} }));
     expect(bar).toContain(`href="/signature?crew=C001&amp;checkInId=${encodeURIComponent(batYellow.checkIn.id)}"`);
     expect(bar).toContain('aria-label="Signature Triage: blood panels"');

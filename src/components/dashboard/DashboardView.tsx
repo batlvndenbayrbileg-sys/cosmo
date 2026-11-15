@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { suggestGuides } from "@/lib/emergency";
 import { EmergencyGuidePanel } from "@/components/emergency/EmergencyGuidePanel";
 import { useEmergencyLibrary } from "@/components/emergency/hooks";
+import { LabsPanel } from "@/components/labs/LabsPanel";
 import { AlertsStrip } from "./AlertsStrip";
 import { IfWorseCard } from "./IfWorseCard";
 import { BodyHero } from "./BodyHero";
@@ -46,8 +47,8 @@ import { TwoToneTitle } from "./parts";
  *
  * Layout (docs/DESIGN_V2.md section 2), single screen like an app:
  * - desktop (>= 1024 px): the dashboard is exactly one viewport high (100dvh) and the page never scrolls. The top
- *   bar's pills are tabs that switch the view inside the glass frame (Overview / Vitals / Plan / Trends / Earth
- *   link / Emergency guide) with a crossfade. Every view is sized from the frame's height (flex, clamp() and vh based sizes).
+ *   bar's pills are tabs that switch the view inside the glass frame (Overview / Vitals / Plan / Trends / Labs /
+ *   Earth link / Emergency guide) with a crossfade. Every view is sized from the frame's height (flex, clamp() and vh based sizes).
  * - phones and small tablets: the same tabs, the active view as one scrolling column.
  * - crew viewer: the bottom of the frame (--dashboard-bottom-reserve) stays free for the floating conversation
  *   bar (check-in lane) and Cosmo's dock, which collapses to a compact pill.
@@ -149,6 +150,8 @@ export function DashboardView({ payload, viewer, dockSlot, dockOpen }: Dashboard
         suggested={suggestions.map((s) => s.scenarioId)}
       />
     ),
+    // urine panel of the linked Inspiration4 reference crew member; fetched only when this tab opens
+    labs: () => <LabsPanel crewId={payload.crew.id} />,
     vitals: () => (
       <section aria-labelledby="vitals-title" data-slot="vitals" className="flex flex-col gap-3 lg:h-full lg:min-h-0">
         <div className="flex flex-col gap-0.5 lg:flex-row lg:flex-wrap lg:items-baseline lg:gap-x-4">
