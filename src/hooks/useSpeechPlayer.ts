@@ -28,6 +28,8 @@ export interface SpeakTurn {
   /** needed (with turnId) to reach the server audio; without them only local speech is used */
   checkInId?: string | null;
   turnId?: string | null;
+  /** one line of the turn (a beat of the step-by-step walkthrough); `text` is then that line */
+  part?: number;
   text: string;
   language: Lang;
 }
@@ -263,7 +265,7 @@ export function useSpeechPlayer(options: UseSpeechPlayerOptions = {}): SpeechPla
         audioFailures.current < maxAudioFailures;
 
       if (canTryServer) {
-        const outcome = await playServerAudio(turnAudioUrl(turn.checkInId as string, turn.turnId as string), mine);
+        const outcome = await playServerAudio(turnAudioUrl(turn.checkInId as string, turn.turnId as string, turn.part), mine);
         if (runId.current !== mine) return; // stopped or superseded: whoever did that owns the status
         if (outcome === "ended") {
           audioFailures.current = 0;

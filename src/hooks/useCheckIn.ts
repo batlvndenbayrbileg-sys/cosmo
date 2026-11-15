@@ -32,6 +32,7 @@ import {
 } from "@/components/checkin/state";
 import type { CosmoEmotion } from "@/components/cosmo/types";
 import type { CheckInCreated, ConversationState, Lang, SummaryPayload } from "@/lib/types";
+import type { ExplainEvent } from "@/lib/explain";
 import { noteSosFromTurn } from "@/components/sos/store";
 
 export interface AssistantTurn {
@@ -53,8 +54,17 @@ export interface UseCheckInOptions {
    * text arrives with the `summary` event and is spoken from `onSummary` after the dashboard shows.
    */
   onAssistant?: (turn: AssistantTurn) => void;
-  /** the `summary` event arrived: load the dashboard, switch the view, speak summary.spoken.text */
-  onSummary?: (summary: SummaryPayload, checkInId: string) => void;
+  /**
+   * the `summary` event arrived: load the dashboard, switch the view, speak summary.spoken.text. `explain`: Cosmo's
+   * step-by-step walkthrough of the day (src/lib/explain.ts), which replaces the dashboard intro when present.
+   */
+  onSummary?: (summary: SummaryPayload, checkInId: string, explain: ExplainEvent | null) => void;
+  /**
+   * A turn answered with a step-by-step walkthrough ("how am I today?", "was it like this before?"): the screen plays
+   * it beat by beat instead of speaking the assistant line (whose text is the beats' captions); onAssistant is not
+   * called for that turn.
+   */
+  onExplain?: (explain: ExplainEvent, checkInId: string) => void;
   /** a resumed check-in that was already confirmed: go straight to the dashboard */
   onResumedFinished?: (checkInId: string) => void;
   /** a request came back 401: the session is gone, send the person to the crew screen */
@@ -169,9 +179,22 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckIn {
       abort.current = controller;
       dispatch({ type: "SEND_START", text: typed }); // cosmoState -> thinking, synchronously
 
-      // the SUMMARY turn's text is spoken from the `summary` event, not from its `assistant` event
+      // the SUMMARY turn's text is spoken from the `summary` event, not from its `assistant` event. Cosmo's words are
+      // handed over when the turn's events are all in (the server sends them together, after the transcript): a
+      // walkthrough (`explain`) that follows them then replaces the plain reading.
       let turnState: ConversationState | null = null;
       let turnLang: Lang = "en";
+      let said: AssistantTurn | null = null;
+      let summary: SummaryPayload | null = null;
+      let explain: ExplainEvent | null = null;
+      let delivered = false;
+      const deliver = () => {
+        if (delivered) return;
+        delivered = true;
+        if (summary) optionsRef.current.onSummary?.(summary, id, explain);
+        else if (explain && optionsRef.current.onExplain) optionsRef.current.onExplain(explain, id);
+        else if (said) optionsRef.current.onAssistant?.(said);
+      };
       try {
         const response = await open(id, controller.signal);
         if (!response.body) throw new ApiClientError("INTERNAL", "Empty response", response.status);
@@ -180,21 +203,20 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckIn {
           dispatch({ type: "TURN_EVENT", event });
           if (event.type === "state") turnState = event.state;
           if (event.type === "assistant" && turnState !== "SUMMARY") {
-            optionsRef.current.onAssistant?.({
-              checkInId: id,
-              turnId: event.turnId,
-              text: event.text,
-              language: event.language,
-              emotion: event.emotion,
-            });
+            said = { checkInId: id, turnId: event.turnId, text: event.text, language: event.language, emotion: event.emotion };
           }
-          if (event.type === "summary") optionsRef.current.onSummary?.(event.summary, id);
+          if (event.type === "summary") summary = event.summary;
+          if (event.type === "explain") explain = event;
           if (event.type === "transcript") turnLang = event.language;
           // "tell Earth": the server stored the urgent alert; the SOS card takes the photo for it (src/components/sos)
           if (event.type === "sos") noteSosFromTurn(event, turnLang, id);
+          if (event.type === "done") deliver();
         }
+        deliver();
         dispatch({ type: "TURN_END" });
       } catch (error) {
+        // what arrived before the stream broke is still said (as before, when it was said on arrival)
+        if (!controller.signal.aborted && mounted.current) deliver();
         if (controller.signal.aborted) {
           dispatch({ type: "TURN_END" });
         } else if (error instanceof ApiClientError && error.code === "STT_FAILED" && error.status === 422) {

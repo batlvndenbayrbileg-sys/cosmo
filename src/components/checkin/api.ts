@@ -238,7 +238,11 @@ export async function fetchDemoScript(language: Lang, fetchImpl?: FetchLike): Pr
   return parsed;
 }
 
-/** Same-origin URL of a turn's audio (also used by the replay button). No text travels in the URL. */
-export function turnAudioUrl(checkInId: string, turnId: string): string {
-  return `/api/checkins/${encodeURIComponent(checkInId)}/turns/${encodeURIComponent(turnId)}/audio`;
+/**
+ * Same-origin URL of a turn's audio (also used by the replay button). No text travels in the URL. `part`: one line of
+ * the turn (one beat of Cosmo's step-by-step walkthrough, src/lib/explain.ts).
+ */
+export function turnAudioUrl(checkInId: string, turnId: string, part?: number): string {
+  const base = `/api/checkins/${encodeURIComponent(checkInId)}/turns/${encodeURIComponent(turnId)}/audio`;
+  return part === undefined ? base : `${base}?part=${part}`;
 }
