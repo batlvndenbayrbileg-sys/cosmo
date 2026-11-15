@@ -146,6 +146,19 @@ export function BodyHero({ payload }: { payload: DashboardPayload }) {
               className="pointer-events-none h-full w-full select-none"
               style={{ filter: "drop-shadow(0 18px 30px rgba(40,80,160,0.18))" }}
             />
+            {/* a slow scanning light over the figure (none with reduced motion or a static render) */}
+            {animate ? (
+              <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-[40%]">
+                <div
+                  className="aegis-sweep absolute inset-0"
+                  style={{
+                    background:
+                      "linear-gradient(180deg, rgba(79,134,247,0) 40%, rgba(79,134,247,0.14) 50%, rgba(79,134,247,0) 60%)",
+                    animation: "aegis-sweep 6.5s ease-in-out 1.6s infinite",
+                  }}
+                />
+              </div>
+            ) : null}
             {BODY_HOTSPOTS.map((spot) => {
               const a = axes.get(spot.axis);
               const status: Status = a?.status ?? "no_data";
