@@ -46,7 +46,7 @@ export function HighlightVital({ payload }: { payload: DashboardPayload }) {
     <section data-slot="highlight-vital" aria-labelledby="highlight-title" className="glass-card flex flex-col gap-4 p-5 lg:min-h-0 lg:flex-[1.25] lg:gap-[clamp(8px,1.5vh,18px)] lg:p-[clamp(12px,1.8vh,20px)] lg:[&_.num-xl]:text-[clamp(24px,3.6vh,38px)]">
       <header className="flex items-center gap-3">
         <IconChip icon={Icon} />
-        <h2 id="highlight-title" className="min-w-0 flex-1 truncate text-[18px] font-normal text-[var(--aegis-ink)]">
+        <h2 id="highlight-title" className="min-w-0 flex-1 truncate text-[18px] font-normal text-[var(--cosmo-ink)]">
           {label}
         </h2>
         <StatusPill status={stat.status} size="sm" />
@@ -64,7 +64,7 @@ export function HighlightVital({ payload }: { payload: DashboardPayload }) {
             summary ? (
               <span className="tnum text-[0.82em] whitespace-nowrap">
                 {formatNumber(summary.min, digits)}
-                <span className="text-[0.7em] text-[var(--aegis-label)]">–</span>
+                <span className="text-[0.7em] text-[var(--cosmo-label)]">–</span>
                 {formatNumber(summary.max, digits)}
               </span>
             ) : (
@@ -76,7 +76,7 @@ export function HighlightVital({ payload }: { payload: DashboardPayload }) {
       </div>
 
       {bars.length === 0 ? (
-        <p className="text-[13px] text-[var(--aegis-label)]">{t("dashboard.highlight.noHistory")}</p>
+        <p className="text-[13px] text-[var(--cosmo-label)]">{t("dashboard.highlight.noHistory")}</p>
       ) : (
         <figure className="flex flex-col gap-2 lg:min-h-0 lg:flex-1">
           <div
@@ -90,7 +90,7 @@ export function HighlightVital({ payload }: { payload: DashboardPayload }) {
               return (
                 <div key={b.date ?? "today"} className="relative flex h-full min-w-0 flex-1 flex-col items-center justify-end">
                   {b.today ? (
-                    <span className="tnum absolute z-10 rounded-full bg-[var(--aegis-ink)] px-2 py-0.5 text-[11px] font-medium whitespace-nowrap text-white shadow-md" style={{ bottom: `calc(${h} + 6px)` }}>
+                    <span className="tnum absolute z-10 rounded-full bg-[var(--cosmo-ink)] px-2 py-0.5 text-[11px] font-medium whitespace-nowrap text-white shadow-md" style={{ bottom: `calc(${h} + 6px)` }}>
                       {formatNumber(b.value, digits)}
                       {unit && !unit.startsWith("/") ? ` ${unit}` : ""}
                     </span>
@@ -99,7 +99,7 @@ export function HighlightVital({ payload }: { payload: DashboardPayload }) {
                     aria-hidden="true"
                     className={cn(
                       "block w-full max-w-[22px] origin-bottom rounded-full",
-                      b.today ? "aegis-hatch bg-[var(--aegis-accent)]" : "bg-[var(--aegis-chart)]",
+                      b.today ? "cosmo-hatch bg-[var(--cosmo-accent)]" : "bg-[var(--cosmo-chart)]",
                     )}
                     style={{ height: h }}
                     initial={animate ? { scaleY: 0 } : false}
@@ -116,14 +116,14 @@ export function HighlightVital({ payload }: { payload: DashboardPayload }) {
                 key={b.date ?? "today"}
                 className={cn(
                   "tnum min-w-0 flex-1 text-center text-[10px]",
-                  b.today ? "font-semibold text-[var(--aegis-ink)]" : "text-[var(--aegis-label)]",
+                  b.today ? "font-semibold text-[var(--cosmo-ink)]" : "text-[var(--cosmo-label)]",
                 )}
               >
                 {b.date ? b.date.slice(8) : payload.checkIn.confirmedAt.slice(8, 10)}
               </span>
             ))}
           </div>
-          <figcaption className="flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5 text-[11px] text-[var(--aegis-label)]">
+          <figcaption className="flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5 text-[11px] text-[var(--cosmo-label)]">
             <span>{t("dashboard.highlight.days", { n: bars.length - (todayBar ? 1 : 0) })}</span>
             {stat.rangeText ? <span>{stat.rangeText[lang]}</span> : null}
           </figcaption>

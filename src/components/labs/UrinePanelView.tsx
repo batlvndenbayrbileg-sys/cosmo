@@ -54,7 +54,7 @@ function LabsInfo({ person }: { person: string | null }) {
             role="note"
             data-slot="labs-info"
             aria-label={lines.join(" ")}
-            className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-white/70 text-[var(--aegis-label)] ring-1 ring-[var(--aegis-hairline)] outline-none hover:text-[var(--aegis-ink)] focus-visible:ring-3 focus-visible:ring-ring/60"
+            className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-white/70 text-[var(--cosmo-label)] ring-1 ring-[var(--cosmo-hairline)] outline-none hover:text-[var(--cosmo-ink)] focus-visible:ring-3 focus-visible:ring-ring/60"
           />
         }
       >
@@ -81,7 +81,7 @@ export function LabsHeader({ person }: { person: string | null }) {
         strong={t("dashboard.labs.titleStrong")}
         className="lg:[&_.icon-chip]:size-[clamp(28px,3.8vh,38px)]! lg:[&_h2]:text-[clamp(20px,2.8vh,26px)]"
       />
-      <span className="rounded-full bg-white/70 px-3 py-1 text-[12px] font-medium text-[var(--aegis-label)] ring-1 ring-[var(--aegis-hairline)]">
+      <span className="rounded-full bg-white/70 px-3 py-1 text-[12px] font-medium text-[var(--cosmo-label)] ring-1 ring-[var(--cosmo-hairline)]">
         {t("dashboard.labs.caption")}
       </span>
       <LabsInfo person={person} />
@@ -141,12 +141,12 @@ function TimepointSelector({
               onClick={() => onSelect(p.timepoint)}
               className={cn(
                 "glass-card flex min-w-0 flex-col gap-1.5 px-3 py-2 text-left outline-none transition-[box-shadow,background-color] duration-200 focus-visible:ring-3 focus-visible:ring-ring/60 motion-reduce:transition-none lg:py-[clamp(6px,1vh,10px)]",
-                on ? "bg-white ring-2 ring-[var(--aegis-accent)]" : "hover:bg-white",
+                on ? "bg-white ring-2 ring-[var(--cosmo-accent)]" : "hover:bg-white",
               )}
             >
               <span className="flex flex-wrap items-baseline justify-between gap-x-2">
-                <span className="tnum text-[17px] leading-none font-medium text-[var(--aegis-ink)]">{p.timepoint}</span>
-                <span className="text-[11px] leading-tight text-[var(--aegis-label)]">{t("dashboard.labs.tp.day", { n: p.day })}</span>
+                <span className="tnum text-[17px] leading-none font-medium text-[var(--cosmo-ink)]">{p.timepoint}</span>
+                <span className="text-[11px] leading-tight text-[var(--cosmo-label)]">{t("dashboard.labs.tp.day", { n: p.day })}</span>
               </span>
               <StackedBar summary={p} />
               <span aria-hidden="true" className="tnum flex items-center gap-3 text-[15px] leading-none font-semibold">
@@ -162,7 +162,7 @@ function TimepointSelector({
                     </span>
                   </>
                 ) : (
-                  <span className="text-[12px] font-normal text-[var(--aegis-label)]">{t("dashboard.labs.tp.noSample")}</span>
+                  <span className="text-[12px] font-normal text-[var(--cosmo-label)]">{t("dashboard.labs.tp.noSample")}</span>
                 )}
               </span>
             </button>
@@ -170,7 +170,7 @@ function TimepointSelector({
         })}
       </div>
       {current?.counts ? (
-        <ul aria-hidden="true" className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-[var(--aegis-label)]">
+        <ul aria-hidden="true" className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-[var(--cosmo-label)]">
           {URINE_GROUPS.map((g) => (
             <li key={g} className="flex items-center gap-1.5">
               <span className={cn("size-2 rounded-full", BAR_CLASS[g])} />
@@ -245,21 +245,21 @@ export function UrinePanelView({
             className="glass-card flex flex-col gap-2 p-3 sm:p-4 lg:min-h-0 lg:flex-1 lg:p-[clamp(10px,1.4vh,16px)]"
           >
             <div className="flex items-baseline justify-between gap-3">
-              <h3 id="labs-list-title" className="text-[15px] leading-tight font-medium text-[var(--aegis-ink)]">
+              <h3 id="labs-list-title" className="text-[15px] leading-tight font-medium text-[var(--cosmo-ink)]">
                 {t("dashboard.labs.list.title", { tp })}
               </h3>
               {summary?.sampled ? (
-                <span className="tnum shrink-0 text-[11.5px] text-[var(--aegis-label)]">
+                <span className="tnum shrink-0 text-[11.5px] text-[var(--cosmo-label)]">
                   {t("dashboard.labs.list.count", { n: flagged.length, total: view.analytes.length })}
                 </span>
               ) : null}
             </div>
             {!summary?.sampled ? (
-              <p role="status" data-slot="labs-no-sample" className="rounded-2xl border border-dashed border-status-nodata/60 bg-white/60 px-3 py-3 text-[14px] text-[var(--aegis-label)]">
+              <p role="status" data-slot="labs-no-sample" className="rounded-2xl border border-dashed border-status-nodata/60 bg-white/60 px-3 py-3 text-[14px] text-[var(--cosmo-label)]">
                 {t("dashboard.labs.noSample")}
               </p>
             ) : flagged.length === 0 ? (
-              <p role="status" className="text-[14px] text-[var(--aegis-label)]">
+              <p role="status" className="text-[14px] text-[var(--cosmo-label)]">
                 {t("dashboard.labs.list.none")}
               </p>
             ) : (
@@ -269,7 +269,7 @@ export function UrinePanelView({
                   if (rows.length === 0) return null;
                   return (
                     <div key={kind} data-group={kind} className="flex flex-col gap-1">
-                      <h4 className="flex items-center gap-2 px-1 text-[11px] font-semibold tracking-wide text-[var(--aegis-label)] uppercase">
+                      <h4 className="flex items-center gap-2 px-1 text-[11px] font-semibold tracking-wide text-[var(--cosmo-label)] uppercase">
                         <span className={cn("size-2 rounded-full", BAR_CLASS[kind])} />
                         {t(`dashboard.labs.group.${kind}`)}
                         <span className="tnum font-medium">{rows.length}</span>
@@ -291,7 +291,7 @@ export function UrinePanelView({
                                 onClick={() => choose(analyte.analyte)}
                                 className={cn(
                                   "flex w-full items-center gap-2 rounded-xl px-2.5 py-1.5 text-left outline-none transition-colors duration-150 focus-visible:ring-3 focus-visible:ring-ring/60 motion-reduce:transition-none",
-                                  on ? "bg-[var(--aegis-pastel-blue)]/70 ring-1 ring-[var(--aegis-accent)]/40" : "bg-white/50 hover:bg-white/90",
+                                  on ? "bg-[var(--cosmo-pastel-blue)]/70 ring-1 ring-[var(--cosmo-accent)]/40" : "bg-white/50 hover:bg-white/90",
                                 )}
                               >
                                 {point.direction ? (
@@ -306,11 +306,11 @@ export function UrinePanelView({
                                 <span
                                   title={analyte.analyte}
                                   data-slot="labs-analyte-name"
-                                  className="min-w-0 flex-1 truncate text-[14px] font-medium text-[var(--aegis-ink)]"
+                                  className="min-w-0 flex-1 truncate text-[14px] font-medium text-[var(--cosmo-ink)]"
                                 >
                                   {analyte.analyte}
                                 </span>
-                                <span className="tnum shrink-0 text-[13.5px] text-[var(--aegis-label)]">{fold}</span>
+                                <span className="tnum shrink-0 text-[13.5px] text-[var(--cosmo-label)]">{fold}</span>
                               </button>
                             </li>
                           );
@@ -334,12 +334,12 @@ export function UrinePanelView({
           {active ? (
             <>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-                <h3 id="labs-chart-title" className="text-[20px] leading-tight font-semibold text-[var(--aegis-ink)]">
+                <h3 id="labs-chart-title" className="text-[20px] leading-tight font-semibold text-[var(--cosmo-ink)]">
                   <span className="sr-only">{t("dashboard.labs.chart.title", { analyte: active.analyte })}</span>
                   <span aria-hidden="true">{active.analyte}</span>
                 </h3>
                 {activePoint && activePoint.fold !== null ? (
-                  <span data-slot="labs-active-fold" className="tnum text-[20px] leading-tight font-light text-[var(--aegis-label)]">
+                  <span data-slot="labs-active-fold" className="tnum text-[20px] leading-tight font-light text-[var(--cosmo-label)]">
                     {formatFold(activePoint.fold, activePoint.change)}
                   </span>
                 ) : null}
@@ -349,7 +349,7 @@ export function UrinePanelView({
                   </span>
                 ) : null}
               </div>
-              {activePoint?.note ? <p className="text-[12.5px] leading-snug text-[var(--aegis-label)]">{noteText(activePoint.note)}</p> : null}
+              {activePoint?.note ? <p className="text-[12.5px] leading-snug text-[var(--cosmo-label)]">{noteText(activePoint.note)}</p> : null}
               <UrineAnalyteChart key={active.analyte} analyte={active} selected={tp} fill />
             </>
           ) : (
@@ -357,7 +357,7 @@ export function UrinePanelView({
               <h3 id="labs-chart-title" className="sr-only">
                 {t("dashboard.labs.list.hint")}
               </h3>
-              <p className="m-auto max-w-[28ch] py-6 text-center text-[14px] text-[var(--aegis-label)]">
+              <p className="m-auto max-w-[28ch] py-6 text-center text-[14px] text-[var(--cosmo-label)]">
                 {summary?.sampled ? t("dashboard.labs.chart.empty") : t("dashboard.labs.noSample")}
               </p>
             </>

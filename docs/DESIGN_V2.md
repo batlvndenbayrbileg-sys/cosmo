@@ -1,6 +1,6 @@
-# AEGIS design v2 — "glass clinic" redesign (team direction, 2026-11-14)
+# Cosmo design v2 — "glass clinic" redesign (team direction, 2026-11-14)
 
-The team supplied a reference dashboard shot (a light, clean medical dashboard: soft blue gradient, frosted-white glass panels, a large central human figure with hotspot dots, profile column on the left, cards on the right, a date timeline along the bottom) and asked for the same look and feel, **next level**, plus a new check-in experience where **only the big mascot is visible**. This file describes the reference precisely (the agents cannot see the image) and how AEGIS adapts it. It supersedes the visual parts of `docs/DASHBOARD_PLAN.md` §3; the data, status model and honesty rules of that document still apply unchanged.
+The team supplied a reference dashboard shot (a light, clean medical dashboard: soft blue gradient, frosted-white glass panels, a large central human figure with hotspot dots, profile column on the left, cards on the right, a date timeline along the bottom) and asked for the same look and feel, **next level**, plus a new check-in experience where **only the big mascot is visible**. This file describes the reference precisely (the agents cannot see the image) and how Cosmo adapts it. It supersedes the visual parts of `docs/DASHBOARD_PLAN.md` §3; the data, status model and honesty rules of that document still apply unchanged.
 
 We reproduce the **layout and visual language**, not the reference's content: no copied logo, photo, MRI image or brand names. The reference's "Medications" block becomes **Today's plan** (we never suggest drugs — guardrail R-21).
 
@@ -15,12 +15,12 @@ We reproduce the **layout and visual language**, not the reference's content: no
 - **Colour:** UI is white/blue-grey. Accent blue `#4F86F7` (charts, active states), light chart blue `#D6E4FF`, deep accent `#2F5BD3`. Pastel card fills: yellow `#FFF5C7`, blue `#DCE9FF`, mint `#DDF7EA`, lilac `#EDE3FF`. Status colours stay as in globals.css (ok / watch / alert / no-data) and status is never colour alone (glyph + word).
 - **Motion:** framer-motion, calm springs (stiffness 120–180, damping 20–26), 200–450 ms; staggered card entrance; respect `prefers-reduced-motion`.
 
-Implement these as CSS variables + utility classes in `src/app/globals.css`: `.aegis-bg` (page gradient + blobs), `.glass-frame`, `.glass-card`, `.pill`, `.icon-chip`, `.pastel-yellow|blue|mint|lilac`, `.num-xl`, `.unit-label`.
+Implement these as CSS variables + utility classes in `src/app/globals.css`: `.cosmo-bg` (page gradient + blobs), `.glass-frame`, `.glass-card`, `.pill`, `.icon-chip`, `.pastel-yellow|blue|mint|lilac`, `.num-xl`, `.unit-label`.
 
 ## 2. Dashboard layout (desktop ≥ 1280 px), inside the glass frame
 
 **Top bar (one row):**
-- Left: round white 44 px logo button with the AEGIS mark.
+- Left: round white 44 px logo button with the Cosmo mark.
 - Centre: segmented pill nav in a light-grey rounded track; active item = slightly darker grey pill with icon + label. Items: **Overview** (active), **Vitals**, **Plan**, **Trends**, **Earth link** (scroll-to anchors or tabs; Overview shows everything).
 - Right: crew avatar circle (crop of the mascot render, variant colour) + two-line "Welcome back" (11 px muted) / crew name (15 px medium); then two round 40 px icon buttons: **bell** (red dot when alerts exist; opens alerts popover) and **language** (EN / МН toggle). (The reference has a settings cog there.)
 
@@ -51,7 +51,7 @@ Mobile (< 768 px): single column in this order — top bar (logo + language), na
 
 ## 3. Check-in experience (team direction)
 
-- **Only the big mascot is visible.** Full-screen `.aegis-bg` gradient; the mascot (ImageCosmo, front pose) centred at ~70% of the viewport height, breathing, with a soft glow ellipse under it. No header, no transcript panel, no cards grid, no visible buttons.
+- **Only the big mascot is visible.** Full-screen `.cosmo-bg` gradient; the mascot (ImageCosmo, front pose) centred at ~70% of the viewport height, breathing, with a soft glow ellipse under it. No header, no transcript panel, no cards grid, no visible buttons.
 - **Voice only for the astronaut.** Listening/thinking/speaking is shown on the mascot itself and by a ring of light on the floor ellipse (listening: soft cyan pulse; thinking: slow rotating lilac arc; speaking: ring brightness follows amplitude).
 - **Cosmo writes the answers.** Every captured value appears as an animated **glass bubble** that flies out from the mascot (spring from the mascot's chest) and settles in a slot around it (alternating left and right columns, top to bottom, up to 7 per side). While it travels, a short glowing "pen" trail connects Cosmo to the bubble and the text appears with a quick typewriter effect, as if Cosmo is writing it down. Bubble = icon chip + label + value + unit + status glyph (e.g. "Sleep · 5.5 h ▲"). A correction makes the bubble shake gently and retype the new value. A clarification shows as a soft question bubble next to Cosmo's head that disappears when answered.
 - **Unobtrusive fallbacks (required for reliability and accessibility):** small ghost icons in the corners at ~35% opacity that brighten on hover/focus: language EN/МН (top-right), captions toggle "CC" (shows Cosmo's sentence and the live transcript as one subtle caption line under the mascot), keyboard (opens a minimal text field for typed answers), and "Run demo" (bottom-left; scripted demo). Keyboard shortcuts: Space = push-to-talk.

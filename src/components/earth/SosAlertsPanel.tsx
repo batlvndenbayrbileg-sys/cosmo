@@ -110,7 +110,7 @@ export function SosAlertsPanel({ delayMs, delayId, crewId }: { delayMs: number; 
       <section
         data-slot="sos-panel"
         aria-labelledby="sos-panel-title"
-        className="relative overflow-hidden rounded-[var(--aegis-radius-card)] border border-[#C53030]/40 bg-gradient-to-br from-[#FFF5F5] via-white to-[#FED7D7] p-4 shadow-[0_30px_80px_-40px_rgba(197,48,48,0.8)] sm:p-5"
+        className="relative overflow-hidden rounded-[var(--cosmo-radius-card)] border border-[#C53030]/40 bg-gradient-to-br from-[#FFF5F5] via-white to-[#FED7D7] p-4 shadow-[0_30px_80px_-40px_rgba(197,48,48,0.8)] sm:p-5"
       >
         <header className="mb-3 flex flex-wrap items-center gap-3">
           <span className="relative flex size-10 items-center justify-center">
@@ -186,7 +186,7 @@ export function SosAlertsPanel({ delayMs, delayId, crewId }: { delayMs: number; 
                       {a.crewName}
                     </Link>
                     <p className={cn("text-[15px]", unseen ? "text-white/95" : "text-[#2D3748]")}>{reasonText(a, t)}</p>
-                    <p className={cn("tnum text-[13px]", unseen ? "text-white/85" : "text-[var(--aegis-label)]")}>
+                    <p className={cn("tnum text-[13px]", unseen ? "text-white/85" : "text-[var(--cosmo-label)]")}>
                       {t("emergency.sos.earth.at", { time: formatClockLabel(a.createdAt, lang) })}
                       {a.seenAt ? ` · ${t("emergency.sos.earth.seenAt", { time: formatClockLabel(a.seenAt, lang) })}` : ""}
                     </p>

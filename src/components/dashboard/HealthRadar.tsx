@@ -36,7 +36,7 @@ export function HealthRadar({
   const anyMissing = axes.some((a) => a.score === null);
 
   const config = {
-    today: { label: t("dashboard.radar.today"), color: "var(--aegis-accent)" },
+    today: { label: t("dashboard.radar.today"), color: "var(--cosmo-accent)" },
     usual: { label: t("dashboard.radar.usual"), color: "#9aa6b8" },
   } satisfies ChartConfig;
 
@@ -80,9 +80,9 @@ export function HealthRadar({
             <Radar
               name={t("dashboard.radar.today")}
               dataKey="today"
-              stroke="var(--aegis-accent)"
+              stroke="var(--cosmo-accent)"
               strokeWidth={2.5}
-              fill="var(--aegis-accent)"
+              fill="var(--cosmo-accent)"
               fillOpacity={0.22}
               isAnimationActive={animate}
             />
@@ -90,10 +90,10 @@ export function HealthRadar({
         </ChartContainer>
       </div>
 
-      <ul className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-[12px] leading-tight text-[var(--aegis-label)]">
+      <ul className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-[12px] leading-tight text-[var(--cosmo-label)]">
         <li className="flex items-center gap-2">
           <svg width="28" height="8" aria-hidden="true" focusable="false">
-            <line x1="1" y1="4" x2="27" y2="4" strokeWidth="3" strokeLinecap="round" stroke="var(--aegis-accent)" />
+            <line x1="1" y1="4" x2="27" y2="4" strokeWidth="3" strokeLinecap="round" stroke="var(--cosmo-accent)" />
           </svg>
           {t("dashboard.radar.today")}
         </li>

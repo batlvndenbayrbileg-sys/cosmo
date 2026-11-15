@@ -25,7 +25,7 @@ function CrewSkeletons() {
   return (
     <div role="status" aria-label={t("earth.loading")} className={CREW_GRID}>
       {[0, 1, 2, 3].map((i) => (
-        <Skeleton key={i} className="h-[268px] rounded-[var(--aegis-radius-card)] bg-white/60" />
+        <Skeleton key={i} className="h-[268px] rounded-[var(--cosmo-radius-card)] bg-white/60" />
       ))}
     </div>
   );
@@ -63,18 +63,18 @@ export function EarthConsole({ initialDelay }: { initialDelay?: string }) {
         {/* heading + delay */}
         <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
           <div className="flex min-w-0 flex-col gap-1.5">
-            <h1 className="text-[30px] leading-tight font-light tracking-tight text-[color:var(--aegis-ink)] sm:text-[34px]">
+            <h1 className="text-[30px] leading-tight font-light tracking-tight text-[color:var(--cosmo-ink)] sm:text-[34px]">
               {t("earth.heading.lead")} <span className="font-medium">{t("earth.heading.accent")}</span>
             </h1>
-            <p className="max-w-xl text-[16px] text-[color:var(--aegis-label)]">{t("earth.subtitle")}</p>
+            <p className="max-w-xl text-[16px] text-[color:var(--cosmo-label)]">{t("earth.subtitle")}</p>
           </div>
           <section aria-label={t("earth.delay.label")} className="flex flex-col items-start gap-1.5 lg:items-end">
             <DelaySelector value={delayId} onChange={setDelayId} />
-            <p className="flex items-center gap-1.5 text-[12px] text-[color:var(--aegis-label)]">
+            <p className="flex items-center gap-1.5 text-[12px] text-[color:var(--cosmo-label)]">
               <Info className="size-3.5 shrink-0" aria-hidden="true" />
               {t("earth.delay.hint")}
             </p>
-            <p className="text-[11px] text-[color:var(--aegis-label)]/80">{t("earth.delay.notNasa")}</p>
+            <p className="text-[11px] text-[color:var(--cosmo-label)]/80">{t("earth.delay.notNasa")}</p>
           </section>
         </div>
 
@@ -108,7 +108,7 @@ export function EarthConsole({ initialDelay }: { initialDelay?: string }) {
               <Skeleton
                 role="status"
                 aria-label={t("earth.loading")}
-                className="h-48 rounded-[var(--aegis-radius-card)] bg-white/60"
+                className="h-48 rounded-[var(--cosmo-radius-card)] bg-white/60"
               />
             ) : null}
             {alerts.status === "error" ? (
@@ -132,11 +132,11 @@ export function EarthConsole({ initialDelay }: { initialDelay?: string }) {
                 <ShieldCheck className="size-[18px]" aria-hidden="true" />
               </span>
               <div className="flex min-w-0 flex-col gap-1">
-                <h2 id="earth-privacy-title" className="text-[15px] font-medium text-[color:var(--aegis-ink)]">
+                <h2 id="earth-privacy-title" className="text-[15px] font-medium text-[color:var(--cosmo-ink)]">
                   {t("earth.privacy.title")}
                 </h2>
-                <p className="text-[13px] leading-snug text-[color:var(--aegis-label)]">{t("earth.privacy.note")}</p>
-                <p className="text-[13px] leading-snug text-[color:var(--aegis-label)]">{t("earth.privacy.noText")}</p>
+                <p className="text-[13px] leading-snug text-[color:var(--cosmo-label)]">{t("earth.privacy.note")}</p>
+                <p className="text-[13px] leading-snug text-[color:var(--cosmo-label)]">{t("earth.privacy.noText")}</p>
               </div>
             </aside>
           </div>

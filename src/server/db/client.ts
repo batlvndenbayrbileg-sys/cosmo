@@ -15,11 +15,11 @@ export type { Db, Queryable, Row } from "./sql";
  * Which database the app talks to:
  *  - DATABASE_URL (or POSTGRES_URL) set: Postgres, e.g. Supabase. Every serverless instance shares it, which is what
  *    makes a check-in survive from one request to the next on Vercel.
- *  - otherwise the SQLite file at AEGIS_DB_PATH (default data/aegis.db), or `:memory:` (the tests).
- *  - AEGIS_DB_PATH=":pglite:": an in-process Postgres (PGlite), used to run the whole test suite against Postgres SQL.
+ *  - otherwise the SQLite file at COSMO_DB_PATH (default data/cosmo.db), or `:memory:` (the tests).
+ *  - COSMO_DB_PATH=":pglite:": an in-process Postgres (PGlite), used to run the whole test suite against Postgres SQL.
  */
 
-const GLOBAL_KEY = Symbol.for("aegis.db");
+const GLOBAL_KEY = Symbol.for("cosmo.db");
 interface DbSlot {
   promise: Promise<Db>;
   /** :pglite: test databases are reused across resets (starting PGlite is slow) and emptied instead */
@@ -42,17 +42,17 @@ const READ_ONLY_FS_CODES = new Set(["EROFS", "EACCES", "EPERM"]);
 
 /** the writable place for the database when the app directory is read-only (Vercel and other serverless hosts) */
 export function tmpDbPath(): string {
-  return path.join(os.tmpdir(), "aegis", "aegis.db");
+  return path.join(os.tmpdir(), "cosmo", "cosmo.db");
 }
 
 /**
  * Where the SQLite file goes. On Vercel the deployment directory is read-only and only the temp directory can be
- * written, so the default `data/aegis.db` moves there unless AEGIS_DB_PATH names a place explicitly. (On Vercel set
+ * written, so the default `data/cosmo.db` moves there unless COSMO_DB_PATH names a place explicitly. (On Vercel set
  * DATABASE_URL instead: a temp-directory file is not shared between instances.)
  */
 export function resolveDbPath(dbPath: string, env: Record<string, string | undefined> = process.env): string {
   if (isMemoryPath(dbPath)) return ":memory:";
-  if (env.VERCEL && !env.AEGIS_DB_PATH?.trim()) return tmpDbPath();
+  if (env.VERCEL && !env.COSMO_DB_PATH?.trim()) return tmpDbPath();
   return path.resolve(dbPath);
 }
 
@@ -65,7 +65,7 @@ function prepareFile(target: string): string {
     const code = (error as NodeJS.ErrnoException).code;
     if (!code || !READ_ONLY_FS_CODES.has(code)) throw error;
     const fallback = tmpDbPath();
-    console.warn(`[aegis] cannot create ${path.dirname(target)} (${code}); using ${fallback}`);
+    console.warn(`[cosmo] cannot create ${path.dirname(target)} (${code}); using ${fallback}`);
     fs.mkdirSync(path.dirname(fallback), { recursive: true });
     return fallback;
   }
@@ -133,7 +133,7 @@ export function openPostgres(url: string): PostgresDb {
     idleTimeoutMillis: 10_000,
     connectionTimeoutMillis: 10_000,
   });
-  pool.on("error", (err) => console.error("[aegis] idle Postgres client error:", err.message));
+  pool.on("error", (err) => console.error("[cosmo] idle Postgres client error:", err.message));
   return new PostgresDb(pool);
 }
 
@@ -174,7 +174,7 @@ export async function preparePostgres(db: Db, opts: { seed: boolean }): Promise<
     if (!(await pgSchemaReady(tx))) await db.exec(PG_SCHEMA_SQL);
     if (opts.seed) {
       const seeded = await seedIfEmpty(db);
-      if (seeded) console.info(`[aegis] empty database: seeded ${seeded.crew} crew, ${seeded.checkIns} check-ins (simulated)`);
+      if (seeded) console.info(`[cosmo] empty database: seeded ${seeded.crew} crew, ${seeded.checkIns} check-ins (simulated)`);
     }
   });
 }
@@ -204,7 +204,7 @@ async function openConfigured(): Promise<DbSlot> {
   // a file database with no crew yet is filled with the demo data (as `pnpm db:seed` would, without wiping), so a
   // fresh clone or a fresh instance has the roster
   const promise = seedIfEmpty(db).then((seeded) => {
-    if (seeded) console.info(`[aegis] empty database: seeded ${seeded.crew} crew, ${seeded.checkIns} check-ins (simulated)`);
+    if (seeded) console.info(`[cosmo] empty database: seeded ${seeded.crew} crew, ${seeded.checkIns} check-ins (simulated)`);
     return db as Db;
   });
   return { promise, kind: "sqlite" };

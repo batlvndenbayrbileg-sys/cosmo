@@ -17,9 +17,9 @@ export const GLASS =
 /** Ghost corner control: ~35% opacity, fully visible on hover or keyboard focus. */
 const GHOST = cn(
   GLASS,
-  "inline-flex h-10 items-center justify-center gap-2 rounded-full text-[var(--aegis-ink)]",
+  "inline-flex h-10 items-center justify-center gap-2 rounded-full text-[var(--cosmo-ink)]",
   "opacity-35 transition-opacity duration-200 hover:opacity-100 focus-visible:opacity-100",
-  "outline-none focus-visible:ring-3 focus-visible:ring-[var(--aegis-accent)]/45",
+  "outline-none focus-visible:ring-3 focus-visible:ring-[var(--cosmo-accent)]/45",
   "aria-pressed:opacity-90",
 );
 
@@ -63,9 +63,9 @@ export function LanguageCaptionControls({
             aria-label={t(o.nameKey)}
             onClick={() => setLang(o.lang)}
             className={cn(
-              "h-8 min-w-10 rounded-full px-2.5 text-[13px] font-medium text-[var(--aegis-ink)] outline-none",
-              "focus-visible:ring-3 focus-visible:ring-[var(--aegis-accent)]/45",
-              lang === o.lang ? "bg-[var(--aegis-ink)] text-white" : "hover:bg-white/80",
+              "h-8 min-w-10 rounded-full px-2.5 text-[13px] font-medium text-[var(--cosmo-ink)] outline-none",
+              "focus-visible:ring-3 focus-visible:ring-[var(--cosmo-accent)]/45",
+              lang === o.lang ? "bg-[var(--cosmo-ink)] text-white" : "hover:bg-white/80",
             )}
           >
             {o.short}
@@ -78,7 +78,7 @@ export function LanguageCaptionControls({
         aria-label={t("checkin.captions.toggle")}
         title={t("checkin.captions.toggle")}
         onClick={() => onCaptions(!captions)}
-        className={cn(GHOST, "w-10 text-[12px] font-semibold tracking-wide", captions && "bg-[var(--aegis-ink)] text-white")}
+        className={cn(GHOST, "w-10 text-[12px] font-semibold tracking-wide", captions && "bg-[var(--cosmo-ink)] text-white")}
       >
         CC
       </button>
@@ -114,7 +114,7 @@ export function FaceFollowControl({
         aria-describedby={descId}
         title={`${label}. ${privacy}`}
         onClick={() => onToggle(!on)}
-        className={cn(GHOST, "w-10", on && "bg-[var(--aegis-ink)] text-white")}
+        className={cn(GHOST, "w-10", on && "bg-[var(--cosmo-ink)] text-white")}
       >
         <ScanFace className="size-[18px]" aria-hidden="true" />
       </button>
@@ -232,13 +232,13 @@ export function KeyboardControl({
               placeholder={t("checkin.text.placeholder")}
               autoComplete="off"
               enterKeyHint="send"
-              className="h-9 min-w-0 flex-1 bg-transparent text-[15px] text-[var(--aegis-ink)] outline-none placeholder:text-[var(--aegis-label)]/80"
+              className="h-9 min-w-0 flex-1 bg-transparent text-[15px] text-[var(--cosmo-ink)] outline-none placeholder:text-[var(--cosmo-label)]/80"
             />
             <button
               type="submit"
               disabled={disabled || value.trim() === ""}
               aria-label={t("checkin.text.send")}
-              className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--aegis-ink)] text-white outline-none transition-opacity focus-visible:ring-3 focus-visible:ring-[var(--aegis-accent)]/45 disabled:opacity-30"
+              className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--cosmo-ink)] text-white outline-none transition-opacity focus-visible:ring-3 focus-visible:ring-[var(--cosmo-accent)]/45 disabled:opacity-30"
             >
               <ArrowUp className="size-4" aria-hidden="true" />
             </button>
@@ -294,14 +294,14 @@ export function StageToasts({ toasts, onAction }: { toasts: StageToast[]; onActi
             {toast.tone === "error" ? (
               <TriangleAlert className="size-4 shrink-0 text-status-watch-ink" aria-hidden="true" />
             ) : (
-              <Info className="size-4 shrink-0 text-[var(--aegis-accent-deep)]" aria-hidden="true" />
+              <Info className="size-4 shrink-0 text-[var(--cosmo-accent-deep)]" aria-hidden="true" />
             )}
-            <p className="min-w-0 flex-1 text-[13.5px] leading-snug text-[var(--aegis-ink)]">{toast.text}</p>
+            <p className="min-w-0 flex-1 text-[13.5px] leading-snug text-[var(--cosmo-ink)]">{toast.text}</p>
             {toast.action ? (
               <button
                 type="button"
                 onClick={() => onAction?.(toast.id)}
-                className="h-8 shrink-0 rounded-full bg-[var(--aegis-ink)] px-3 text-[13px] font-medium text-white outline-none focus-visible:ring-3 focus-visible:ring-[var(--aegis-accent)]/45"
+                className="h-8 shrink-0 rounded-full bg-[var(--cosmo-ink)] px-3 text-[13px] font-medium text-white outline-none focus-visible:ring-3 focus-visible:ring-[var(--cosmo-accent)]/45"
               >
                 {toast.action}
               </button>
@@ -311,7 +311,7 @@ export function StageToasts({ toasts, onAction }: { toasts: StageToast[]; onActi
                 type="button"
                 onClick={toast.onDismiss}
                 aria-label={t("shell.action.dismiss")}
-                className="inline-flex size-8 shrink-0 items-center justify-center rounded-full text-[var(--aegis-label)] outline-none hover:bg-white/80 focus-visible:ring-3 focus-visible:ring-[var(--aegis-accent)]/45"
+                className="inline-flex size-8 shrink-0 items-center justify-center rounded-full text-[var(--cosmo-label)] outline-none hover:bg-white/80 focus-visible:ring-3 focus-visible:ring-[var(--cosmo-accent)]/45"
               >
                 <X className="size-4" aria-hidden="true" />
               </button>
@@ -363,14 +363,14 @@ export function QuestionBubble({
           exit={{ opacity: 0, scale: 0.85, y: -6 }}
           transition={{ type: "spring", stiffness: 220, damping: 20 }}
         >
-          <div className={cn(GLASS, "relative flex items-start gap-2.5 rounded-[22px] rounded-bl-md bg-[var(--aegis-pastel-lilac)]/80 px-3.5 py-2.5")}>
+          <div className={cn(GLASS, "relative flex items-start gap-2.5 rounded-[22px] rounded-bl-md bg-[var(--cosmo-pastel-lilac)]/80 px-3.5 py-2.5")}>
             <CircleHelp className="mt-0.5 size-[18px] shrink-0 text-[#6d4fd8]" aria-hidden="true" />
             <div className="min-w-0">
-              <p className="text-[14.5px] font-medium leading-snug text-[var(--aegis-ink)]">
+              <p className="text-[14.5px] font-medium leading-snug text-[var(--cosmo-ink)]">
                 {t("checkin.clarify.title", { label: getKpi(clarification.key).labels[lang] })}
               </p>
               {CLARIFY_REASON_KEYS[clarification.reason.trim()] ? (
-                <p className="mt-0.5 text-[13px] leading-snug text-[var(--aegis-label)]">
+                <p className="mt-0.5 text-[13px] leading-snug text-[var(--cosmo-label)]">
                   {t(CLARIFY_REASON_KEYS[clarification.reason.trim()])}
                 </p>
               ) : null}
@@ -401,7 +401,7 @@ export function ProgressArc({ size = 18 }: { size?: number }) {
         cy="10"
         r="8"
         fill="none"
-        stroke="var(--aegis-accent)"
+        stroke="var(--cosmo-accent)"
         strokeWidth="2"
         strokeLinecap="round"
         strokeDasharray="14 50.3"

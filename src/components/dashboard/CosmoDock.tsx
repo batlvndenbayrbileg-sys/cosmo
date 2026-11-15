@@ -98,7 +98,7 @@ export function CosmoDock({
           <p
             data-slot="dock-headline"
             className={cn(
-              "leading-snug font-medium text-[var(--aegis-ink)]",
+              "leading-snug font-medium text-[var(--cosmo-ink)]",
               open ? "line-clamp-2 text-[15px]" : "truncate text-[13px]",
             )}
           >
@@ -109,7 +109,7 @@ export function CosmoDock({
           type="button"
           size={open ? "icon-lg" : "icon"}
           variant="ghost"
-          className={cn(!open && "rounded-full bg-white/80 ring-1 ring-[var(--aegis-hairline)]")}
+          className={cn(!open && "rounded-full bg-white/80 ring-1 ring-[var(--cosmo-hairline)]")}
           aria-expanded={open}
           aria-label={open ? t("dashboard.dock.hide") : t("dashboard.dock.show")}
           onClick={() => setOpen((o) => !o)}
@@ -119,15 +119,15 @@ export function CosmoDock({
       </div>
 
       {open ? (
-        <div className="flex max-h-[min(24rem,calc(100dvh-12rem))] flex-col gap-3 overflow-y-auto border-t border-[var(--aegis-hairline)] px-4 py-3">
+        <div className="flex max-h-[min(24rem,calc(100dvh-12rem))] flex-col gap-3 overflow-y-auto border-t border-[var(--cosmo-hairline)] px-4 py-3">
           <section aria-label={t("dashboard.dock.findings")} className="flex flex-col gap-1.5">
             <h3 className="unit-label">{t("dashboard.dock.findings")}</h3>
             {findings.length === 0 ? (
-              <p className="text-[14px] text-[var(--aegis-ink)]">{t("dashboard.dock.noFindings")}</p>
+              <p className="text-[14px] text-[var(--cosmo-ink)]">{t("dashboard.dock.noFindings")}</p>
             ) : (
               <ul className="flex flex-col gap-1.5">
                 {findings.map((f) => (
-                  <li key={f.key} className="text-[14px] leading-snug text-[var(--aegis-ink)]">
+                  <li key={f.key} className="text-[14px] leading-snug text-[var(--cosmo-ink)]">
                     {pick(f.text)}
                   </li>
                 ))}
@@ -142,7 +142,7 @@ export function CosmoDock({
               </h3>
               <ul className="flex flex-col gap-2">
                 {recommendations.map((r) => (
-                  <li key={r.id} className="flex flex-col rounded-2xl bg-[var(--aegis-pastel-blue)]/70 px-3 py-2 text-[14px] leading-snug text-[var(--aegis-ink)]">
+                  <li key={r.id} className="flex flex-col rounded-2xl bg-[var(--cosmo-pastel-blue)]/70 px-3 py-2 text-[14px] leading-snug text-[var(--cosmo-ink)]">
                     <span className="font-medium">{pick(r.title)}</span>
                   </li>
                 ))}
@@ -150,7 +150,7 @@ export function CosmoDock({
             </section>
           ) : null}
 
-          <p className="text-[12px] text-[var(--aegis-label)]">{pick(summary.disclaimer)}</p>
+          <p className="text-[12px] text-[var(--cosmo-label)]">{pick(summary.disclaimer)}</p>
 
           <div className="flex flex-col gap-1.5">
             <Button

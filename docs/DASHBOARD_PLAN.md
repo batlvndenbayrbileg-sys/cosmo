@@ -1,4 +1,4 @@
-# AEGIS — question set, status model and dashboard creative plan (v1)
+# Cosmo — question set, status model and dashboard creative plan (v1)
 
 Date: 2026-11-14. Source: `NASA_Health_Companion_Requirements.xlsx` (8 sheets, read in full) layered on `docs/BRIEF.md`.
 Types for everything below live in `src/lib/types.ts` (the contract). Where this document and `docs/PLAN.md` disagree, **this document wins** for the question set, statuses and dashboard; `PLAN.md` still governs architecture, state machine, API shape and risks.

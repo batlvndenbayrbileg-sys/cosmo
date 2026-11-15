@@ -48,12 +48,12 @@ export async function synthesizeSpeech(text: string, lang: Lang): Promise<Respon
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
   } catch (err) {
-    console.error("[aegis] TTS request failed:", err instanceof Error ? err.message : err);
+    console.error("[cosmo] TTS request failed:", err instanceof Error ? err.message : err);
     throw new HttpError(502, "TTS_FAILED", "Speech synthesis did not respond.");
   }
   if (!res.ok || !res.body) {
     const detail = (await res.text().catch(() => "")).slice(0, 200);
-    console.error(`[aegis] TTS HTTP ${res.status} (model ${modelId}, lang ${lang}): ${detail}`);
+    console.error(`[cosmo] TTS HTTP ${res.status} (model ${modelId}, lang ${lang}): ${detail}`);
     throw new HttpError(502, "TTS_FAILED", "Speech synthesis failed.");
   }
   return res;

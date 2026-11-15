@@ -119,7 +119,7 @@ function Step({ label, state, t }: { label: string; state: StepState; t: T }) {
         "flex min-h-10 min-w-0 flex-col items-center gap-1 rounded-2xl px-1.5 py-1.5 text-center text-[12px] leading-tight font-medium ring-1 transition-colors duration-300 sm:flex-row sm:gap-2 sm:px-2.5 sm:text-left sm:text-[13px]",
         state === "done" && "bg-[#F0FFF4] text-[#22543D] ring-[#9AE6B4]",
         state === "now" && "bg-[#FFF5F5] text-[#9B2C2C] ring-[#FEB2B2]",
-        state === "waiting" && "bg-white/70 text-[var(--aegis-label)] ring-[var(--aegis-hairline)]",
+        state === "waiting" && "bg-white/70 text-[var(--cosmo-label)] ring-[var(--cosmo-hairline)]",
         state === "none" && "bg-[#FFFAF0] text-[#744210] ring-[#FBD38D]",
         state === "failed" && "bg-[#FFF5F5] text-[#9B2C2C] ring-[#FC8181]",
       )}
@@ -190,7 +190,7 @@ function PhotoRow({ s, t }: { s: Sent; t: T }) {
         ? "text-[#9B2C2C]"
         : s.photo === "denied" || s.photo === "unavailable"
           ? "text-[#744210]"
-          : "text-[var(--aegis-label)]";
+          : "text-[var(--cosmo-label)]";
 
   return (
     <div className="flex min-w-0 items-center gap-3" data-slot="sos-photo" data-photo={s.photo}>
@@ -336,7 +336,7 @@ export function SosStatus({
         ) : null}
 
         {inline && s.phase === "sent" ? (
-          <p className="flex items-center gap-2 text-[13px] text-[var(--aegis-label)] lg:col-span-3">
+          <p className="flex items-center gap-2 text-[13px] text-[var(--cosmo-label)] lg:col-span-3">
             <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-[#C53030] motion-safe:animate-pulse" />
             <span>
               <span className="font-semibold text-[#C53030]">{t("emergency.sos.signal")}.</span>{" "}<span className="max-sm:hidden">{t("emergency.sos.calm")}</span>

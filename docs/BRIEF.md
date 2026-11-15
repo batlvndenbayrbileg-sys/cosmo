@@ -4,7 +4,7 @@ Paste everything below the line into Claude Code (run it in an empty folder, or 
 
 ---
 
-You are building Phase 1 of **AEGIS**, our NASA Space Apps Challenge 2026 entry ("Create Health Monitoring
+You are building Phase 1 of **Cosmo**, our NASA Space Apps Challenge 2026 entry ("Create Health Monitoring
 Software for Astronauts on Space Missions"). We have ~20 hours in total; this phase must be demo-ready in
 about 6–8 hours. Work in small, verifiable steps, keep `main` runnable, and commit after each step.
 

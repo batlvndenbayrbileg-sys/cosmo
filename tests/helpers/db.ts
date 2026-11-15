@@ -2,7 +2,7 @@ import { getDb, openDb, openPglite, resetDbForTests, type Db } from "@/server/db
 import { seedDatabase } from "@/server/db/seed";
 
 /** true when the suite runs against the in-process Postgres (`pnpm test:pg`) */
-export const TESTING_POSTGRES = process.env.AEGIS_DB_PATH === ":pglite:";
+export const TESTING_POSTGRES = process.env.COSMO_DB_PATH === ":pglite:";
 
 /**
  * A separate, empty database on the engine the suite runs against (not the getDb() singleton), for tests that compare

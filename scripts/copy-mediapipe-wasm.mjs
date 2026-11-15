@@ -34,5 +34,5 @@ export function copyMediapipeWasm(publicDir = join(ROOT, "public"), packageDir =
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   const { target, files } = copyMediapipeWasm();
-  console.log(`[aegis] MediaPipe runtime ready in ${target} (${files.length} files)`);
+  console.log(`[cosmo] MediaPipe runtime ready in ${target} (${files.length} files)`);
 }

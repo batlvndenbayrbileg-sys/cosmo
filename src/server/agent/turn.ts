@@ -599,7 +599,7 @@ export async function* runTurn(args: RunTurnArgs): AsyncGenerator<TurnEvent> {
     yield* runTurnInner(args, started);
   } catch (err) {
     const known = err instanceof HttpError;
-    if (!known) console.error("[aegis] turn failed:", err);
+    if (!known) console.error("[cosmo] turn failed:", err);
     const code: ApiErrorCode = known ? err.code : "INTERNAL";
     yield {
       type: "error",
@@ -783,7 +783,7 @@ async function* runTurnInner(args: RunTurnArgs, started: number): AsyncGenerator
     // the reason only (timeout, HTTP status, refusal...), never the key: so a deployment's logs say why Claude was not used
     const cause = err.cause as { status?: unknown; name?: unknown; message?: unknown } | undefined;
     console.warn(
-      `[aegis] Claude unavailable for this turn: ${err.reason}` +
+      `[cosmo] Claude unavailable for this turn: ${err.reason}` +
         (cause ? ` (${String(cause.name ?? "")} ${String(cause.status ?? "")} ${String(cause.message ?? "").slice(0, 160)})` : ""),
     );
     out.push({ type: "error", code: "LLM_FAILED", message: "The assistant is unavailable; using the offline helper.", recoverable: true });

@@ -39,10 +39,10 @@ export function AlertsFeed({
           <Bell className="size-[18px]" aria-hidden="true" />
         </span>
         <div className="flex min-w-0 flex-1 flex-col leading-tight">
-          <h2 id="alerts-feed-title" className="text-[18px] text-[color:var(--aegis-ink)]">
+          <h2 id="alerts-feed-title" className="text-[18px] text-[color:var(--cosmo-ink)]">
             {t("earth.alerts.title")}
           </h2>
-          <p className="text-[13px] text-[color:var(--aegis-label)]">{t("earth.alerts.subtitle")}</p>
+          <p className="text-[13px] text-[color:var(--cosmo-label)]">{t("earth.alerts.subtitle")}</p>
         </div>
         <span className="pill tnum !min-h-8 !px-3 text-[14px]" aria-hidden="true">
           {open}
@@ -51,7 +51,7 @@ export function AlertsFeed({
       </header>
 
       {sorted.length === 0 ? (
-        <p className="rounded-2xl border border-dashed border-[color:var(--aegis-hairline)] bg-white/50 px-4 py-4 text-[15px] text-[color:var(--aegis-label)]">
+        <p className="rounded-2xl border border-dashed border-[color:var(--cosmo-hairline)] bg-white/50 px-4 py-4 text-[15px] text-[color:var(--cosmo-label)]">
           {t("earth.alerts.empty")}
         </p>
       ) : (
@@ -61,7 +61,7 @@ export function AlertsFeed({
               key={alert.id}
               data-alert={alert.id}
               className={cn(
-                "flex items-start gap-3 rounded-2xl bg-white px-3.5 py-3 ring-1 ring-[color:var(--aegis-hairline)]",
+                "flex items-start gap-3 rounded-2xl bg-white px-3.5 py-3 ring-1 ring-[color:var(--cosmo-hairline)]",
                 alert.acknowledgedAt && "opacity-75",
               )}
             >
@@ -74,15 +74,15 @@ export function AlertsFeed({
                 <StatusGlyph status={alert.level} size={16} />
               </span>
               <div className="flex min-w-0 flex-1 flex-col gap-1">
-                <p className="text-[15px] leading-snug text-[color:var(--aegis-ink)]">{pick(alert.text)}</p>
-                <p className="flex flex-wrap items-center gap-x-1.5 text-[13px] text-[color:var(--aegis-label)]">
+                <p className="text-[15px] leading-snug text-[color:var(--cosmo-ink)]">{pick(alert.text)}</p>
+                <p className="flex flex-wrap items-center gap-x-1.5 text-[13px] text-[color:var(--cosmo-label)]">
                   <span className={cn("font-medium", statusClasses(alert.level).ink)}>
                     {t(statusWordKey(alert.level))}
                   </span>
                   <span aria-hidden="true">·</span>
                   <Link
                     href={`/earth/${encodeURIComponent(alert.crewId)}?delay=${delayId}`}
-                    className="rounded font-medium text-[color:var(--aegis-ink)] underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-[color:var(--aegis-accent)]/45"
+                    className="rounded font-medium text-[color:var(--cosmo-ink)] underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-[color:var(--cosmo-accent)]/45"
                   >
                     {names.get(alert.crewId) ?? alert.crewId}
                   </Link>

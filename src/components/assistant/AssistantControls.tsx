@@ -79,16 +79,16 @@ export function ModeControl({
       transition={{ type: "spring", stiffness: 200, damping: 24 }}
       className={cn(
         GLASS,
-        "group flex items-center gap-3 text-left text-[var(--aegis-ink)] outline-none",
+        "group flex items-center gap-3 text-left text-[var(--cosmo-ink)] outline-none",
         placement === "stage" ? "rounded-[22px] py-2.5 pr-5 pl-2.5" : "rounded-full py-1.5 pr-4 pl-1.5 [&>span:first-child]:size-8 [&>span:first-child]:rounded-full",
-        "transition-[transform,opacity] hover:-translate-y-0.5 focus-visible:ring-4 focus-visible:ring-[var(--aegis-accent)]/40 disabled:opacity-60",
+        "transition-[transform,opacity] hover:-translate-y-0.5 focus-visible:ring-4 focus-visible:ring-[var(--cosmo-accent)]/40 disabled:opacity-60",
       )}
     >
       <span
         aria-hidden="true"
         className={cn(
           "inline-flex size-11 shrink-0 items-center justify-center rounded-2xl text-white",
-          back ? "bg-[var(--aegis-label)]" : "bg-[var(--aegis-ink)]",
+          back ? "bg-[var(--cosmo-label)]" : "bg-[var(--cosmo-ink)]",
         )}
       >
         {back ? <ArrowLeft className="size-5" /> : state === "done" ? <Check className="size-5" /> : <ClipboardCheck className="size-5" />}
@@ -96,7 +96,7 @@ export function ModeControl({
       <span className="flex min-w-0 flex-col">
         <span className="text-[15.5px] leading-tight font-semibold">{label}</span>
         {/* over the dashboard the button stays small: the label only */}
-        {placement === "stage" ? <span className="text-[12.5px] leading-tight text-[var(--aegis-label)]">{hint}</span> : null}
+        {placement === "stage" ? <span className="text-[12.5px] leading-tight text-[var(--cosmo-label)]">{hint}</span> : null}
       </span>
     </motion.button>
   );
@@ -117,7 +117,7 @@ export function IdentityChip({
   if (!crew) return null;
   const name = displayName(crew, lang);
   const item =
-    "flex h-10 w-full items-center gap-2.5 rounded-md px-2.5 text-left text-[14.5px] text-[var(--aegis-ink)] outline-none hover:bg-black/5 focus-visible:ring-2 focus-visible:ring-[var(--aegis-accent)]/45";
+    "flex h-10 w-full items-center gap-2.5 rounded-md px-2.5 text-left text-[14.5px] text-[var(--cosmo-ink)] outline-none hover:bg-black/5 focus-visible:ring-2 focus-visible:ring-[var(--cosmo-accent)]/45";
   return (
     <Popover>
       <PopoverTrigger
@@ -126,8 +126,8 @@ export function IdentityChip({
         className={cn(
           GLASS,
           // phones: just the coloured dot in the top-left corner (the name is in its label); wider: the name too
-          "inline-flex h-10 items-center gap-2 rounded-full px-1.5 text-[14px] font-medium text-[var(--aegis-ink)] outline-none sm:pr-3",
-          "opacity-80 transition-opacity hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-3 focus-visible:ring-[var(--aegis-accent)]/45",
+          "inline-flex h-10 items-center gap-2 rounded-full px-1.5 text-[14px] font-medium text-[var(--cosmo-ink)] outline-none sm:pr-3",
+          "opacity-80 transition-opacity hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-3 focus-visible:ring-[var(--cosmo-accent)]/45",
         )}
       >
         <span aria-hidden="true" className="size-7 rounded-full ring-2 ring-white" style={variantDot(crew.mascotVariant)} />
@@ -135,7 +135,7 @@ export function IdentityChip({
         <ChevronDown className="hidden size-3.5 opacity-60 sm:inline" aria-hidden="true" />
       </PopoverTrigger>
       <PopoverContent align="center" className="w-60 gap-1 p-1.5" data-slot="assistant-person-menu">
-        <p className="px-2.5 pt-1 pb-1.5 text-[12px] font-medium tracking-wide text-[var(--aegis-label)] uppercase">
+        <p className="px-2.5 pt-1 pb-1.5 text-[12px] font-medium tracking-wide text-[var(--cosmo-label)] uppercase">
           {t("checkin.assistant.person.menu")}
         </p>
         {roster.map((c) => (

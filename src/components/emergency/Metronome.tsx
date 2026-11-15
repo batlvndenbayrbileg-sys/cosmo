@@ -62,10 +62,10 @@ export function Metronome({
   return (
     <section
       aria-label={t("emergency.metro.title")}
-      className="flex flex-wrap items-center gap-3 rounded-[22px] bg-white/80 px-3 py-2.5 ring-1 ring-[var(--aegis-hairline)]"
+      className="flex flex-wrap items-center gap-3 rounded-[22px] bg-white/80 px-3 py-2.5 ring-1 ring-[var(--cosmo-hairline)]"
     >
       <div className="relative flex size-14 shrink-0 items-center justify-center" aria-hidden="true">
-        {running ? <span key={beats} className="aegis-beat absolute inset-0 rounded-full bg-[#C53030]/35" /> : null}
+        {running ? <span key={beats} className="cosmo-beat absolute inset-0 rounded-full bg-[#C53030]/35" /> : null}
         <span
           className={cn(
             "relative size-9 rounded-full ring-4 ring-white transition-colors duration-100",
@@ -76,11 +76,11 @@ export function Metronome({
       </div>
       <div className="flex min-w-0 flex-col leading-tight">
         <span className="unit-label">{t("emergency.metro.title")}</span>
-        <span className="tnum text-[17px] font-medium text-[var(--aegis-ink)]">{t("emergency.metro.rate", { rate })}</span>
-        <span className="tnum text-[13px] text-[var(--aegis-label)]">
+        <span className="tnum text-[17px] font-medium text-[var(--cosmo-ink)]">{t("emergency.metro.rate", { rate })}</span>
+        <span className="tnum text-[13px] text-[var(--cosmo-label)]">
           {t("emergency.metro.count", { n: pos })} ·{" "}
           <span className="sr-only">{t("emergency.metro.elapsed")} </span>
-          <span className="font-medium text-[var(--aegis-ink)]" role="timer" aria-live="off">
+          <span className="font-medium text-[var(--cosmo-ink)]" role="timer" aria-live="off">
             {formatElapsed(now - startedAt)}
           </span>
         </span>
@@ -100,7 +100,7 @@ export function Metronome({
           onClick={() => setSound((s) => !s)}
           aria-pressed={sound}
           aria-label={t("emergency.metro.sound")}
-          className="inline-flex size-12 items-center justify-center rounded-full bg-white ring-1 ring-[var(--aegis-hairline)] outline-none focus-visible:ring-3 focus-visible:ring-ring/60"
+          className="inline-flex size-12 items-center justify-center rounded-full bg-white ring-1 ring-[var(--cosmo-hairline)] outline-none focus-visible:ring-3 focus-visible:ring-ring/60"
         >
           {sound ? <Volume2 className="size-5" aria-hidden /> : <VolumeX className="size-5" aria-hidden />}
         </button>
@@ -108,7 +108,7 @@ export function Metronome({
           type="button"
           onClick={onResetTimer}
           aria-label={t("emergency.metro.reset")}
-          className="inline-flex size-12 items-center justify-center rounded-full bg-white ring-1 ring-[var(--aegis-hairline)] outline-none focus-visible:ring-3 focus-visible:ring-ring/60"
+          className="inline-flex size-12 items-center justify-center rounded-full bg-white ring-1 ring-[var(--cosmo-hairline)] outline-none focus-visible:ring-3 focus-visible:ring-ring/60"
         >
           <RotateCcw className="size-5" aria-hidden />
         </button>

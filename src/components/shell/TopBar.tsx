@@ -4,11 +4,11 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { useI18n } from "@/i18n/I18nProvider";
 import { cn } from "@/lib/utils";
-import { AegisMark } from "./AegisMark";
+import { CosmoMark } from "./CosmoMark";
 import { LanguageToggle } from "./LanguageToggle";
 
 export interface TopBarProps {
-  /** shown next to the logo button (defaults to the "AEGIS / Cosmo health companion" wordmark) */
+  /** shown next to the logo button (defaults to the "Cosmo / health companion" wordmark) */
   brand?: ReactNode;
   /** optional centre slot (a title pill, a segmented nav...) */
   center?: ReactNode;
@@ -42,18 +42,18 @@ export function TopBar({ brand, center, right, homeHref = "/", className }: TopB
           aria-label={t("shell.header.home")}
           className={cn(
             "inline-flex size-11 shrink-0 items-center justify-center rounded-full bg-white outline-none",
-            "border border-[color:var(--aegis-hairline)] shadow-[0_6px_18px_-10px_rgba(40,80,160,0.45)]",
-            "transition-transform duration-200 hover:scale-[1.04] focus-visible:ring-3 focus-visible:ring-[color:var(--aegis-accent)]/45",
+            "border border-[color:var(--cosmo-hairline)] shadow-[0_6px_18px_-10px_rgba(40,80,160,0.45)]",
+            "transition-transform duration-200 hover:scale-[1.04] focus-visible:ring-3 focus-visible:ring-[color:var(--cosmo-accent)]/45",
           )}
         >
-          <AegisMark />
+          <CosmoMark />
         </Link>
         {brand === undefined ? (
           <span className="hidden min-w-0 flex-col leading-tight sm:flex">
-            <span className="truncate text-[15px] font-semibold tracking-[0.14em] text-[color:var(--aegis-ink)]">
+            <span className="truncate text-[15px] font-semibold tracking-[0.14em] text-[color:var(--cosmo-ink)]">
               {t("shell.title")}
             </span>
-            <span className="truncate text-[11px] text-[color:var(--aegis-label)]">{t("shell.subtitle")}</span>
+            <span className="truncate text-[11px] text-[color:var(--cosmo-label)]">{t("shell.subtitle")}</span>
           </span>
         ) : (
           brand

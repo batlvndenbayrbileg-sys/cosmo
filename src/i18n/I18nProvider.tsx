@@ -14,7 +14,7 @@ import { dictionaries } from "./dictionary";
 import { translate } from "./translate";
 import type { TranslateVars } from "./types";
 
-const STORAGE_KEY = "aegis.lang";
+const STORAGE_KEY = "cosmo.lang";
 const DEFAULT_LANG: Lang = "en";
 
 export interface I18nValue {

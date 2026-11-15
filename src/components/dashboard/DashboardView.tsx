@@ -169,18 +169,18 @@ export function DashboardView({ payload, viewer, dockSlot, dockOpen }: Dashboard
     vitals: () => (
       <section aria-labelledby="vitals-title" data-slot="vitals" className="flex flex-col gap-3 lg:h-full lg:min-h-0">
         <div className="flex flex-col gap-0.5 lg:flex-row lg:flex-wrap lg:items-baseline lg:gap-x-4">
-          <h2 id="vitals-title" className="text-[26px] leading-tight font-light text-[var(--aegis-ink)] lg:text-[clamp(20px,2.8vh,26px)]">
+          <h2 id="vitals-title" className="text-[26px] leading-tight font-light text-[var(--cosmo-ink)] lg:text-[clamp(20px,2.8vh,26px)]">
             {t("dashboard.details.title")}
           </h2>
-          <p className="text-[13px] text-[var(--aegis-label)] lg:text-[12px]">{t("dashboard.vitals.subtitle")}</p>
-          <p className="text-[13px] text-[var(--aegis-label)] lg:text-[12px]">{t("dashboard.vitals.legend")}</p>
+          <p className="text-[13px] text-[var(--cosmo-label)] lg:text-[12px]">{t("dashboard.vitals.subtitle")}</p>
+          <p className="text-[13px] text-[var(--cosmo-label)] lg:text-[12px]">{t("dashboard.vitals.legend")}</p>
           {hazardStat ? (
-            <p role="status" className="text-[13px] font-medium text-[var(--aegis-accent-deep)] lg:text-[12px]">
+            <p role="status" className="text-[13px] font-medium text-[var(--cosmo-accent-deep)] lg:text-[12px]">
               {t("dashboard.vitals.sorted")}
             </p>
           ) : null}
           {viewer === "ground" ? (
-            <p className="text-[13px] text-[var(--aegis-label)] lg:text-[12px]">{t("dashboard.vitals.textHidden")}</p>
+            <p className="text-[13px] text-[var(--cosmo-label)] lg:text-[12px]">{t("dashboard.vitals.textHidden")}</p>
           ) : null}
         </div>
         <div className="flex flex-col gap-4 lg:grid lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,2.3fr)] lg:gap-[clamp(10px,1.2vw,18px)]">
@@ -191,10 +191,10 @@ export function DashboardView({ payload, viewer, dockSlot, dockOpen }: Dashboard
                 <PersonStanding className="size-3.5" />
               </span>
               <div className="min-w-0">
-                <h3 id="body-map-title" className="text-[15px] leading-tight font-medium text-[var(--aegis-ink)]">
+                <h3 id="body-map-title" className="text-[15px] leading-tight font-medium text-[var(--cosmo-ink)]">
                   {t("dashboard.bodyMap.title")}
                 </h3>
-                <p className="truncate text-[11.5px] text-[var(--aegis-label)]">{t("dashboard.bodyMap.subtitle")}</p>
+                <p className="truncate text-[11.5px] text-[var(--cosmo-label)]">{t("dashboard.bodyMap.subtitle")}</p>
               </div>
             </div>
             <BodyMap vitals={bodyVitals} animate={!reduced} className="h-[360px] lg:h-auto lg:min-h-0 lg:flex-1" />
@@ -239,7 +239,7 @@ export function DashboardView({ payload, viewer, dockSlot, dockOpen }: Dashboard
               strong={t("dashboard.radar.titleStrong")}
               className="lg:[&_h2]:text-[clamp(18px,2.4vh,24px)]"
             />
-            <p className="text-[12px] leading-snug text-[var(--aegis-label)]">{t("dashboard.radar.subtitle")}</p>
+            <p className="text-[12px] leading-snug text-[var(--cosmo-label)]">{t("dashboard.radar.subtitle")}</p>
             <HealthRadar axes={payload.axes} fill />
           </section>
           <section aria-labelledby="trends-title" className="flex flex-col gap-3 lg:min-h-0">
@@ -251,7 +251,7 @@ export function DashboardView({ payload, viewer, dockSlot, dockOpen }: Dashboard
                 strong={t("dashboard.trends.titleStrong")}
                 className="lg:[&_h2]:text-[clamp(18px,2.4vh,24px)]"
               />
-              <p className="text-[12px] text-[var(--aegis-label)]">{t("dashboard.trends.subtitle")}</p>
+              <p className="text-[12px] text-[var(--cosmo-label)]">{t("dashboard.trends.subtitle")}</p>
             </div>
             <TrendTiles byKey={byKey} />
           </section>
@@ -268,8 +268,8 @@ export function DashboardView({ payload, viewer, dockSlot, dockOpen }: Dashboard
             <AlertsStrip alerts={payload.alerts} viewer={viewer} />
           ) : (
             <div role="status" className="glass-card flex flex-col gap-1 px-5 py-4">
-              <h2 className="text-lg font-medium text-[var(--aegis-ink)]">{t("dashboard.alerts.title")}</h2>
-              <p className="text-[15px] text-[var(--aegis-label)]">{t("dashboard.top.noAlerts")}</p>
+              <h2 className="text-lg font-medium text-[var(--cosmo-ink)]">{t("dashboard.alerts.title")}</h2>
+              <p className="text-[15px] text-[var(--cosmo-label)]">{t("dashboard.top.noAlerts")}</p>
             </div>
           )}
         </div>
@@ -297,7 +297,7 @@ export function DashboardView({ payload, viewer, dockSlot, dockOpen }: Dashboard
         {payload.overall === "no_data" ? (
           <p
             role="status"
-            className="rounded-2xl border border-dashed border-status-nodata/50 bg-white/60 px-4 py-3 text-[15px] text-[var(--aegis-label)] lg:hidden"
+            className="rounded-2xl border border-dashed border-status-nodata/50 bg-white/60 px-4 py-3 text-[15px] text-[var(--cosmo-label)] lg:hidden"
           >
             {t("dashboard.noDataBanner")}
           </p>
@@ -398,7 +398,7 @@ function OverviewPanel({
                 className="lg:gap-2.5 lg:[&_.icon-chip]:size-[clamp(28px,3.8vh,38px)]! lg:[&_h2]:text-[clamp(18px,2.6vh,26px)]"
               />
               <div className="glass-card flex flex-col px-3 pt-2 pb-3 lg:min-h-0 lg:flex-1 lg:pt-[clamp(4px,0.8vh,8px)] lg:pb-[clamp(4px,1vh,12px)]">
-                <p className="px-2 pt-1 text-[12px] leading-snug text-[var(--aegis-label)] lg:truncate lg:pt-0 dash-short:sr-only">
+                <p className="px-2 pt-1 text-[12px] leading-snug text-[var(--cosmo-label)] lg:truncate lg:pt-0 dash-short:sr-only">
                   {t("dashboard.radar.subtitle")}
                 </p>
                 <HealthRadar axes={payload.axes} fill />

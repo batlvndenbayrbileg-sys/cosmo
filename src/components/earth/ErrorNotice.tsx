@@ -20,14 +20,14 @@ export function ErrorNotice({
         <TriangleAlert className="size-[18px]" aria-hidden="true" />
       </span>
       <div className="flex min-w-0 flex-col gap-1">
-        <p className="text-[16px] font-medium text-[color:var(--aegis-ink)]">{title}</p>
-        {detail ? <p className="text-[14px] text-[color:var(--aegis-label)]">{detail}</p> : null}
+        <p className="text-[16px] font-medium text-[color:var(--cosmo-ink)]">{title}</p>
+        {detail ? <p className="text-[14px] text-[color:var(--cosmo-label)]">{detail}</p> : null}
         {onRetry ? (
           <div className="mt-2">
             <button
               type="button"
               onClick={onRetry}
-              className="inline-flex h-10 items-center rounded-full bg-[color:var(--aegis-ink)] px-5 text-[14px] font-medium text-white outline-none hover:bg-[color:var(--aegis-accent-deep)] focus-visible:ring-4 focus-visible:ring-[color:var(--aegis-accent)]/45"
+              className="inline-flex h-10 items-center rounded-full bg-[color:var(--cosmo-ink)] px-5 text-[14px] font-medium text-white outline-none hover:bg-[color:var(--cosmo-accent-deep)] focus-visible:ring-4 focus-visible:ring-[color:var(--cosmo-accent)]/45"
             >
               {t("shell.action.retry")}
             </button>

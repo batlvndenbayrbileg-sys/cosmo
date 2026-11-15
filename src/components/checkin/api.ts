@@ -1,5 +1,5 @@
 /**
- * Thin client for the AEGIS API (docs/PLAN.md section 5). Every function takes an optional `fetchImpl`
+ * Thin client for the Cosmo API (docs/PLAN.md section 5). Every function takes an optional `fetchImpl`
  * so tests can inject a fake. Failures become `ApiClientError` with an ApiErrorCode (or "NETWORK"
  * when the request never got an answer). `crewId` is never sent except to POST /api/session: after
  * that the server knows who is asking from the signed cookie.

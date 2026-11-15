@@ -10,6 +10,6 @@ const pkgPath = require.resolve("vitest/package.json");
 const vitest = path.join(path.dirname(pkgPath), require(pkgPath).bin.vitest);
 const result = spawnSync(process.execPath, [vitest, "run", ...process.argv.slice(2)], {
   stdio: "inherit",
-  env: { ...process.env, AEGIS_TEST_DB: ":pglite:" },
+  env: { ...process.env, COSMO_TEST_DB: ":pglite:" },
 });
 process.exit(result.status ?? 1);

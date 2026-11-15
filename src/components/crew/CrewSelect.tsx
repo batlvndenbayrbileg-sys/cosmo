@@ -77,16 +77,16 @@ export function CrewSelect() {
           transition={{ type: "spring", stiffness: 140, damping: 24 }}
           className="flex flex-col items-start gap-3 sm:items-center sm:text-center"
         >
-          <span className="unit-label inline-flex items-center gap-2 rounded-full bg-white/70 px-3 py-1.5 ring-1 ring-[color:var(--aegis-hairline)]">
-            <span aria-hidden="true" className="size-1.5 rounded-full bg-[color:var(--aegis-accent)]" />
+          <span className="unit-label inline-flex items-center gap-2 rounded-full bg-white/70 px-3 py-1.5 ring-1 ring-[color:var(--cosmo-hairline)]">
+            <span aria-hidden="true" className="size-1.5 rounded-full bg-[color:var(--cosmo-accent)]" />
             {t("crew.eyebrow")}
           </span>
           <h1
-            className="text-[32px] leading-[1.1] font-light tracking-tight text-[color:var(--aegis-ink)] sm:text-[44px]"
+            className="text-[32px] leading-[1.1] font-light tracking-tight text-[color:var(--cosmo-ink)] sm:text-[44px]"
           >
             {t("crew.title.lead")} <span className="font-medium">{t("crew.title.accent")}</span>
           </h1>
-          <p className="max-w-2xl text-[17px] text-[color:var(--aegis-label)]">{t("crew.subtitle")}</p>
+          <p className="max-w-2xl text-[17px] text-[color:var(--cosmo-label)]">{t("crew.subtitle")}</p>
         </motion.header>
 
         {sessionFailed ? (
@@ -96,24 +96,24 @@ export function CrewSelect() {
         {load.status === "loading" ? (
           <div role="status" aria-label={t("crew.loading")} className={GRID}>
             {[0, 1, 2, 3].map((i) => (
-              <Skeleton key={i} className="h-[360px] rounded-[var(--aegis-radius-card)] bg-white/60" />
+              <Skeleton key={i} className="h-[360px] rounded-[var(--cosmo-radius-card)] bg-white/60" />
             ))}
           </div>
         ) : load.status === "failed" ? (
           <div className="glass-card flex flex-col items-center gap-4 p-10 text-center">
-            <p role="alert" className="text-lg text-[color:var(--aegis-ink)]">
+            <p role="alert" className="text-lg text-[color:var(--cosmo-ink)]">
               {t("crew.error.load")}
             </p>
             <button
               type="button"
               onClick={retry}
-              className="inline-flex h-11 items-center rounded-full bg-[color:var(--aegis-ink)] px-6 text-[15px] font-medium text-white outline-none hover:bg-[color:var(--aegis-accent-deep)] focus-visible:ring-4 focus-visible:ring-[color:var(--aegis-accent)]/45"
+              className="inline-flex h-11 items-center rounded-full bg-[color:var(--cosmo-ink)] px-6 text-[15px] font-medium text-white outline-none hover:bg-[color:var(--cosmo-accent-deep)] focus-visible:ring-4 focus-visible:ring-[color:var(--cosmo-accent)]/45"
             >
               {t("shell.action.retry")}
             </button>
           </div>
         ) : load.crew.length === 0 ? (
-          <p className="glass-card p-10 text-center text-lg text-[color:var(--aegis-label)]">{t("crew.empty")}</p>
+          <p className="glass-card p-10 text-center text-lg text-[color:var(--cosmo-label)]">{t("crew.empty")}</p>
         ) : (
           <ul role="list" aria-label={t("crew.list.label")} className={GRID}>
             {load.crew.map((crew, i) => (
@@ -136,18 +136,18 @@ export function CrewSelect() {
         )}
 
         <footer className="mt-auto flex flex-col items-center justify-between gap-3 border-t border-white/70 pt-5 sm:flex-row">
-          <p className="inline-flex items-center gap-2 text-[14px] text-[color:var(--aegis-label)]">
+          <p className="inline-flex items-center gap-2 text-[14px] text-[color:var(--cosmo-label)]">
             <ShieldCheck className="size-4 shrink-0" aria-hidden="true" />
             {t("crew.privacy")}
           </p>
           <Link
             href="/earth"
             title={t("crew.earth.hint")}
-            className="group inline-flex min-h-10 items-center gap-2 rounded-full px-3 py-1.5 text-[14px] text-[color:var(--aegis-label)] outline-none transition-colors hover:bg-white/70 hover:text-[color:var(--aegis-ink)] focus-visible:ring-3 focus-visible:ring-[color:var(--aegis-accent)]/45"
+            className="group inline-flex min-h-10 items-center gap-2 rounded-full px-3 py-1.5 text-[14px] text-[color:var(--cosmo-label)] outline-none transition-colors hover:bg-white/70 hover:text-[color:var(--cosmo-ink)] focus-visible:ring-3 focus-visible:ring-[color:var(--cosmo-accent)]/45"
           >
             <Satellite className="size-4" aria-hidden="true" />
             <span className="font-medium">{t("crew.earth.link")}</span>
-            <span className="hidden text-[color:var(--aegis-label)]/80 md:inline">· {t("crew.earth.hint")}</span>
+            <span className="hidden text-[color:var(--cosmo-label)]/80 md:inline">· {t("crew.earth.hint")}</span>
             <ArrowUpRight
               className="size-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
               aria-hidden="true"

@@ -13,7 +13,7 @@ import type { Timepoint } from "@/lib/signature/types";
 import { CardLimits } from "./CardLimits";
 import { FRI_MAX, drawView, formatFri, recoveryTimeline } from "./logic";
 
-const POINT = "var(--aegis-ink)";
+const POINT = "var(--cosmo-ink)";
 const FAN = "#4f86f7";
 
 /** chart rows: one per panel and one per fan day, merged on the day axis */
@@ -96,7 +96,7 @@ export function RecoveryCard({
     <section aria-labelledby="sig-rec-title" data-slot="signature-recovery" className="glass-card flex min-w-0 flex-col gap-3 p-4 sm:p-5">
       <header className="flex items-center gap-2.5">
         <IconChip icon={Activity} size={32} />
-        <h2 id="sig-rec-title" className="text-[17px] leading-tight font-medium text-[var(--aegis-ink)]">
+        <h2 id="sig-rec-title" className="text-[17px] leading-tight font-medium text-[var(--cosmo-ink)]">
           {t("dashboard.signature.rec.title")}
         </h2>
         <CardLimits card="rec" />
@@ -136,7 +136,7 @@ export function RecoveryCard({
               </ComposedChart>
             </ChartContainer>
           </div>
-          <ul aria-hidden="true" className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-[var(--aegis-label)]">
+          <ul aria-hidden="true" className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-[var(--cosmo-label)]">
             <li className="flex items-center gap-1.5">
               <span className="inline-block w-5 border-t-[1.5px] border-dashed border-[#5b6678]" />
               {t("dashboard.signature.rec.threshold", { t: tl.threshold })}
@@ -154,7 +154,7 @@ export function RecoveryCard({
               </>
             ) : null}
           </ul>
-          <p className="text-[13px] leading-snug text-[var(--aegis-ink)]">
+          <p className="text-[13px] leading-snug text-[var(--cosmo-ink)]">
             {tl.recovery && tl.from
               ? t("dashboard.signature.rec.eta", {
                   tp: tl.from.tp,
@@ -195,17 +195,17 @@ export function RecoveryCard({
 
         <aside
           aria-labelledby="sig-draw-title"
-          className="flex flex-col gap-2 rounded-2xl bg-white/60 p-3 ring-1 ring-[var(--aegis-hairline)]"
+          className="flex flex-col gap-2 rounded-2xl bg-white/60 p-3 ring-1 ring-[var(--cosmo-hairline)]"
         >
-          <h3 id="sig-draw-title" className="flex items-center gap-2 text-[13px] font-medium text-[var(--aegis-ink)]">
+          <h3 id="sig-draw-title" className="flex items-center gap-2 text-[13px] font-medium text-[var(--cosmo-ink)]">
             <Package aria-hidden="true" className="size-4" strokeWidth={1.8} />
             {t("dashboard.signature.draw.title")}
           </h3>
           <p className="flex flex-col gap-0.5">
             <span className="unit-label">{t("dashboard.signature.draw.ruleId", { rule: a.rule })}</span>
-            <span className="text-[14px] font-medium text-[var(--aegis-ink)]">{t(`dashboard.signature.draw.rule.${a.rule}`)}</span>
+            <span className="text-[14px] font-medium text-[var(--cosmo-ink)]">{t(`dashboard.signature.draw.rule.${a.rule}`)}</span>
           </p>
-          <p className="text-[12px] text-[var(--aegis-label)]">
+          <p className="text-[12px] text-[var(--cosmo-label)]">
             {a.daysSinceLastPanel === null
               ? t("dashboard.signature.draw.sinceNone")
               : a.daysSinceLastPanel === 0
@@ -213,13 +213,13 @@ export function RecoveryCard({
                 : t("dashboard.signature.draw.since", { days: a.daysSinceLastPanel })}
           </p>
           {draw.nextRetestDay !== null ? (
-            <p className="text-[12px] text-[var(--aegis-ink)]">{t("dashboard.signature.draw.next", { day: draw.nextRetestDay })}</p>
+            <p className="text-[12px] text-[var(--cosmo-ink)]">{t("dashboard.signature.draw.next", { day: draw.nextRetestDay })}</p>
           ) : null}
           <ul className="flex flex-wrap gap-1.5">
-            <li className="rounded-full bg-[var(--aegis-pastel-blue)] px-2.5 py-0.5 text-[12px] text-[var(--aegis-ink)]">
+            <li className="rounded-full bg-[var(--cosmo-pastel-blue)] px-2.5 py-0.5 text-[12px] text-[var(--cosmo-ink)]">
               {t("dashboard.signature.draw.kitsLeft", { left: a.kitsLeft, total: a.kitsTotal })}
             </li>
-            <li className="rounded-full bg-[var(--aegis-pastel-mint)] px-2.5 py-0.5 text-[12px] text-[var(--aegis-ink)]">
+            <li className="rounded-full bg-[var(--cosmo-pastel-mint)] px-2.5 py-0.5 text-[12px] text-[var(--cosmo-ink)]">
               {t("dashboard.signature.draw.kitsSaved", { n: a.kitsSaved })}
             </li>
           </ul>
@@ -230,17 +230,17 @@ export function RecoveryCard({
                   {t("dashboard.signature.draw.simulated")}
                 </span>
               ) : null}
-              <span className="text-[11px] text-[var(--aegis-label)]">{t("dashboard.signature.draw.dss", { n: draw.dss.length })}</span>
+              <span className="text-[11px] text-[var(--cosmo-label)]">{t("dashboard.signature.draw.dss", { n: draw.dss.length })}</span>
               <DssSparkline values={draw.dss} />
             </div>
           ) : (
-            <p className="text-[11px] leading-snug text-[var(--aegis-label)]">{t("dashboard.signature.draw.dssNone")}</p>
+            <p className="text-[11px] leading-snug text-[var(--cosmo-label)]">{t("dashboard.signature.draw.dssNone")}</p>
           )}
-          <p className="text-[11px] leading-snug text-[var(--aegis-label)]">{t("dashboard.signature.draw.protocol")}</p>
+          <p className="text-[11px] leading-snug text-[var(--cosmo-label)]">{t("dashboard.signature.draw.protocol")}</p>
         </aside>
       </div>
 
-      <p className="text-[11px] leading-snug text-[var(--aegis-label)]">{caption}</p>
+      <p className="text-[11px] leading-snug text-[var(--cosmo-label)]">{caption}</p>
     </section>
   );
 }

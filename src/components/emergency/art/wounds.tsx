@@ -16,7 +16,7 @@ function PressingHand({ x, y, from = [x + 34, 24] as [number, number] }: { x: nu
   return (
     <g>
       <Limb d={`M${from[0]} ${from[1]} L${x + 6} ${y - 14}`} tone="helper" w={14} />
-      <ellipse cx={x} cy={y - 6} rx="18" ry="10" fill="var(--aegis-pastel-blue)" stroke={ACCENT_DEEP} strokeWidth="2" />
+      <ellipse cx={x} cy={y - 6} rx="18" ry="10" fill="var(--cosmo-pastel-blue)" stroke={ACCENT_DEEP} strokeWidth="2" />
     </g>
   );
 }
@@ -66,7 +66,7 @@ export function ColdPackArt() {
       <path d="M44 150 V78 a10 10 0 0 1 10 -10" stroke={INK} strokeOpacity="0.18" strokeWidth="6" />
       <Sitter x={100} recline={10} hand={[78, 58]} />
       <g transform="translate(64 46) rotate(-12)">
-        <rect width="28" height="20" rx="6" fill="var(--aegis-pastel-blue)" stroke={ACCENT_DEEP} strokeWidth="2" />
+        <rect width="28" height="20" rx="6" fill="var(--cosmo-pastel-blue)" stroke={ACCENT_DEEP} strokeWidth="2" />
         <path d="M14 4 v12 M8 7 l12 6 M20 7 l-12 6" stroke={ACCENT_DEEP} strokeWidth="1.6" />
       </g>
     </Canvas>

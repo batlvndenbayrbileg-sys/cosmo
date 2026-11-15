@@ -27,7 +27,7 @@ export function CardLimits({ card }: { card: SignatureLimitCard }) {
             data-slot="signature-limits"
             data-card={card}
             aria-label={`${title}. ${label}: ${text}`}
-            className="inline-flex size-6 items-center justify-center rounded-full text-[var(--aegis-label)] outline-none hover:text-[var(--aegis-ink)] focus-visible:ring-3 focus-visible:ring-ring/60"
+            className="inline-flex size-6 items-center justify-center rounded-full text-[var(--cosmo-label)] outline-none hover:text-[var(--cosmo-ink)] focus-visible:ring-3 focus-visible:ring-ring/60"
           />
         }
       >

@@ -8,7 +8,7 @@ import "server-only";
 
 type ClockSource = () => Date;
 
-const CLOCK_KEY = Symbol.for("aegis.clockOverride");
+const CLOCK_KEY = Symbol.for("cosmo.clockOverride");
 type GlobalWithClock = typeof globalThis & { [CLOCK_KEY]?: ClockSource | null };
 
 /** The current instant: the test override when set, otherwise the real clock. */

@@ -29,7 +29,7 @@ export function PageFrame({
       <div
         className={cn(
           "glass-frame flex flex-col gap-6 !p-4 sm:gap-8 sm:!p-6 lg:!p-8",
-          "rounded-[26px] sm:rounded-[var(--aegis-radius-frame)]",
+          "rounded-[26px] sm:rounded-[var(--cosmo-radius-frame)]",
           frameClassName,
         )}
       >

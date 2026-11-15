@@ -139,7 +139,7 @@ export const PRESENTER_LINES: Readonly<Partial<Record<DemoBeatId, string>>> = {
   recovery:
     "NASA has no sample between day 1 and day 45, so we give an upper bound and schedule the draw that closes the gap.",
   c2: "No flight, same pattern, two independent tests agree. Real Inspiration4 data.",
-  d: "Here one test says alarm and the other says no. AEGIS does not escalate on one key.",
+  d: "Here one test says alarm and the other says no. Cosmo does not escalate on one key.",
   evidence: "Four people is not a study. We show what held up — IL-6 — and what did not.",
 };
 

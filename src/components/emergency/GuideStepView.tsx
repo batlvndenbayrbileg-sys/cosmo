@@ -93,7 +93,7 @@ export function GuideStepView({
     <div onKeyDown={onKeyDown} className="flex flex-col gap-3 lg:h-full lg:min-h-0" data-slot="guide-step-view">
       {/* header: back to the list, title, call for help (always visible) */}
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" onClick={onBack} className={cn(BTN, "bg-white px-3 ring-1 ring-[var(--aegis-hairline)]")}>
+        <button type="button" onClick={onBack} className={cn(BTN, "bg-white px-3 ring-1 ring-[var(--cosmo-hairline)]")}>
           <ChevronLeft className="size-5" aria-hidden />
           <span className="max-sm:sr-only">{t("emergency.step.list")}</span>
         </button>
@@ -101,7 +101,7 @@ export function GuideStepView({
         <Heading
           ref={headingRef}
           tabIndex={-1}
-          className="min-w-0 flex-1 text-[22px] leading-tight font-medium text-[var(--aegis-ink)] outline-none lg:text-[clamp(20px,2.8vh,26px)]"
+          className="min-w-0 flex-1 text-[22px] leading-tight font-medium text-[var(--cosmo-ink)] outline-none lg:text-[clamp(20px,2.8vh,26px)]"
         >
           {scenario.title[lang]}
         </Heading>
@@ -117,7 +117,7 @@ export function GuideStepView({
       </div>
 
       {scenario.context ? (
-        <p className="rounded-2xl bg-[var(--aegis-pastel-lilac)]/70 px-3 py-2 text-[13px] leading-snug text-[#44337a]">
+        <p className="rounded-2xl bg-[var(--cosmo-pastel-lilac)]/70 px-3 py-2 text-[13px] leading-snug text-[#44337a]">
           <span className="mr-1 font-semibold">{t("emergency.step.space")}:</span>
           {scenario.context[lang]}
         </p>
@@ -125,12 +125,12 @@ export function GuideStepView({
 
       {/* progress */}
       <div className="flex items-center gap-3">
-        <span className="tnum text-[15px] font-semibold text-[var(--aegis-ink)]" aria-label={t("emergency.step.progressAria", { n: index + 1, total })}>
+        <span className="tnum text-[15px] font-semibold text-[var(--cosmo-ink)]" aria-label={t("emergency.step.progressAria", { n: index + 1, total })}>
           {t("emergency.step.progress", { n: index + 1, total })}
         </span>
         <span className="flex flex-1 gap-1" aria-hidden="true">
           {scenario.steps.map((_, i) => (
-            <span key={i} className={cn("h-1.5 flex-1 rounded-full transition-colors", i <= index ? "bg-[var(--aegis-accent)]" : "bg-[var(--aegis-chart)]")} />
+            <span key={i} className={cn("h-1.5 flex-1 rounded-full transition-colors", i <= index ? "bg-[var(--cosmo-accent)]" : "bg-[var(--cosmo-chart)]")} />
           ))}
         </span>
       </div>
@@ -174,7 +174,7 @@ export function GuideStepView({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
               transition={{ duration: reduced ? 0.1 : 0.22 }}
-              className="shrink-0 text-[24px] leading-snug text-[var(--aegis-ink)] lg:text-[clamp(18px,2.7vh,30px)]"
+              className="shrink-0 text-[24px] leading-snug text-[var(--cosmo-ink)] lg:text-[clamp(18px,2.7vh,30px)]"
             >
               {current.text[lang]}
             </motion.p>
@@ -202,19 +202,19 @@ export function GuideStepView({
           </div>
 
           <div className="mt-auto flex shrink-0 flex-wrap items-center gap-2 pt-1">
-            <button type="button" onClick={() => go(index - 1)} disabled={index === 0} className={cn(BTN, "bg-white ring-1 ring-[var(--aegis-hairline)]")}>
+            <button type="button" onClick={() => go(index - 1)} disabled={index === 0} className={cn(BTN, "bg-white ring-1 ring-[var(--cosmo-hairline)]")}>
               <ChevronLeft className="size-5" aria-hidden />
               {t("emergency.step.prev")}
             </button>
             <button
               type="button"
               onClick={() => (last ? onBack() : go(index + 1))}
-              className={cn(BTN, "min-w-32 bg-[var(--aegis-ink)] px-6 text-white")}
+              className={cn(BTN, "min-w-32 bg-[var(--cosmo-ink)] px-6 text-white")}
             >
               {last ? t("emergency.step.done") : t("emergency.step.next")}
               {last ? null : <ChevronRight className="size-5" aria-hidden />}
             </button>
-            <button type="button" onClick={() => speak(scenario, index)} className={cn(BTN, "bg-white ring-1 ring-[var(--aegis-hairline)]")}>
+            <button type="button" onClick={() => speak(scenario, index)} className={cn(BTN, "bg-white ring-1 ring-[var(--cosmo-hairline)]")}>
               <Volume2 className="size-4" aria-hidden />
               {t("emergency.step.listen")}
             </button>
@@ -223,10 +223,10 @@ export function GuideStepView({
       </div>
 
       {/* review status, sources, disclaimer */}
-      <footer className="flex flex-col gap-0.5 text-[12px] leading-snug text-[var(--aegis-label)]">
+      <footer className="flex flex-col gap-0.5 text-[12px] leading-snug text-[var(--cosmo-label)]">
         <p className={isReviewed(scenario) ? "" : "font-medium text-[#975A16]"}>
           {isReviewed(scenario) ? t("emergency.reviewed", { name: scenario.reviewedBy }) : t("emergency.pending")}{" "}
-          <span className="font-normal text-[var(--aegis-label)]">{t("emergency.disclaimer")}</span>
+          <span className="font-normal text-[var(--cosmo-label)]">{t("emergency.disclaimer")}</span>
         </p>
         {scenario.sources.length > 0 ? (
           <p className="lg:truncate">

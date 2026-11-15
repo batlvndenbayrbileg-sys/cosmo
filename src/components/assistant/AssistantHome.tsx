@@ -128,7 +128,7 @@ export function AssistantHome() {
     [current, open],
   );
 
-  if (stage.kind === "loading") return <div className="aegis-bg fixed inset-0" aria-busy="true" />;
+  if (stage.kind === "loading") return <div className="cosmo-bg fixed inset-0" aria-busy="true" />;
   if (stage.kind === "identify") return <IdentifyStage onResolved={resolved} />;
   return (
     <CheckInExperience

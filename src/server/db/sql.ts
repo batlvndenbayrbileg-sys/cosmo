@@ -7,7 +7,7 @@ import type { Pool, PoolClient } from "pg";
  * One small async database interface over three engines:
  *  - SQLite (better-sqlite3): local development and the default test run
  *  - Postgres (node-postgres): the deployed app (Supabase), shared by every serverless instance
- *  - PGlite (in-process Postgres): the test run that proves the Postgres SQL works (AEGIS_DB_PATH=":pglite:")
+ *  - PGlite (in-process Postgres): the test run that proves the Postgres SQL works (COSMO_DB_PATH=":pglite:")
  *
  * Queries are written once, in the SQLite dialect the app always used: `?` placeholders, `rowid` as the insertion-order
  * tie-breaker and `INSERT OR IGNORE`. The Postgres adapters translate them (`$1..$n`, the `seq` identity column every
