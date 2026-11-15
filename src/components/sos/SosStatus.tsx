@@ -1,7 +1,7 @@
 "use client";
 
 import { useSyncExternalStore, type ReactNode } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import { Camera, CameraOff, Check, Loader2, RotateCw, SatelliteDish, X } from "lucide-react";
 import type { Lang } from "@/lib/types";
 import { formatClockLabel } from "@/components/dashboard/logic";
@@ -172,12 +172,21 @@ export function SosStatus({
       </motion.div>
     );
 
-  if (variant === "inline") return <AnimatePresence initial={false}>{card}</AnimatePresence>;
+  // reduced motion holds wherever the card is mounted
+  if (variant === "inline") {
+    return (
+      <MotionConfig reducedMotion="user">
+        <AnimatePresence initial={false}>{card}</AnimatePresence>
+      </MotionConfig>
+    );
+  }
   return (
-    <div className="pointer-events-none fixed inset-x-0 top-16 z-[65] flex justify-center px-4">
-      <div className="pointer-events-auto">
-        <AnimatePresence>{card}</AnimatePresence>
+    <MotionConfig reducedMotion="user">
+      <div className="pointer-events-none fixed inset-x-0 top-16 z-[65] flex justify-center px-4">
+        <div className="pointer-events-auto">
+          <AnimatePresence>{card}</AnimatePresence>
+        </div>
       </div>
-    </div>
+    </MotionConfig>
   );
 }

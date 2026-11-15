@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import { BellOff, BellRing, CameraOff, Check, Eye, ImageIcon, SatelliteDish, Volume2 } from "lucide-react";
 import type { GroundSosAlert } from "@/lib/sos";
 import { formatClockLabel } from "@/components/dashboard/logic";
@@ -101,113 +101,116 @@ export function SosAlertsPanel({ delayMs, delayId, crewId }: { delayMs: number; 
 
   if (shown.length === 0) return null;
 
+  // its own MotionConfig: /earth/[crewId] has none around it, and reduced motion must still hold there
   return (
-    <section
-      data-slot="sos-panel"
-      aria-labelledby="sos-panel-title"
-      className="relative overflow-hidden rounded-[var(--aegis-radius-card)] border border-[#C53030]/40 bg-gradient-to-br from-[#FFF5F5] via-white to-[#FED7D7] p-4 shadow-[0_30px_80px_-40px_rgba(197,48,48,0.8)] sm:p-5"
-    >
-      <header className="mb-3 flex flex-wrap items-center gap-3">
-        <span className="relative flex size-10 items-center justify-center">
-          {ringing ? <span aria-hidden className="absolute inset-0 rounded-full bg-[#C53030]/40 motion-safe:animate-ping" /> : null}
-          <span className="relative flex size-10 items-center justify-center rounded-full bg-[#C53030] text-white">
-            <SatelliteDish className="size-5" aria-hidden />
+    <MotionConfig reducedMotion="user">
+      <section
+        data-slot="sos-panel"
+        aria-labelledby="sos-panel-title"
+        className="relative overflow-hidden rounded-[var(--aegis-radius-card)] border border-[#C53030]/40 bg-gradient-to-br from-[#FFF5F5] via-white to-[#FED7D7] p-4 shadow-[0_30px_80px_-40px_rgba(197,48,48,0.8)] sm:p-5"
+      >
+        <header className="mb-3 flex flex-wrap items-center gap-3">
+          <span className="relative flex size-10 items-center justify-center">
+            {ringing ? <span aria-hidden className="absolute inset-0 rounded-full bg-[#C53030]/40 motion-safe:animate-ping" /> : null}
+            <span className="relative flex size-10 items-center justify-center rounded-full bg-[#C53030] text-white">
+              <SatelliteDish className="size-5" aria-hidden />
+            </span>
           </span>
-        </span>
-        <h2 id="sos-panel-title" className="text-[20px] font-semibold tracking-tight text-[#742A2A]">
-          {t("emergency.sos.earth.title")}
-        </h2>
-        <div className="ml-auto flex flex-wrap items-center gap-2">
-          {ringing && !muted && soundState === "suspended" ? (
+          <h2 id="sos-panel-title" className="text-[20px] font-semibold tracking-tight text-[#742A2A]">
+            {t("emergency.sos.earth.title")}
+          </h2>
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            {ringing && !muted && soundState === "suspended" ? (
+              <button
+                type="button"
+                onClick={() => void sirenRef.current?.unlock().then(() => setSoundState(sirenRef.current?.state() ?? "unsupported"))}
+                className="inline-flex h-10 items-center gap-2 rounded-full bg-white px-4 text-[13px] font-medium text-[#742A2A] ring-1 ring-[#C53030]/30 outline-none focus-visible:ring-3 focus-visible:ring-[#C53030]/40"
+              >
+                <Volume2 className="size-4" aria-hidden />
+                <span className="sr-only sm:not-sr-only">{t("emergency.sos.earth.soundBlocked")} · </span>
+                {t("emergency.sos.earth.soundEnable")}
+              </button>
+            ) : null}
+            {ringing ? (
             <button
               type="button"
-              onClick={() => void sirenRef.current?.unlock().then(() => setSoundState(sirenRef.current?.state() ?? "unsupported"))}
-              className="inline-flex h-10 items-center gap-2 rounded-full bg-white px-4 text-[13px] font-medium text-[#742A2A] ring-1 ring-[#C53030]/30 outline-none focus-visible:ring-3 focus-visible:ring-[#C53030]/40"
+              onClick={() => setMuted((m) => !m)}
+              aria-pressed={muted}
+              className="inline-flex h-10 items-center gap-2 rounded-full bg-white/80 px-4 text-[13px] font-medium text-[#742A2A] ring-1 ring-[#C53030]/20 outline-none focus-visible:ring-3 focus-visible:ring-[#C53030]/40"
             >
-              <Volume2 className="size-4" aria-hidden />
-              <span className="sr-only sm:not-sr-only">{t("emergency.sos.earth.soundBlocked")} · </span>
-              {t("emergency.sos.earth.soundEnable")}
+              {muted ? <BellRing className="size-4" aria-hidden /> : <BellOff className="size-4" aria-hidden />}
+              {muted ? t("emergency.sos.earth.unmute") : t("emergency.sos.earth.mute")}
             </button>
-          ) : null}
-          {ringing ? (
-          <button
-            type="button"
-            onClick={() => setMuted((m) => !m)}
-            aria-pressed={muted}
-            className="inline-flex h-10 items-center gap-2 rounded-full bg-white/80 px-4 text-[13px] font-medium text-[#742A2A] ring-1 ring-[#C53030]/20 outline-none focus-visible:ring-3 focus-visible:ring-[#C53030]/40"
-          >
-            {muted ? <BellRing className="size-4" aria-hidden /> : <BellOff className="size-4" aria-hidden />}
-            {muted ? t("emergency.sos.earth.unmute") : t("emergency.sos.earth.mute")}
-          </button>
-          ) : null}
-        </div>
-      </header>
+            ) : null}
+          </div>
+        </header>
 
-      <ul className="flex flex-col gap-3">
-        <AnimatePresence initial={false}>
-          {shown.map((a) => {
-            const unseen = !a.seenAt;
-            return (
-              <motion.li
-                key={a.id}
-                layout
-                data-sos={a.id}
-                data-seen={unseen ? "false" : "true"}
-                initial={{ opacity: 0, y: -18, scale: 0.97 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.97 }}
-                transition={{ type: "spring", stiffness: 220, damping: 24 }}
-                role={unseen ? "alert" : undefined}
-                className={cn(
-                  "relative flex flex-col gap-3 overflow-hidden rounded-[22px] p-3 sm:flex-row sm:items-center sm:p-4",
-                  unseen ? "bg-[#C53030] text-white ring-2 ring-[#9B2C2C]" : "bg-white/85 text-[#0F1B2D] ring-1 ring-[#C53030]/25",
-                )}
-              >
-                {unseen ? (
-                  <span aria-hidden className="pointer-events-none absolute inset-0 bg-[#FC8181]/45 motion-safe:animate-pulse" style={{ animationDuration: "1s" }} />
-                ) : null}
-                <div className="relative flex items-center gap-3 sm:contents">
-                  <Photo alert={a} delayQuery={delayQuery} />
-                </div>
-                <div className="relative flex min-w-0 flex-1 flex-col gap-1">
-                  <p className={cn("text-[12px] font-bold tracking-[0.14em] uppercase", unseen ? "text-white/90" : "text-[#C53030]")}>
-                    SOS · {t("emergency.sos.earth.signal")}
-                  </p>
-                  <Link
-                    href={`/earth/${encodeURIComponent(a.crewId)}?delay=${delayId}`}
-                    aria-label={t("emergency.sos.earth.openCrew", { name: a.crewName })}
-                    className="w-fit rounded text-[22px] leading-tight font-semibold underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-white/70"
-                  >
-                    {a.crewName}
-                  </Link>
-                  <p className={cn("text-[15px]", unseen ? "text-white/95" : "text-[#2D3748]")}>{reasonText(a, t)}</p>
-                  <p className={cn("tnum text-[13px]", unseen ? "text-white/85" : "text-[var(--aegis-label)]")}>
-                    {t("emergency.sos.earth.at", { time: formatClockLabel(a.createdAt, lang) })}
-                    {a.seenAt ? ` · ${t("emergency.sos.earth.seenAt", { time: formatClockLabel(a.seenAt, lang) })}` : ""}
-                  </p>
-                </div>
-                <div className="relative flex shrink-0 items-center">
-                  {unseen ? (
-                    <button
-                      type="button"
-                      onClick={() => void markSeen(a.id)}
-                      className="inline-flex h-12 items-center gap-2 rounded-full bg-white px-5 text-[15px] font-semibold text-[#9B2C2C] shadow-[0_10px_24px_-12px_rgba(0,0,0,0.5)] outline-none focus-visible:ring-3 focus-visible:ring-white/70"
-                    >
-                      <Eye className="size-4" aria-hidden />
-                      {t("emergency.sos.earth.markSeen")}
-                    </button>
-                  ) : (
-                    <span className="inline-flex h-10 items-center gap-1.5 rounded-full bg-[#F0FFF4] px-4 text-[14px] font-medium text-[#22543D] ring-1 ring-[#9AE6B4]">
-                      <Check className="size-4" aria-hidden />
-                      {t("emergency.sos.earth.seen")}
-                    </span>
+        <ul className="flex flex-col gap-3">
+          <AnimatePresence initial={false}>
+            {shown.map((a) => {
+              const unseen = !a.seenAt;
+              return (
+                <motion.li
+                  key={a.id}
+                  layout
+                  data-sos={a.id}
+                  data-seen={unseen ? "false" : "true"}
+                  initial={{ opacity: 0, y: -18, scale: 0.97 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.97 }}
+                  transition={{ type: "spring", stiffness: 220, damping: 24 }}
+                  role={unseen ? "alert" : undefined}
+                  className={cn(
+                    "relative flex flex-col gap-3 overflow-hidden rounded-[22px] p-3 sm:flex-row sm:items-center sm:p-4",
+                    unseen ? "bg-[#C53030] text-white ring-2 ring-[#9B2C2C]" : "bg-white/85 text-[#0F1B2D] ring-1 ring-[#C53030]/25",
                   )}
-                </div>
-              </motion.li>
-            );
-          })}
-        </AnimatePresence>
-      </ul>
-    </section>
+                >
+                  {unseen ? (
+                    <span aria-hidden className="pointer-events-none absolute inset-0 bg-[#FC8181]/45 motion-safe:animate-pulse" style={{ animationDuration: "1s" }} />
+                  ) : null}
+                  <div className="relative flex items-center gap-3 sm:contents">
+                    <Photo alert={a} delayQuery={delayQuery} />
+                  </div>
+                  <div className="relative flex min-w-0 flex-1 flex-col gap-1">
+                    <p className={cn("text-[12px] font-bold tracking-[0.14em] uppercase", unseen ? "text-white/90" : "text-[#C53030]")}>
+                      SOS · {t("emergency.sos.earth.signal")}
+                    </p>
+                    <Link
+                      href={`/earth/${encodeURIComponent(a.crewId)}?delay=${delayId}`}
+                      aria-label={t("emergency.sos.earth.openCrew", { name: a.crewName })}
+                      className="w-fit rounded text-[22px] leading-tight font-semibold underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-white/70"
+                    >
+                      {a.crewName}
+                    </Link>
+                    <p className={cn("text-[15px]", unseen ? "text-white/95" : "text-[#2D3748]")}>{reasonText(a, t)}</p>
+                    <p className={cn("tnum text-[13px]", unseen ? "text-white/85" : "text-[var(--aegis-label)]")}>
+                      {t("emergency.sos.earth.at", { time: formatClockLabel(a.createdAt, lang) })}
+                      {a.seenAt ? ` · ${t("emergency.sos.earth.seenAt", { time: formatClockLabel(a.seenAt, lang) })}` : ""}
+                    </p>
+                  </div>
+                  <div className="relative flex shrink-0 items-center">
+                    {unseen ? (
+                      <button
+                        type="button"
+                        onClick={() => void markSeen(a.id)}
+                        className="inline-flex h-12 items-center gap-2 rounded-full bg-white px-5 text-[15px] font-semibold text-[#9B2C2C] shadow-[0_10px_24px_-12px_rgba(0,0,0,0.5)] outline-none focus-visible:ring-3 focus-visible:ring-white/70"
+                      >
+                        <Eye className="size-4" aria-hidden />
+                        {t("emergency.sos.earth.markSeen")}
+                      </button>
+                    ) : (
+                      <span className="inline-flex h-10 items-center gap-1.5 rounded-full bg-[#F0FFF4] px-4 text-[14px] font-medium text-[#22543D] ring-1 ring-[#9AE6B4]">
+                        <Check className="size-4" aria-hidden />
+                        {t("emergency.sos.earth.seen")}
+                      </span>
+                    )}
+                  </div>
+                </motion.li>
+              );
+            })}
+          </AnimatePresence>
+        </ul>
+      </section>
+    </MotionConfig>
   );
 }

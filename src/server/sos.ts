@@ -8,6 +8,8 @@ import { getCrewPublic } from "@/server/db/repos/crew";
 import { raiseSosAlert } from "@/server/db/repos/sos";
 import { appendTurn } from "@/server/db/repos/turn";
 import { crisisReply, detectCrisis } from "@/server/agent/companion";
+import type { MachineCtx } from "@/server/agent/machine";
+import { saveMachineCtx } from "@/server/checkin/service";
 
 /**
  * SOS to Earth (docs: src/lib/sos). Raised only by the crew member: POST /api/sos (the SOS button) or the words of a
@@ -63,6 +65,8 @@ export async function sosTurn(p: {
   lang: Lang;
   /** friend mode is on (medical-emergency words count as crisis words, as in companion.ts) */
   talking: boolean;
+  /** where the check-in stands; with crisis words it is switched to the crisis-aware talk, like the CRISIS event */
+  ctx?: MachineCtx;
 }): Promise<TurnEvent[] | null> {
   const hit = matchSosRequest(p.text);
   if (!hit) return null;
@@ -84,6 +88,15 @@ export async function sosTurn(p: {
       await raiseCrisisAlert(p.crewId, p.checkInId, crisis);
     } catch (err) {
       console.error("[aegis] crisis alert next to the SOS failed:", err);
+    }
+    // as the CRISIS transition does (machine.ts): Cosmo stays in a crisis-aware talk for the next turns
+    const c = p.ctx;
+    if (c && c.state !== "SUMMARY" && c.state !== "DONE") {
+      try {
+        await saveMachineCtx(p.crewId, p.checkInId, { ...c, companion: true, companionTurns: c.companionTurns + 1, companionCrisis: true });
+      } catch (err) {
+        console.error("[aegis] marking the crisis next to the SOS failed:", err);
+      }
     }
   }
 

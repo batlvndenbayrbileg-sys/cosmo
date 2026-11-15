@@ -608,7 +608,7 @@ async function* runTurnInner(args: RunTurnArgs, started: number): AsyncGenerator
   yield { type: "transcript", turnId: crewTurn.id, text, language: lang };
 
   /* ── SOS: "tell Earth" raises one urgent alert for the ground console, in any state (src/server/sos.ts) ── */
-  const sos = await sosTurn({ crewId, checkInId, text, lang, talking: ctx0.companion });
+  const sos = await sosTurn({ crewId, checkInId, text, lang, talking: ctx0.companion, ctx: ctx0 });
   if (sos) {
     yield* sos;
     yield { type: "timing", sttMs: Math.max(0, Math.round(input.sttMs ?? 0)), llmMs: 0, totalMs: Math.round(performance.now() - started) };

@@ -443,6 +443,15 @@ describe("SOS by voice, in a conversation turn", () => {
     expect(assistantText(events).startsWith(SOS_SPOKEN.sent.en)).toBe(true);
     expect(assistantText(events).length).toBeGreaterThan(SOS_SPOKEN.sent.en.length);
     expect((await listAlerts("bat")).some((a) => a.id === `al-${checkInId}-companion-self`)).toBe(true);
+    // the check-in knows about the crisis, as after the crisis words alone (a plain answer next does not end the talk)
+    const ctx = await ctxOf("bat", checkInId);
+    expect(ctx).toMatchObject({ companion: true, companionCrisis: true });
+  });
+
+  it("'tell Earth' without crisis words leaves the crisis flag alone", async () => {
+    const checkInId = await startCheckIn("bat", "en");
+    await playTurn("bat", checkInId, "tell Earth");
+    expect((await ctxOf("bat", checkInId)).companionCrisis).toBe(false);
   });
 
   it("never without the words: ordinary answers and 'don't tell Earth' raise nothing", async () => {
