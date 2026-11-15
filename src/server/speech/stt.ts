@@ -93,18 +93,47 @@ export async function transcribeAudio(
 }
 
 /** filler sounds that are not an answer on their own (English and Mongolian) */
-const FILLER_ONLY = /^(?:u+h+|u+m+|h+m+|m+|a+h+|e+h+|o+h+|е+|э+|аа+н*|ээ+|мм+|хм+|өө+|за+)$/iu;
+const FILLER_ONLY = /^(?:u+h+|u+m+|h+m+|m+|a+h+|e+h+|e+r+m*|o+h+|е+|э+|аа+н*|ээ+|мм+|хм+|өө+|за+)$/iu;
+
+/**
+ * Words a recogniser writes for a sound rather than for speech, when they come without brackets or alone ("*noise*",
+ * "♪ music ♪", "шуугиан"). Only a transcript made of nothing but these is noise; inside a sentence they are words.
+ * Words that can be a real answer on their own are NOT here: "cough" / "ханиалга" (a symptom), "алга" (there is
+ * none), "breathing", "sound" (sound sleep).
+ */
+const SOUND_WORDS = new Set([
+  "noise", "noises", "background", "music", "musical", "laughter", "laughing", "laughs", "applause", "silence",
+  "inaudible", "unintelligible", "sigh", "sighs", "static", "beep", "beeping", "clapping", "chatter", "crosstalk",
+  "humming", "buzzing", "click", "clicks",
+  "шуугиан", "шуугиантай", "чимээ", "чимээгүй", "хөгжим", "инээд", "инээх", "ташилт",
+]);
+
+/**
+ * Function words and particles that are never an answer on their own: a recogniser fed noise sometimes returns one
+ * of them. ("so" is kept out: "so-so" answers how one feels.)
+ */
+const PARTICLES = new Set(["the", "a", "an", "and", "of", "to", "in", "on", "at", "it", "is", "нь", "ч", "л", "шүү", "даа", "дээ", "юм"]);
+
+/** one letter, or one letter / syllable repeated ("ааааа", "ssss", "хаха", "lalala"): a sound, not a word */
+function isSoundShape(word: string): boolean {
+  if (/\p{N}/u.test(word)) return false;
+  if ([...word].length === 1) return true;
+  return /^(\p{L}{1,2})\1+$/u.test(word);
+}
 
 /**
  * Whether a transcript holds words worth answering: not empty, not only punctuation, audio-event tags like
- * "(noise)" / "[music]", or filler ("hmm", "аан").
+ * "(noise)" / "[music]" / "(шуугиан)", filler ("hmm", "аан"), sound words without brackets ("noise", "хөгжим"),
+ * lone particles, single letters or repeated characters. A transcript with no words is not an answer: the turn route
+ * returns the quiet 422 and the client listens again without Cosmo saying "sorry, I didn't catch that".
  */
 export function hasWords(text: string): boolean {
   const stripped = text
-    .replace(/\([^)]*\)|\[[^\]]*\]/gu, " ")
+    .normalize("NFC")
+    .replace(/\([^)]*\)|\[[^\]]*\]|\{[^}]*\}|<[^>]*>|\*[^*]*\*/gu, " ")
     .replace(/[^\p{L}\p{N}\s]/gu, " ")
     .trim();
   if (!stripped) return false;
-  const words = stripped.split(/\s+/u);
-  return !words.every((w) => FILLER_ONLY.test(w));
+  const words = stripped.toLowerCase().split(/\s+/u);
+  return !words.every((w) => FILLER_ONLY.test(w) || SOUND_WORDS.has(w) || PARTICLES.has(w) || isSoundShape(w));
 }
