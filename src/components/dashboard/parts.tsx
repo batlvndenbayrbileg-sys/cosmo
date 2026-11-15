@@ -66,7 +66,7 @@ export function TwoToneTitle({
   return (
     <div className={cn("flex items-center gap-3", className)}>
       {icon ? <IconChip icon={icon} /> : null}
-      <Tag id={id} className="text-[26px] leading-tight font-light tracking-tight text-[var(--aegis-ink)]">
+      <Tag id={id} className="text-[26px] leading-tight font-light tracking-tight text-[var(--cosmo-ink)]">
         {light} <span className="font-medium">{strong}</span>
       </Tag>
     </div>
@@ -116,7 +116,7 @@ export function BigStat({
       <span className="unit-label">{label}</span>
       <span className="flex items-baseline gap-1.5">
         <span className="num-xl">{value}</span>
-        {unit ? <span className="text-[12px] text-[var(--aegis-label)]">{unit}</span> : null}
+        {unit ? <span className="text-[12px] text-[var(--cosmo-label)]">{unit}</span> : null}
       </span>
     </div>
   );

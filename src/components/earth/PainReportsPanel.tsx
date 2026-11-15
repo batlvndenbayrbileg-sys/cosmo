@@ -58,13 +58,13 @@ export function PainReportsPanel({ delayMs, delayId, crewId }: { delayMs: number
       <section
         data-slot="pain-panel"
         aria-labelledby="pain-panel-title"
-        className="rounded-[var(--aegis-radius-card)] border border-[#2f5bd3]/25 bg-gradient-to-br from-[#EEF4FF] via-white to-[#E3ECFF] p-4 sm:p-5"
+        className="rounded-[var(--cosmo-radius-card)] border border-[#2f5bd3]/25 bg-gradient-to-br from-[#EEF4FF] via-white to-[#E3ECFF] p-4 sm:p-5"
       >
         <header className="mb-3 flex items-center gap-3">
-          <span className="flex size-10 items-center justify-center rounded-full bg-[var(--aegis-accent-deep)] text-white">
+          <span className="flex size-10 items-center justify-center rounded-full bg-[var(--cosmo-accent-deep)] text-white">
             <Activity className="size-5" aria-hidden />
           </span>
-          <h2 id="pain-panel-title" className="text-[20px] font-semibold tracking-tight text-[var(--aegis-ink)]">
+          <h2 id="pain-panel-title" className="text-[20px] font-semibold tracking-tight text-[var(--cosmo-ink)]">
             {t("emergency.pain.earth.title")}
           </h2>
         </header>
@@ -86,13 +86,13 @@ export function PainReportsPanel({ delayMs, delayId, crewId }: { delayMs: number
                   exit={{ opacity: 0 }}
                   className={cn(
                     "flex flex-col gap-1.5 rounded-[20px] bg-white/90 p-3.5 ring-1",
-                    r.urgent ? "ring-2 ring-[#C53030]/60" : "ring-[var(--aegis-hairline)]",
+                    r.urgent ? "ring-2 ring-[#C53030]/60" : "ring-[var(--cosmo-hairline)]",
                   )}
                 >
                   <div className="flex items-center gap-2">
                     <Link
                       href={`/earth/${encodeURIComponent(r.crewId)}?delay=${delayId}`}
-                      className="min-w-0 flex-1 truncate rounded text-[17px] font-semibold text-[var(--aegis-ink)] underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-[var(--aegis-accent)]"
+                      className="min-w-0 flex-1 truncate rounded text-[17px] font-semibold text-[var(--cosmo-ink)] underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-[var(--cosmo-accent)]"
                     >
                       {t("emergency.pain.earth.place", { name: r.crewName, place })}
                     </Link>
@@ -103,7 +103,7 @@ export function PainReportsPanel({ delayMs, delayId, crewId }: { delayMs: number
                       </span>
                     ) : null}
                   </div>
-                  <p className="tnum text-[13px] text-[var(--aegis-label)]">
+                  <p className="tnum text-[13px] text-[var(--cosmo-label)]">
                     {t("emergency.pain.earth.at", { time: formatClockLabel(r.sentAt, lang) })}
                     {sev ? ` · ${t("emergency.pain.earth.severity", { value: sev })}` : ""}
                     {since ? ` · ${t("emergency.pain.earth.onset", { value: since })}` : ""}
@@ -111,20 +111,20 @@ export function PainReportsPanel({ delayMs, delayId, crewId }: { delayMs: number
                   {r.redFlags.length > 0 ? (
                     <p className="text-[13px] text-[#9B2C2C]">{r.redFlags.map((f) => t(`emergency.pain.flag.${f}`)).join(" · ")}</p>
                   ) : null}
-                  {guide ? <p className="text-[13px] text-[var(--aegis-ink)]">{t("emergency.pain.earth.guide", { guide: pick(guide.title) })}</p> : null}
+                  {guide ? <p className="text-[13px] text-[var(--cosmo-ink)]">{t("emergency.pain.earth.guide", { guide: pick(guide.title) })}</p> : null}
                   {r.items.length > 0 ? (
                     <div>
-                      <p className="text-[11px] font-semibold tracking-[0.12em] text-[var(--aegis-accent-deep)] uppercase">{t("emergency.pain.earth.related")}</p>
+                      <p className="text-[11px] font-semibold tracking-[0.12em] text-[var(--cosmo-accent-deep)] uppercase">{t("emergency.pain.earth.related")}</p>
                       <ul className="mt-1 flex flex-wrap gap-1.5">
                         {r.items.map((i) => (
-                          <li key={i.id} className="rounded-full bg-[var(--aegis-pastel-blue)] px-2.5 py-0.5 text-[12.5px] text-[var(--aegis-ink)]">
+                          <li key={i.id} className="rounded-full bg-[var(--cosmo-pastel-blue)] px-2.5 py-0.5 text-[12.5px] text-[var(--cosmo-ink)]">
                             {pick(i.label)}: <span className="tnum font-medium">{pick(i.valueText)}</span>
                           </li>
                         ))}
                       </ul>
                     </div>
                   ) : (
-                    <p className="text-[13px] text-[var(--aegis-label)]">{t("emergency.pain.earth.none")}</p>
+                    <p className="text-[13px] text-[var(--cosmo-label)]">{t("emergency.pain.earth.none")}</p>
                   )}
                 </motion.li>
               );

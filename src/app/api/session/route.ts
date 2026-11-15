@@ -20,7 +20,7 @@ const NO_STORE = { "cache-control": "no-store" } as const;
 
 /**
  * 204 + signed httpOnly cookie. Unknown crew member: 404. The two roles use separate cookies
- * (aegis_session for crew, aegis_ground for ground): signing one in never touches the other, so
+ * (cosmo_session for crew, cosmo_ground for ground): signing one in never touches the other, so
  * opening the Earth console does not end a crew member's session in the same browser.
  */
 export function POST(request: Request): Promise<Response> {

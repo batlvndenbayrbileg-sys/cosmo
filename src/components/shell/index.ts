@@ -1,5 +1,5 @@
 export { AppFrame } from "./AppFrame";
-export { AegisMark } from "./AegisMark";
+export { CosmoMark } from "./CosmoMark";
 export { TopBar, TopBarTrack, type TopBarProps } from "./TopBar";
 export { PageFrame } from "./PageFrame";
 export { LanguageToggle } from "./LanguageToggle";

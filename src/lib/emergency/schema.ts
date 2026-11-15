@@ -3,7 +3,7 @@ import { z } from "zod";
 /**
  * Emergency guidance format. Two sources share it:
  *  - the built-in guides that ship with the app (src/lib/emergency/guides.ts, typed data, works with no network);
- *  - the team's optional folder AEGIS_EMERGENCY_DIR (default C:/dev/aegis-assets/emergency, outside the repo):
+ *  - the team's optional folder COSMO_EMERGENCY_DIR (default C:/dev/cosmo-assets/emergency, outside the repo):
  *      <id>/scenario.json   validated by scenarioSchema below
  *      <id>/step-1.png ...  optional image per step (the app's visual style)
  *    A team scenario with the id of a built-in guide replaces it; other ids are added.

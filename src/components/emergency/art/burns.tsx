@@ -63,7 +63,7 @@ export function CoverBurnArt() {
 export function NoIceArt() {
   return (
     <Canvas floor={false}>
-      <rect x="54" y="64" width="44" height="44" rx="10" fill="var(--aegis-pastel-blue)" stroke={ACCENT_DEEP} strokeWidth="2.4" />
+      <rect x="54" y="64" width="44" height="44" rx="10" fill="var(--cosmo-pastel-blue)" stroke={ACCENT_DEEP} strokeWidth="2.4" />
       <path d="M64 74 l10 8" stroke="#fff" strokeWidth="4" />
       <NoSign cx={76} cy={86} r={34} />
       <g transform="translate(164 86) rotate(-20)">

@@ -1,4 +1,4 @@
-# NASA Space Apps 2026 — submission text (AEGIS / Cosmo)
+# NASA Space Apps 2026 — submission text (Cosmo)
 
 Ready-to-paste text for the project page. Every link below answered HTTP 200 on 2026-11-15.
 Items marked **(in progress)** are being built now; update them before you submit.
@@ -7,7 +7,7 @@ Items marked **(in progress)** are being built now; update them before you submi
 
 ## Project name
 
-**AEGIS — Cosmo, a voice-first health companion for astronauts**
+**Cosmo — a voice-first health companion for astronauts**
 
 ## Challenge
 
@@ -21,7 +21,7 @@ Create Health Monitoring Software for Astronauts on Space Missions
 
 ## High-level summary (short)
 
-AEGIS is a health companion for astronauts, run by Cosmo, a friendly assistant you talk to. It speaks Mongolian and English. You open the app and talk; Cosmo works out who is speaking and answers health questions. It runs a short daily check-up and explains results step by step with charts and a body map. It compares today with your own past days and with real NASA spaceflight data (the SpaceX Inspiration4 blood and urine panels from NASA's Open Science Data Repository). When something is wrong it opens first-aid guidance and sends an urgent alert to Mission Control on Earth. It supports decisions and never gives a diagnosis.
+Cosmo is a health companion for astronauts: a friendly assistant you talk to. It speaks Mongolian and English. You open the app and talk; Cosmo works out who is speaking and answers health questions. It runs a short daily check-up and explains results step by step with charts and a body map. It compares today with your own past days and with real NASA spaceflight data (the SpaceX Inspiration4 blood and urine panels from NASA's Open Science Data Repository). When something is wrong it opens first-aid guidance and sends an urgent alert to Mission Control on Earth. It supports decisions and never gives a diagnosis.
 
 ## What it does
 

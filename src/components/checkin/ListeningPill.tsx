@@ -24,7 +24,7 @@ function LevelBars({ level }: { level: LevelStore }) {
       {BAR_WEIGHTS.map((w, i) => (
         <span
           key={i}
-          className="w-[3px] rounded-full bg-[var(--aegis-accent)] transition-[height] duration-100 ease-out"
+          className="w-[3px] rounded-full bg-[var(--cosmo-accent)] transition-[height] duration-100 ease-out"
           style={{ height: `${Math.round(4 + Math.min(1, value * 1.6) * 16 * w)}px` }}
         />
       ))}
@@ -39,11 +39,11 @@ function ThinkingDots() {
     <span aria-hidden="true" className="flex items-center gap-1">
       {[0, 1, 2].map((i) =>
         reduced ? (
-          <span key={i} className="size-1.5 rounded-full bg-[var(--aegis-accent)] opacity-70" />
+          <span key={i} className="size-1.5 rounded-full bg-[var(--cosmo-accent)] opacity-70" />
         ) : (
           <motion.span
             key={i}
-            className="size-1.5 rounded-full bg-[var(--aegis-accent)]"
+            className="size-1.5 rounded-full bg-[var(--cosmo-accent)]"
             animate={{ opacity: [0.25, 1, 0.25], y: [0, -2, 0] }}
             transition={{ duration: 1, repeat: Infinity, delay: i * 0.15, ease: "easeInOut" }}
           />
@@ -84,7 +84,7 @@ export function ListeningPill({
             transition={{ type: "spring", stiffness: 380, damping: 30 }}
             className={cn(
               GLASS,
-              "pointer-events-auto flex h-11 max-w-[min(26rem,calc(100vw-2rem))] items-center gap-2.5 rounded-full pr-1.5 pl-4 text-[14.5px] text-[var(--aegis-ink)]",
+              "pointer-events-auto flex h-11 max-w-[min(26rem,calc(100vw-2rem))] items-center gap-2.5 rounded-full pr-1.5 pl-4 text-[14.5px] text-[var(--cosmo-ink)]",
               mode !== "heard" && "pr-4",
             )}
           >
@@ -114,7 +114,7 @@ export function ListeningPill({
                   animate={{ opacity: 1, scale: 1, width: "auto" }}
                   exit={{ opacity: 0, scale: 0.8, width: 0 }}
                   transition={{ type: "spring", stiffness: 420, damping: 30 }}
-                  className="flex h-8 shrink-0 items-center gap-1.5 overflow-hidden rounded-full bg-[var(--aegis-ink)] px-3.5 text-[13.5px] font-semibold whitespace-nowrap text-white outline-none focus-visible:ring-4 focus-visible:ring-[var(--aegis-accent)]/40"
+                  className="flex h-8 shrink-0 items-center gap-1.5 overflow-hidden rounded-full bg-[var(--cosmo-ink)] px-3.5 text-[13.5px] font-semibold whitespace-nowrap text-white outline-none focus-visible:ring-4 focus-visible:ring-[var(--cosmo-accent)]/40"
                 >
                   <Check className="size-3.5" aria-hidden="true" />
                   {t("checkin.listen.done")}

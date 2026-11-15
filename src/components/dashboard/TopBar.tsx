@@ -26,13 +26,13 @@ export const NAV_ITEMS: ReadonlyArray<{ id: NavSection; icon: LucideIcon }> = [
 ];
 
 const ROUND_BTN =
-  "relative inline-flex size-10 shrink-0 items-center justify-center rounded-full bg-white text-[var(--aegis-ink)] shadow-[0_4px_14px_-8px_rgba(40,80,160,0.35)] ring-1 ring-[var(--aegis-hairline)] outline-none transition-[transform,box-shadow] hover:-translate-y-px hover:shadow-[0_8px_18px_-8px_rgba(40,80,160,0.4)] focus-visible:ring-3 focus-visible:ring-ring/60";
+  "relative inline-flex size-10 shrink-0 items-center justify-center rounded-full bg-white text-[var(--cosmo-ink)] shadow-[0_4px_14px_-8px_rgba(40,80,160,0.35)] ring-1 ring-[var(--cosmo-hairline)] outline-none transition-[transform,box-shadow] hover:-translate-y-px hover:shadow-[0_8px_18px_-8px_rgba(40,80,160,0.4)] focus-visible:ring-3 focus-visible:ring-ring/60";
 
 function Mark() {
-  // AEGIS mark: ring with three status stars (circle, triangle, diamond)
+  // Cosmo mark: ring with three status stars (circle, triangle, diamond)
   return (
     <svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
-      <circle cx="16" cy="16" r="12" fill="none" strokeWidth="1.8" stroke="var(--aegis-accent-deep)" />
+      <circle cx="16" cy="16" r="12" fill="none" strokeWidth="1.8" stroke="var(--cosmo-accent-deep)" />
       <circle cx="16" cy="4.5" r="2.6" className="fill-status-ok" />
       <polygon points="26 21.6 29.2 27 22.8 27" className="fill-status-watch" />
       <polygon points="6 20 8.4 22.8 6 25.6 3.6 22.8" className="fill-status-alert" />
@@ -87,7 +87,7 @@ export function TopBar({
         role="tablist"
         aria-label={t("dashboard.nav.label")}
         aria-orientation="horizontal"
-        className="aegis-noscrollbar order-last flex w-full min-w-0 items-center gap-1 overflow-x-auto rounded-full bg-[rgba(15,27,45,0.05)] p-1 ring-1 ring-white/70 md:order-none md:mx-auto md:w-auto"
+        className="cosmo-noscrollbar order-last flex w-full min-w-0 items-center gap-1 overflow-x-auto rounded-full bg-[rgba(15,27,45,0.05)] p-1 ring-1 ring-white/70 md:order-none md:mx-auto md:w-auto"
       >
         {NAV_ITEMS.map(({ id, icon: Icon }) => {
           const current = id === active;
@@ -103,10 +103,10 @@ export function TopBar({
               onClick={() => onNavigate(id)}
               onKeyDown={onTabKey}
               className={cn(
-                "inline-flex h-10 shrink-0 items-center gap-2 rounded-full px-3.5 text-[15px] whitespace-nowrap text-[var(--aegis-label)] outline-none transition-[background-color,color,box-shadow] duration-200 focus-visible:ring-3 focus-visible:ring-ring/60 lg:h-[clamp(34px,4.4vh,40px)] lg:px-[clamp(10px,0.95vw,16px)] lg:text-[clamp(13px,1.6vh,15px)]",
+                "inline-flex h-10 shrink-0 items-center gap-2 rounded-full px-3.5 text-[15px] whitespace-nowrap text-[var(--cosmo-label)] outline-none transition-[background-color,color,box-shadow] duration-200 focus-visible:ring-3 focus-visible:ring-ring/60 lg:h-[clamp(34px,4.4vh,40px)] lg:px-[clamp(10px,0.95vw,16px)] lg:text-[clamp(13px,1.6vh,15px)]",
                 current
-                  ? "bg-white font-medium text-[var(--aegis-ink)] shadow-[0_4px_12px_-6px_rgba(40,80,160,0.35)]"
-                  : "hover:bg-white/60 hover:text-[var(--aegis-ink)]",
+                  ? "bg-white font-medium text-[var(--cosmo-ink)] shadow-[0_4px_12px_-6px_rgba(40,80,160,0.35)]"
+                  : "hover:bg-white/60 hover:text-[var(--cosmo-ink)]",
               )}
             >
               <Icon aria-hidden="true" className="size-4" strokeWidth={1.8} />
@@ -118,17 +118,17 @@ export function TopBar({
 
       <div className="ml-auto flex items-center gap-2.5 md:ml-0">
         <div className="hidden items-center gap-2.5 pr-1 lg:flex">
-          <span className="relative size-11 overflow-hidden rounded-full bg-[var(--aegis-pastel-blue)] ring-2 ring-white">
+          <span className="relative size-11 overflow-hidden rounded-full bg-[var(--cosmo-pastel-blue)] ring-2 ring-white">
             <MascotPicture
               variant={payload.crew.mascotVariant}
               className="absolute top-[2px] left-1/2 w-[150%] max-w-none -translate-x-1/2"
             />
           </span>
           <span className="flex flex-col leading-tight">
-            <span className="text-[11px] text-[var(--aegis-label)]">
+            <span className="text-[11px] text-[var(--cosmo-label)]">
               {viewer === "ground" ? t("dashboard.viewer.ground") : t("dashboard.top.welcome")}
             </span>
-            <span className="text-[15px] font-medium text-[var(--aegis-ink)]">{payload.crew.name}</span>
+            <span className="text-[15px] font-medium text-[var(--cosmo-ink)]">{payload.crew.name}</span>
           </span>
         </div>
 
@@ -160,7 +160,7 @@ export function TopBar({
             className="w-[min(24rem,calc(100vw-2rem))] rounded-[22px] border border-white/80 bg-white/90 p-2 shadow-[0_24px_60px_-24px_rgba(40,80,160,0.45)] backdrop-blur-xl"
           >
             {payload.alerts.length === 0 ? (
-              <p className="px-3 py-2.5 text-[15px] text-[var(--aegis-label)]">{t("dashboard.top.noAlerts")}</p>
+              <p className="px-3 py-2.5 text-[15px] text-[var(--cosmo-label)]">{t("dashboard.top.noAlerts")}</p>
             ) : (
               <AlertsStrip alerts={payload.alerts} viewer={viewer} />
             )}

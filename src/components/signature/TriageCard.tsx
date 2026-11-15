@@ -57,7 +57,7 @@ function NoiseStripPlot() {
   const x = (v: number) => 8 + (trackPct(v) / 100) * (W - 16);
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-[13px] font-medium text-[var(--aegis-ink)]">{t("dashboard.signature.sure.title")}</p>
+      <p className="text-[13px] font-medium text-[var(--cosmo-ink)]">{t("dashboard.signature.sure.title")}</p>
       <svg
         viewBox={`0 0 ${W} ${H}`}
         className="h-11 w-full"
@@ -68,7 +68,7 @@ function NoiseStripPlot() {
         <rect x={x(T_LOW)} y={14} width={x(T_HIGH) - x(T_LOW)} height={16} fill="var(--status-watch-soft)" />
         <rect x={x(T_HIGH)} y={14} width={x(FRI_MAX) - x(T_HIGH)} height={16} rx={3} fill="#f3f6fa" />
         {strip.dots.map((d, i) => (
-          <circle key={i} data-control={d} cx={x(d)} cy={22} r={4} fill="var(--aegis-ink)" fillOpacity={0.55} stroke="white" strokeWidth={1} />
+          <circle key={i} data-control={d} cx={x(d)} cy={22} r={4} fill="var(--cosmo-ink)" fillOpacity={0.55} stroke="white" strokeWidth={1} />
         ))}
         {[0, T_LOW, T_HIGH, FRI_MAX].map((v) => (
           <text key={v} x={x(v)} y={42} textAnchor="middle" fontSize={9} fill="#5b6678">
@@ -76,10 +76,10 @@ function NoiseStripPlot() {
           </text>
         ))}
       </svg>
-      <p className="text-[12px] leading-snug text-[var(--aegis-label)]">
+      <p className="text-[12px] leading-snug text-[var(--cosmo-label)]">
         {t("dashboard.signature.sure.body", { n: strip.n, median: strip.median, max: strip.max })}
       </p>
-      <p className="text-[12px] font-medium leading-snug text-[var(--aegis-ink)]">{noiseCaption(strip, lang)}</p>
+      <p className="text-[12px] font-medium leading-snug text-[var(--cosmo-ink)]">{noiseCaption(strip, lang)}</p>
     </div>
   );
 }
@@ -113,7 +113,7 @@ export function TriageCard({
     >
       <header className="flex flex-wrap items-center gap-2.5">
         <IconChip icon={Gauge} size={32} />
-        <h2 id="sig-triage-title" className="text-[17px] leading-tight font-medium text-[var(--aegis-ink)]">
+        <h2 id="sig-triage-title" className="text-[17px] leading-tight font-medium text-[var(--cosmo-ink)]">
           {t("dashboard.signature.triage.title")}
         </h2>
         <CardLimits card="triage" />
@@ -155,13 +155,13 @@ export function TriageCard({
         {track.friLabel !== null && track.bandLabel ? (
           <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
             <span className="num-xl">{track.friLabel}</span>
-            <span className="text-[13px] text-[var(--aegis-label)]">{t("dashboard.signature.triage.outOf", { max: FRI_MAX })}</span>
-            <span className="text-[13px] text-[var(--aegis-label)]">
+            <span className="text-[13px] text-[var(--cosmo-label)]">{t("dashboard.signature.triage.outOf", { max: FRI_MAX })}</span>
+            <span className="text-[13px] text-[var(--cosmo-label)]">
               {t("dashboard.signature.triage.range", { lo: track.bandLabel[0], hi: track.bandLabel[1] })}
             </span>
           </p>
         ) : (
-          <p className="text-[14px] text-[var(--aegis-label)]">{t("dashboard.signature.triage.none")}</p>
+          <p className="text-[14px] text-[var(--cosmo-label)]">{t("dashboard.signature.triage.none")}</p>
         )}
       </div>
 
@@ -175,7 +175,7 @@ export function TriageCard({
         className="flex flex-col gap-1.5"
       >
         <div className="relative h-7">
-          <div className="absolute inset-x-0 top-2 h-3 overflow-hidden rounded-full ring-1 ring-[var(--aegis-hairline)]">
+          <div className="absolute inset-x-0 top-2 h-3 overflow-hidden rounded-full ring-1 ring-[var(--cosmo-hairline)]">
             {track.zones.map((z) => (
               <span
                 key={z.from}
@@ -188,30 +188,30 @@ export function TriageCard({
             <span
               aria-hidden="true"
               data-slot="signature-whisker"
-              className="absolute top-[13px] h-[2px] bg-[var(--aegis-ink)]/70 transition-[left,width] duration-500"
+              className="absolute top-[13px] h-[2px] bg-[var(--cosmo-ink)]/70 transition-[left,width] duration-500"
               style={{ left: `${trackPct(track.band[0])}%`, width: `${Math.max(trackPct(track.band[1]) - trackPct(track.band[0]), 0.5)}%` }}
             >
-              <span className="absolute -top-[5px] left-0 h-3 w-[2px] bg-[var(--aegis-ink)]/70" />
-              <span className="absolute -top-[5px] right-0 h-3 w-[2px] bg-[var(--aegis-ink)]/70" />
+              <span className="absolute -top-[5px] left-0 h-3 w-[2px] bg-[var(--cosmo-ink)]/70" />
+              <span className="absolute -top-[5px] right-0 h-3 w-[2px] bg-[var(--cosmo-ink)]/70" />
             </span>
           ) : null}
           {track.fri !== null ? (
             <span
               aria-hidden="true"
               data-slot="signature-dot"
-              className="absolute top-[7px] size-[14px] -translate-x-1/2 rounded-full bg-[var(--aegis-ink)] ring-[3px] ring-white shadow transition-[left] duration-500"
+              className="absolute top-[7px] size-[14px] -translate-x-1/2 rounded-full bg-[var(--cosmo-ink)] ring-[3px] ring-white shadow transition-[left] duration-500"
               style={{ left: `${trackPct(track.fri)}%` }}
             />
           ) : null}
         </div>
-        <div aria-hidden="true" className="relative h-4 text-[10px] text-[var(--aegis-label)]">
+        <div aria-hidden="true" className="relative h-4 text-[10px] text-[var(--cosmo-label)]">
           {track.ticks.map((v) => (
             <span key={v} className="absolute -translate-x-1/2 tnum" style={{ left: `${trackPct(v)}%` }}>
               {v}
             </span>
           ))}
         </div>
-        <div aria-hidden="true" className="hidden grid-cols-[20fr_20fr_60fr] gap-x-1 text-[10px] leading-tight text-[var(--aegis-label)] sm:grid">
+        <div aria-hidden="true" className="hidden grid-cols-[20fr_20fr_60fr] gap-x-1 text-[10px] leading-tight text-[var(--cosmo-label)] sm:grid">
           <span>{t("dashboard.signature.triage.zone.low")}</span>
           <span>{t("dashboard.signature.triage.zone.mid")}</span>
           <span>{t("dashboard.signature.triage.zone.high")}</span>
@@ -219,22 +219,22 @@ export function TriageCard({
       </div>
 
       <div className="flex flex-col gap-0.5">
-        <p className="text-[14px] text-[var(--aegis-ink)]">{reasonText(panel, lang)}</p>
-        <p className="text-[12px] text-[var(--aegis-label)]">
+        <p className="text-[14px] text-[var(--cosmo-ink)]">{reasonText(panel, lang)}</p>
+        <p className="text-[12px] text-[var(--cosmo-label)]">
           {t("dashboard.signature.triage.panel", { tp: panel.timepoint, day: panel.missionDay })}
         </p>
-        <p className="text-[11px] text-[var(--aegis-label)]">{t("dashboard.signature.source", { crew: panel.crew })}</p>
+        <p className="text-[11px] text-[var(--cosmo-label)]">{t("dashboard.signature.source", { crew: panel.crew })}</p>
         {/* T14 (spec section 8.1): every number comes from ground laboratories; the popover gives S1-S3 */}
         <Popover>
           <PopoverTrigger
             data-slot="signature-space-caption"
-            className="self-start rounded text-[11px] text-[var(--aegis-label)] underline decoration-dotted underline-offset-2 outline-none hover:text-[var(--aegis-ink)] focus-visible:ring-3 focus-visible:ring-ring/60"
+            className="self-start rounded text-[11px] text-[var(--cosmo-label)] underline decoration-dotted underline-offset-2 outline-none hover:text-[var(--cosmo-ink)] focus-visible:ring-3 focus-visible:ring-ring/60"
           >
             {t("dashboard.signature.space.caption")}
           </PopoverTrigger>
           <PopoverContent align="start" className="w-[min(22rem,calc(100vw-2rem))] rounded-[18px] bg-white/95 p-3">
-            <p className="text-[13px] font-medium text-[var(--aegis-ink)]">{t("dashboard.signature.space.title")}</p>
-            <ul className="mt-1.5 flex flex-col gap-1.5 text-[12px] leading-snug text-[var(--aegis-ink)]">
+            <p className="text-[13px] font-medium text-[var(--cosmo-ink)]">{t("dashboard.signature.space.title")}</p>
+            <ul className="mt-1.5 flex flex-col gap-1.5 text-[12px] leading-snug text-[var(--cosmo-ink)]">
               {spaceStatements(lang).map((s, i) => (
                 <li key={i}>{s}</li>
               ))}
@@ -259,7 +259,7 @@ export function TriageCard({
               key={tp}
               value={tp}
               aria-label={t("dashboard.signature.tpAria", { tp, day: TIMEPOINT_DAY[tp] })}
-              className="h-8 rounded-full px-3 text-[13px] text-[var(--aegis-label)] aria-pressed:bg-white aria-pressed:text-[var(--aegis-ink)] aria-pressed:shadow-sm"
+              className="h-8 rounded-full px-3 text-[13px] text-[var(--cosmo-label)] aria-pressed:bg-white aria-pressed:text-[var(--cosmo-ink)] aria-pressed:shadow-sm"
             >
               {tp}
             </ToggleGroupItem>
@@ -267,7 +267,7 @@ export function TriageCard({
         </ToggleGroup>
 
         <Popover>
-          <PopoverTrigger className="text-[13px] font-medium text-[var(--aegis-accent-deep)] underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/60 rounded">
+          <PopoverTrigger className="text-[13px] font-medium text-[var(--cosmo-accent-deep)] underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/60 rounded">
             {t("dashboard.signature.sure.button")}
           </PopoverTrigger>
           <PopoverContent align="end" className="w-[min(20rem,calc(100vw-2rem))] rounded-[18px] bg-white/95 p-3">
@@ -275,7 +275,7 @@ export function TriageCard({
           </PopoverContent>
         </Popover>
       </div>
-      <p className="-mt-2 text-[11px] text-[var(--aegis-label)]">{noiseCaption(strip, lang)}</p>
+      <p className="-mt-2 text-[11px] text-[var(--cosmo-label)]">{noiseCaption(strip, lang)}</p>
     </section>
   );
 }

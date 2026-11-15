@@ -13,7 +13,7 @@ addendum > spec > build prompt; code style, paths, commands, i18n, UI primitives
 | UI | React 19.3, Tailwind 4 (`@tailwindcss/turbopack`), shadcn/ui style `base-nova` on `@base-ui/react` (`src/components/ui/*`: card, badge, popover, toggle-group, tooltip, tabs, dialog, chart), lucide-react, framer-motion 14 | shadcn Card/Badge/Popover/ToggleGroup |
 | Charts | recharts 3.8.0 (+ shadcn `src/components/ui/chart.tsx`) | Recharts BarChart / ComposedChart |
 | Validation | zod 4 | not stated |
-| Data layer | Own async `Db` layer `src/server/db/*` (raw SQL, `SCHEMA_SQL` in `schema.ts`): SQLite (better-sqlite3, `data/aegis.db`) locally, Postgres via `DATABASE_URL`/`POSTGRES_URL` (Supabase); PGlite for `pnpm test:pg` | **Prisma** (`prisma/schema.prisma`) |
+| Data layer | Own async `Db` layer `src/server/db/*` (raw SQL, `SCHEMA_SQL` in `schema.ts`): SQLite (better-sqlite3, `data/cosmo.db`) locally, Postgres via `DATABASE_URL`/`POSTGRES_URL` (Supabase); PGlite for `pnpm test:pg` | **Prisma** (`prisma/schema.prisma`) |
 | Lab data | **None.** No Phase 1B lab importer, no lab engine, no lab tables. The only health data are the daily Cosmo check-in KPIs (`measurement` table, `src/lib/kpi/registry.ts`, `src/lib/health/*`) | "Phase 1B importer and lab engine" to extend |
 | Agent | `src/server/agent/*`: frozen `SYSTEM_PROMPT` (`prompt.ts`), frozen 6-tool `TOOL_DEFINITIONS` + `executeTool` (`tools.ts`), per-turn directive (`directive.ts`), turn pipeline `turn.ts` (check-in state machine, DONE-state dashboard Q&A through `Agent.answerAboutResults`, friend mode `companion.ts`, questions asked back `questions.ts`), live `ClaudeAgent`, `HybridAgent`, rule-based `ScriptedAgent`, templates `templates.ts`, results facts + numeral guard `resultsFacts.ts` (`numeralsAreGrounded`) | a tool registry the model calls |
 | i18n | `src/i18n/strings/<area>.ts` registered in `src/i18n/dictionary.ts` (`areaDictionaries`); identical EN/MN key sets; every key starts with `<area>.` | "the i18n dictionary" |
@@ -43,7 +43,7 @@ reused where they fit.
 | `spaceMeasurability.ts` | ADD | `src/lib/signature/spaceMeasurability.ts` | S1-S3 verbatim, `assertNoOrbitClaim`. |
 | second assay (T11-T12) | ADD | `src/lib/signature/secondAssay.ts` | |
 | Cosmo tools | ADD + small edits | `src/server/agent/signature.ts` (tool definitions, executor, intent detection, guarded answer) | See section 3: NOT appended to the frozen `TOOL_DEFINITIONS`. |
-| `src/components/signature/*` 4 cards | ADD | `src/components/signature/{TriageCard,FingerprintCard,RecoveryCard,EvidenceCard,SignatureView}.tsx` | REUSE `src/components/ui/{card,badge,popover,toggle-group,tooltip,dialog,chart}.tsx`, `--aegis-*` tokens from `globals.css`, `PageFrame`/`TopBar` shell, `useI18n`. |
+| `src/components/signature/*` 4 cards | ADD | `src/components/signature/{TriageCard,FingerprintCard,RecoveryCard,EvidenceCard,SignatureView}.tsx` | REUSE `src/components/ui/{card,badge,popover,toggle-group,tooltip,dialog,chart}.tsx`, `--cosmo-*` tokens from `globals.css`, `PageFrame`/`TopBar` shell, `useI18n`. |
 | analyte drawer | ADD | inside `FingerprintCard` (shadcn `Dialog` + small recharts line) | Spec §7.2 says "the existing analyte drawer": none exists in this repo. |
 | route / tab | ADD | `src/app/signature/page.tsx` (`?crew=C001&tp=R+1`), `src/app/demo/signature/page.tsx` | See section 4.4. |
 | API (Cosmo explain, Q&A outside a check-in) | ADD | `src/app/api/signature/route.ts` (GET panel results), `src/app/api/signature/explain/route.ts` | Thin wrappers via `src/server/http.ts` `handle`/`ok`. |
@@ -55,7 +55,7 @@ reused where they fit.
 
 | File | Task | Edit |
 |---|---|---|
-| `.gitignore` | T-1 (this commit) | `/data/` became `/data/*` + `!/data/nasa/`, so the NASA CSVs are tracked while `data/aegis.db*` stays ignored. |
+| `.gitignore` | T-1 (this commit) | `/data/` became `/data/*` + `!/data/nasa/`, so the NASA CSVs are tracked while `data/cosmo.db*` stays ignored. |
 | `.gitattributes` (new file) | T-1 | `-text` for `data/nasa/*.csv` and `docs/signature_reference/**`: `core.autocrlf=true` on this machine would otherwise rewrite line endings on checkout and break the SHA-256 manifest and the byte-identical fixture check. |
 | `next.config.ts` | T1 | `outputFileTracingIncludes` so the server routes that read `data/nasa/*.csv` get the files in the Vercel trace (section 4.5). Nothing else in the config changes. |
 | `package.json` | T0, T9 | add scripts `sig:ref` (optional Python helper) and `demo:audio`. No dependency changes. |

@@ -9,13 +9,13 @@ import type { ReactNode } from "react";
 export type Tone = "patient" | "helper";
 
 const TONES: Record<Tone, { fill: string; line: string }> = {
-  patient: { fill: "#ffffff", line: "var(--aegis-ink)" },
-  helper: { fill: "var(--aegis-pastel-blue)", line: "var(--aegis-accent-deep)" },
+  patient: { fill: "#ffffff", line: "var(--cosmo-ink)" },
+  helper: { fill: "var(--cosmo-pastel-blue)", line: "var(--cosmo-accent-deep)" },
 };
 
-export const INK = "var(--aegis-ink)";
-export const ACCENT = "var(--aegis-accent)";
-export const ACCENT_DEEP = "var(--aegis-accent-deep)";
+export const INK = "var(--cosmo-ink)";
+export const ACCENT = "var(--cosmo-accent)";
+export const ACCENT_DEEP = "var(--cosmo-accent-deep)";
 export const ALERT = "#C53030";
 export const FLOOR_Y = 150;
 
@@ -56,7 +56,7 @@ export function Head({ cx, cy, r = 11, tone = "patient" }: { cx: number; cy: num
 }
 
 /** a soft cushion / pad / block */
-export function Pad({ x, y, w, h, fill = "var(--aegis-pastel-lilac)" }: { x: number; y: number; w: number; h: number; fill?: string }) {
+export function Pad({ x, y, w, h, fill = "var(--cosmo-pastel-lilac)" }: { x: number; y: number; w: number; h: number; fill?: string }) {
   return <rect x={x} y={y} width={w} height={h} rx={Math.min(h, w) / 2.4} fill={fill} stroke={INK} strokeOpacity="0.35" strokeWidth="1.5" />;
 }
 

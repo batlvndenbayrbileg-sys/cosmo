@@ -16,7 +16,7 @@ import { ErrorNotice } from "./ErrorNotice";
 import { delayMsFor, parseDelayId, type DelayId } from "./delay";
 import { useResource } from "./useResource";
 
-const SKELETON = "rounded-[var(--aegis-radius-card)] bg-white/60";
+const SKELETON = "rounded-[var(--cosmo-radius-card)] bg-white/60";
 
 function DashboardSkeleton() {
   const { t } = useI18n();
@@ -66,7 +66,7 @@ export function EarthCrewView({ crewId, initialDelay }: { crewId: string; initia
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           <Link
             href={`/earth?delay=${delayId}`}
-            className="inline-flex h-11 items-center gap-2 rounded-full border border-[color:var(--aegis-hairline)] bg-white px-4 text-[14px] font-medium text-[color:var(--aegis-ink)] shadow-[0_6px_18px_-12px_rgba(40,80,160,0.45)] outline-none transition-colors hover:bg-white/80 focus-visible:ring-3 focus-visible:ring-[color:var(--aegis-accent)]/45"
+            className="inline-flex h-11 items-center gap-2 rounded-full border border-[color:var(--cosmo-hairline)] bg-white px-4 text-[14px] font-medium text-[color:var(--cosmo-ink)] shadow-[0_6px_18px_-12px_rgba(40,80,160,0.45)] outline-none transition-colors hover:bg-white/80 focus-visible:ring-3 focus-visible:ring-[color:var(--cosmo-accent)]/45"
           >
             <ArrowLeft className="size-4" aria-hidden="true" />
             {t("earth.crewPage.back")}
@@ -75,7 +75,7 @@ export function EarthCrewView({ crewId, initialDelay }: { crewId: string; initia
           <DelaySelector value={delayId} onChange={setDelayId} className="ml-auto" />
         </div>
       </nav>
-      <p className="-mt-1 flex items-center gap-1.5 px-3 text-[12px] text-[color:var(--aegis-label)]">
+      <p className="-mt-1 flex items-center gap-1.5 px-3 text-[12px] text-[color:var(--cosmo-label)]">
         <Info className="size-3.5 shrink-0" aria-hidden="true" />
         {t("earth.delay.hint")}
       </p>
@@ -95,8 +95,8 @@ export function EarthCrewView({ crewId, initialDelay }: { crewId: string; initia
 
       {empty ? (
         <div role="status" className="glass-card flex max-w-xl flex-col gap-1 px-6 py-6">
-          <p className="text-[20px] font-medium text-[color:var(--aegis-ink)]">{t("earth.crewPage.emptyTitle")}</p>
-          <p className="text-[15px] text-[color:var(--aegis-label)]">{t("earth.crewPage.emptyBody")}</p>
+          <p className="text-[20px] font-medium text-[color:var(--cosmo-ink)]">{t("earth.crewPage.emptyTitle")}</p>
+          <p className="text-[15px] text-[color:var(--cosmo-label)]">{t("earth.crewPage.emptyBody")}</p>
         </div>
       ) : null}
 

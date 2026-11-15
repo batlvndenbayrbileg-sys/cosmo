@@ -1,6 +1,6 @@
-# AEGIS — Signature Triage: integration prompt (entry point, for Sonnet 5.5 in Claude Code)
+# Cosmo — Signature Triage: integration prompt (entry point, for Sonnet 5.5 in Claude Code)
 
-You are working in the existing AEGIS repository (NASA Space Apps 2026, astronaut health monitoring;
+You are working in the existing Cosmo repository (NASA Space Apps 2026, astronaut health monitoring;
 voice companion "Cosmo"). The earlier phases are built and working. Your job is to add **one** feature,
 Signature Triage, without changing the behaviour of anything that exists.
 

@@ -102,10 +102,10 @@ describe("role separation", () => {
 
   it("a forged ground cookie (tampered signature) is no session at all: 401", async () => {
     await signInCrew("bat");
-    const token = mocks.jar.get("aegis_session") as string;
+    const token = mocks.jar.get("cosmo_session") as string;
     const [body, sig] = token.split(".");
     const forged = Buffer.from(JSON.stringify({ p: { role: "ground" }, exp: Date.now() + 1e8 })).toString("base64url");
-    mocks.jar.set("aegis_session", `${forged}.${sig}`);
+    mocks.jar.set("cosmo_session", `${forged}.${sig}`);
     expect(body).not.toBe(forged);
     const res = await getGroundCrew(new Request(url("/api/ground/crew")));
     expect(res.status).toBe(401);

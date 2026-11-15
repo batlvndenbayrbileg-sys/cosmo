@@ -44,10 +44,10 @@ export function LanguageToggle({ className }: { className?: string }) {
             className={cn(
               "inline-flex h-9 min-w-11 items-center justify-center rounded-full px-3 text-sm font-medium outline-none",
               "transition-[background-color,color,box-shadow] duration-200",
-              "focus-visible:ring-3 focus-visible:ring-[color:var(--aegis-accent)]/45",
+              "focus-visible:ring-3 focus-visible:ring-[color:var(--cosmo-accent)]/45",
               active
-                ? "bg-white text-[color:var(--aegis-ink)] shadow-[0_4px_12px_-6px_rgba(40,80,160,0.4)]"
-                : "text-[color:var(--aegis-label)] hover:bg-white/60 hover:text-[color:var(--aegis-ink)]",
+                ? "bg-white text-[color:var(--cosmo-ink)] shadow-[0_4px_12px_-6px_rgba(40,80,160,0.4)]"
+                : "text-[color:var(--cosmo-label)] hover:bg-white/60 hover:text-[color:var(--cosmo-ink)]",
             )}
           >
             {o.short}

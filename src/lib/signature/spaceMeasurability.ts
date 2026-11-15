@@ -2,7 +2,7 @@
  * Signature Triage honesty guard: in-space measurability (docs/SIGNATURE_SPEC.md section 8.1, decision D-SPACE; build
  * prompt T14). Pure; safe for server and client.
  *
- * Every number AEGIS scores comes from ground laboratories. When asked whether this can be measured in space, Cosmo
+ * Every number Cosmo scores comes from ground laboratories. When asked whether this can be measured in space, Cosmo
  * answers with statements S1-S3 only (copied verbatim from the spec table; the Mongolian is not re-translated), and no
  * assistant text may claim in-flight measurement (`assertNoOrbitClaim`).
  */

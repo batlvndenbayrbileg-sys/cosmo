@@ -7,7 +7,7 @@
  * the injected storage getter; unit-tested in tests/face-follow.test.ts.
  */
 
-export const FACE_FOLLOW_STORAGE_KEY = "aegis.cosmo.faceFollow";
+export const FACE_FOLLOW_STORAGE_KEY = "cosmo.cosmo.faceFollow";
 
 export type StorageLike = Pick<Storage, "getItem" | "setItem">;
 

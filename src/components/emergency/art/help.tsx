@@ -66,7 +66,7 @@ export function TimerArt() {
     <Canvas floor={false}>
       <rect x="110" y="30" width="20" height="10" rx="4" fill={INK} />
       <circle cx="120" cy="92" r="52" fill="#fff" stroke={INK} strokeWidth="3" />
-      <path d="M120 92 m0 -44 a44 44 0 0 1 38 22 L120 92 Z" fill="var(--aegis-pastel-blue)" />
+      <path d="M120 92 m0 -44 a44 44 0 0 1 38 22 L120 92 Z" fill="var(--cosmo-pastel-blue)" />
       <g stroke={INK} strokeOpacity="0.4" strokeWidth="2.4">
         {ticks.map((d) => (
           <path key={d} d={d} />

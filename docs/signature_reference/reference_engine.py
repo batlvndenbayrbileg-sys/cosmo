@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""AEGIS - Flight Response Signature: REFERENCE IMPLEMENTATION (Python 3 stdlib only).
+"""Cosmo - Flight Response Signature: REFERENCE IMPLEMENTATION (Python 3 stdlib only).
 
 Purpose: single source of truth for every number in docs/SIGNATURE_SPEC.md and for the
 test expectations in docs/PROMPT_SIGNATURE_BUILD.md. The production engine is TypeScript;

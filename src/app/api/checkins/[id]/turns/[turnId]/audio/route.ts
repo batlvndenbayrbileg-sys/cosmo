@@ -58,7 +58,7 @@ export function GET(
       return new Response(spoken.body, { status: 200, headers: AUDIO_HEADERS });
     } catch (err) {
       if (err instanceof HttpError) throw err;
-      console.error("[aegis] speech synthesis failed:", err);
+      console.error("[cosmo] speech synthesis failed:", err);
       throw new HttpError(502, "TTS_FAILED", "Speech synthesis failed");
     }
   });

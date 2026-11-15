@@ -35,7 +35,7 @@ import { BodyMap } from "./BodyMap";
 import { numberText, valueText } from "./format";
 
 /** window event asking the dashboard to switch to one of its tabs (DashboardView listens), detail: { section } */
-export const OPEN_DASHBOARD_SECTION_EVENT = "aegis:open-dashboard-section";
+export const OPEN_DASHBOARD_SECTION_EVENT = "cosmo:open-dashboard-section";
 
 /** how long the panels stay after Cosmo has finished speaking, unless the next question replaces them */
 export const SHOW_LINGER_MS = 12_000;
@@ -68,7 +68,7 @@ function Chip({ icon: Icon, tone = "ink" }: { icon: LucideIcon; tone?: "ink" | "
       aria-hidden="true"
       className={cn(
         "inline-flex size-7 shrink-0 items-center justify-center rounded-full",
-        tone === "ink" ? "bg-[var(--aegis-ink)] text-white" : "bg-[var(--aegis-pastel-blue)] text-[var(--aegis-accent-deep)]",
+        tone === "ink" ? "bg-[var(--cosmo-ink)] text-white" : "bg-[var(--cosmo-pastel-blue)] text-[var(--cosmo-accent-deep)]",
       )}
     >
       <Icon className="size-3.5" strokeWidth={2} />
@@ -81,9 +81,9 @@ function CardTitle({ icon, title, recorded, right }: { icon: LucideIcon; title: 
   return (
     <header className="flex items-center gap-2">
       <Chip icon={icon} />
-      <h3 className="min-w-0 flex-1 truncate text-[13.5px] leading-tight font-medium text-[var(--aegis-ink)]">{title}</h3>
+      <h3 className="min-w-0 flex-1 truncate text-[13.5px] leading-tight font-medium text-[var(--cosmo-ink)]">{title}</h3>
       {recorded ? (
-        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[var(--aegis-pastel-blue)] px-2 py-0.5 text-[10.5px] font-medium text-[var(--aegis-accent-deep)]">
+        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[var(--cosmo-pastel-blue)] px-2 py-0.5 text-[10.5px] font-medium text-[var(--cosmo-accent-deep)]">
           <Sparkles className="size-3" aria-hidden="true" />
           {t("checkin.show.recorded")}
         </span>
@@ -103,7 +103,7 @@ function ReferenceLine({ vital }: { vital: ShowVital }) {
   const parts: string[] = [];
   parts.push(vital.mean !== null ? t("checkin.show.usual", { value: numberText(vital.key, vital.mean) }) : t("checkin.show.noBaseline"));
   if (vital.rangeText) parts.push(pick(vital.rangeText));
-  return <p className="text-[11px] leading-snug text-[var(--aegis-label)]">{parts.join(" · ")}</p>;
+  return <p className="text-[11px] leading-snug text-[var(--cosmo-label)]">{parts.join(" · ")}</p>;
 }
 
 /** the big value with its unit, or "not recorded today" */
@@ -112,10 +112,10 @@ function BigValue({ main, unit, status }: { main: string | null; unit: string; s
   return (
     <div className="flex items-end justify-between gap-2">
       {main === null ? (
-        <span className="text-[13px] text-[var(--aegis-label)]">{t("checkin.show.notToday")}</span>
+        <span className="text-[13px] text-[var(--cosmo-label)]">{t("checkin.show.notToday")}</span>
       ) : (
         <span className="flex items-baseline gap-1">
-          <span className="tnum text-[30px] leading-none font-normal tracking-[-0.02em] text-[var(--aegis-ink)]">{main}</span>
+          <span className="tnum text-[30px] leading-none font-normal tracking-[-0.02em] text-[var(--cosmo-ink)]">{main}</span>
           {unit ? <span className="unit-label">{unit}</span> : null}
         </span>
       )}
@@ -163,7 +163,7 @@ function MiniTrend({
           width={width}
           height={Math.max(g.band.bottom - g.band.top, 1)}
           rx={4}
-          fill="var(--aegis-accent)"
+          fill="var(--cosmo-accent)"
           initial={reduced ? false : { opacity: 0 }}
           animate={{ opacity: 0.13 }}
           transition={{ duration: 0.9, delay: 0.5 }}
@@ -175,7 +175,7 @@ function MiniTrend({
           y={Math.max(g.band.top - 3, 9)}
           textAnchor="end"
           fontSize={9}
-          fill="var(--aegis-accent-deep)"
+          fill="var(--cosmo-accent-deep)"
           initial={reduced ? false : { opacity: 0 }}
           animate={{ opacity: 0.9 }}
           transition={{ duration: 0.6, delay: 0.9 }}
@@ -187,7 +187,7 @@ function MiniTrend({
         <motion.path
           d={line}
           fill="none"
-          stroke="var(--aegis-ink)"
+          stroke="var(--cosmo-ink)"
           strokeOpacity={0.55}
           strokeWidth={1.6}
           strokeLinejoin="round"
@@ -234,8 +234,8 @@ function VitalCard({ panel }: { panel: Extract<ShowPanel, { kind: "vital" }> }) 
         <ul className="mt-2 flex flex-col gap-1">
           {panel.vitals.map((v) => (
             <li key={v.key} className="flex items-center justify-between gap-2 text-[13px]">
-              <span className="text-[var(--aegis-label)]">{label(v.key, lang)}</span>
-              <span className="flex items-center gap-1.5 font-medium text-[var(--aegis-ink)]">
+              <span className="text-[var(--cosmo-label)]">{label(v.key, lang)}</span>
+              <span className="flex items-center gap-1.5 font-medium text-[var(--cosmo-ink)]">
                 {v.value === null ? "–" : valueText(v.key, v.value, lang, true)}
                 <StatusGlyph status={v.status} size={12} />
               </span>
@@ -286,7 +286,7 @@ function EcgCard({ panel }: { panel: Extract<ShowPanel, { kind: "ecg" }> }) {
   const flat = bpm === null;
   const copy = flat ? `M0 ${H * 0.62} L${W} ${H * 0.62}` : ecgPath(W, H, beats);
   const still = reduced || flat;
-  const color = v.status === "no_data" ? "var(--aegis-accent)" : statusColorVar(v.status);
+  const color = v.status === "no_data" ? "var(--cosmo-accent)" : statusColorVar(v.status);
   const gradId = useId();
   const valueStr = bpm === null ? null : numberText("heart_rate", bpm);
   return (
@@ -323,8 +323,8 @@ function EcgCard({ panel }: { panel: Extract<ShowPanel, { kind: "ecg" }> }) {
           </svg>
           <div
             aria-hidden="true"
-            className="aegis-ecg-scroll absolute inset-y-0 left-0 w-[200%]"
-            style={{ animation: still ? "none" : `aegis-ecg-scroll ${(beats * period).toFixed(2)}s linear infinite` }}
+            className="cosmo-ecg-scroll absolute inset-y-0 left-0 w-[200%]"
+            style={{ animation: still ? "none" : `cosmo-ecg-scroll ${(beats * period).toFixed(2)}s linear infinite` }}
           >
             <svg className="h-full w-full" viewBox={`0 0 ${W * 2} ${H}`} preserveAspectRatio="none">
               <defs>
@@ -356,7 +356,7 @@ function EcgCard({ panel }: { panel: Extract<ShowPanel, { kind: "ecg" }> }) {
               </g>
             </svg>
           </div>
-          <span className="absolute top-1 right-2 rounded-full bg-white/80 px-1.5 text-[9px] font-semibold tracking-[0.1em] text-[var(--aegis-label)] uppercase">
+          <span className="absolute top-1 right-2 rounded-full bg-white/80 px-1.5 text-[9px] font-semibold tracking-[0.1em] text-[var(--cosmo-label)] uppercase">
             {t("checkin.show.ecgSimulated")}
           </span>
         </div>
@@ -374,7 +374,7 @@ function RingCard({ panel }: { panel: Extract<ShowPanel, { kind: "ring" }> }) {
   const r = 26;
   const c = 2 * Math.PI * r;
   const fraction = panel.value === null ? null : Math.min(Math.max(panel.value / panel.max, 0), 1);
-  const color = panel.status === "no_data" ? "var(--aegis-accent)" : statusColorVar(panel.status);
+  const color = panel.status === "no_data" ? "var(--cosmo-accent)" : statusColorVar(panel.status);
   const title = t(`checkin.show.ring.${panel.metric}`);
   const center =
     panel.value === null
@@ -414,15 +414,15 @@ function RingCard({ panel }: { panel: Extract<ShowPanel, { kind: "ring" }> }) {
             ) : null}
           </svg>
           <span className="absolute inset-0 flex flex-col items-center justify-center leading-none">
-            <span className="tnum text-[17px] font-medium text-[var(--aegis-ink)]">{center}</span>
+            <span className="tnum text-[17px] font-medium text-[var(--cosmo-ink)]">{center}</span>
             {panel.value !== null && panel.unit ? (
-              <span className="mt-0.5 text-[9px] text-[var(--aegis-label)]">{unitLabel(panel.unit, lang)}</span>
+              <span className="mt-0.5 text-[9px] text-[var(--cosmo-label)]">{unitLabel(panel.unit, lang)}</span>
             ) : null}
           </span>
         </span>
         <div className="flex min-w-0 flex-col gap-1.5">
           <StatusPill status={panel.status} size="sm" className="self-start" />
-          <p className="text-[12px] leading-snug text-[var(--aegis-label)]">{detail}</p>
+          <p className="text-[12px] leading-snug text-[var(--cosmo-label)]">{detail}</p>
         </div>
       </div>
     </div>
@@ -443,16 +443,16 @@ function TrendCard({ panel }: { panel: Extract<ShowPanel, { kind: "trend" }> }) 
         {series.map((s, i) => (
           <div key={s.key} className="flex flex-col gap-1">
             <MiniTrend vital={s} height={bp ? 46 : 78} showBandLabel={i === 0} />
-            <div className="flex items-baseline justify-between gap-2 text-[11px] text-[var(--aegis-label)]">
+            <div className="flex items-baseline justify-between gap-2 text-[11px] text-[var(--cosmo-label)]">
               <span>{bp ? t(s.key === "bp_systolic" ? "checkin.show.sys" : "checkin.show.dia") : t("checkin.show.days", { n: s.history.length })}</span>
-              <span className="tnum font-medium text-[var(--aegis-ink)]">
+              <span className="tnum font-medium text-[var(--cosmo-ink)]">
                 {s.value === null ? t("checkin.show.notToday") : valueText(s.key, s.value, lang, true)}
               </span>
             </div>
             <ReferenceLine vital={s} />
           </div>
         ))}
-        {bp ? <p className="text-[11px] text-[var(--aegis-label)]">{t("checkin.show.days", { n: v.history.length })}</p> : null}
+        {bp ? <p className="text-[11px] text-[var(--cosmo-label)]">{t("checkin.show.days", { n: v.history.length })}</p> : null}
       </div>
     </div>
   );
@@ -486,11 +486,11 @@ function LinkCard({
   if (checkInId) query.set("checkInId", checkInId);
   const qs = query.toString();
   const sigHref = `/signature${qs ? `?${qs}` : ""}`;
-  const action = "inline-flex items-center gap-1 self-start rounded-full bg-[var(--aegis-ink)] px-3 py-1.5 text-[12px] font-medium text-white outline-none hover:opacity-90 focus-visible:ring-3 focus-visible:ring-ring/60";
+  const action = "inline-flex items-center gap-1 self-start rounded-full bg-[var(--cosmo-ink)] px-3 py-1.5 text-[12px] font-medium text-white outline-none hover:opacity-90 focus-visible:ring-3 focus-visible:ring-ring/60";
   return (
     <div className={CARD} data-panel={panel.kind}>
       <CardTitle icon={sig ? Microscope : FlaskConical} title={t(sig ? "checkin.show.signature.title" : "checkin.show.labs.title")} />
-      <p className="mt-1.5 text-[12px] leading-snug text-[var(--aegis-label)]">
+      <p className="mt-1.5 text-[12px] leading-snug text-[var(--cosmo-label)]">
         {t(sig ? "checkin.show.signature.text" : "checkin.show.labs.text")}
       </p>
       <div className="mt-2">
@@ -510,7 +510,7 @@ function LinkCard({
             <ArrowUpRight className="size-3.5" aria-hidden="true" />
           </button>
         ) : (
-          <p className="text-[12px] font-medium text-[var(--aegis-accent-deep)]">{t("checkin.show.labs.later")}</p>
+          <p className="text-[12px] font-medium text-[var(--cosmo-accent-deep)]">{t("checkin.show.labs.later")}</p>
         )}
       </div>
     </div>
@@ -632,17 +632,17 @@ export function ShowStage({
         >
           <div className="flex items-center gap-2 px-1.5 pt-0.5">
             <span aria-hidden="true" className="relative flex size-2">
-              <span className="absolute inset-0 animate-ping rounded-full bg-[var(--aegis-accent)] opacity-50" />
-              <span className="relative size-2 rounded-full bg-[var(--aegis-accent)]" />
+              <span className="absolute inset-0 animate-ping rounded-full bg-[var(--cosmo-accent)] opacity-50" />
+              <span className="relative size-2 rounded-full bg-[var(--cosmo-accent)]" />
             </span>
-            <p className="min-w-0 flex-1 text-[10.5px] leading-tight font-semibold tracking-[0.14em] text-[var(--aegis-ink)]/80 uppercase">
-              {t("checkin.show.header")} <span className="text-[var(--aegis-label)]">· {t("checkin.show.tag")}</span>
+            <p className="min-w-0 flex-1 text-[10.5px] leading-tight font-semibold tracking-[0.14em] text-[var(--cosmo-ink)]/80 uppercase">
+              {t("checkin.show.header")} <span className="text-[var(--cosmo-label)]">· {t("checkin.show.tag")}</span>
             </p>
             <button
               type="button"
               onClick={onDismiss}
               aria-label={t("checkin.show.close")}
-              className="inline-flex size-7 items-center justify-center rounded-full text-[var(--aegis-label)] outline-none hover:bg-black/5 focus-visible:ring-3 focus-visible:ring-ring/60"
+              className="inline-flex size-7 items-center justify-center rounded-full text-[var(--cosmo-label)] outline-none hover:bg-black/5 focus-visible:ring-3 focus-visible:ring-ring/60"
             >
               <X className="size-4" aria-hidden="true" />
             </button>
@@ -654,7 +654,7 @@ export function ShowStage({
               </motion.li>
             ))}
           </motion.ul>
-          <p className="px-1.5 pb-0.5 text-center text-[9.5px] font-medium tracking-[0.12em] text-[var(--aegis-label)] uppercase">
+          <p className="px-1.5 pb-0.5 text-center text-[9.5px] font-medium tracking-[0.12em] text-[var(--cosmo-label)] uppercase">
             {t("checkin.show.footer")}
           </p>
         </motion.section>

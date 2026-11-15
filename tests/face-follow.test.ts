@@ -326,7 +326,7 @@ describe("browser detector glue", () => {
       copyMediapipeWasm(publicDir: string): { target: string; files: string[] };
     };
     expect(script.mediapipeWasmPath(MEDIAPIPE_VISION_VERSION)).toBe(MEDIAPIPE_WASM_URL);
-    const out = mkdtempSync(path.join(tmpdir(), "aegis-mp-"));
+    const out = mkdtempSync(path.join(tmpdir(), "cosmo-mp-"));
     try {
       const { target, files } = script.copyMediapipeWasm(out);
       expect(files.sort()).toEqual([

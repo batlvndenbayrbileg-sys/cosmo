@@ -40,7 +40,7 @@ export async function measureVoice(blob: Blob): Promise<VoiceClass> {
   }
 }
 
-const VOICE_KEY = "aegis.voice";
+const VOICE_KEY = "cosmo.voice";
 
 export interface RememberedVoice {
   crewId: string;

@@ -67,8 +67,8 @@ describe("signature T14: statements S1-S3 (spec section 8.1, verbatim)", () => {
     }
   });
 
-  it("assertNoOrbitClaim: 'AEGIS measures IL-6 in orbit' fails, 'I do not measure anything in orbit myself' passes", () => {
-    expect(assertNoOrbitClaim("AEGIS measures IL-6 in orbit")).toBe(false);
+  it("assertNoOrbitClaim: 'Cosmo measures IL-6 in orbit' fails, 'I do not measure anything in orbit myself' passes", () => {
+    expect(assertNoOrbitClaim("Cosmo measures IL-6 in orbit")).toBe(false);
     expect(assertNoOrbitClaim("I do not measure anything in orbit myself")).toBe(true);
     expect(assertNoOrbitClaim("We track these markers on the ISS every week.")).toBe(false);
     expect(assertNoOrbitClaim("Cosmo is monitoring your cytokines in space.")).toBe(false);
@@ -76,9 +76,9 @@ describe("signature T14: statements S1-S3 (spec section 8.1, verbatim)", () => {
     expect(assertNoOrbitClaim("This cannot be measured in orbit today. Your IL-6 is 2.4 times your baseline.")).toBe(true);
     expect(assertNoOrbitClaim("IL-6 isn't measured on the ISS.")).toBe(true);
     // the claim in one sentence is not excused by a negation in another
-    expect(assertNoOrbitClaim("I do not diagnose. AEGIS measures IL-6 in orbit.")).toBe(false);
+    expect(assertNoOrbitClaim("I do not diagnose. Cosmo measures IL-6 in orbit.")).toBe(false);
     // Mongolian counterpart
-    expect(assertNoOrbitClaim("AEGIS тойрог замд IL-6 хэмждэг.")).toBe(false);
+    expect(assertNoOrbitClaim("Cosmo тойрог замд IL-6 хэмждэг.")).toBe(false);
     expect(assertNoOrbitClaim("Би өөрөө тойрог замд юу ч хэмждэггүй.")).toBe(true);
   });
 
@@ -118,7 +118,7 @@ describe("signature T14: get_space_measurability", () => {
   it("detects questions about measuring in space, in orbit or on the ISS, and nothing else", () => {
     for (const q of [
       "Can you measure this on the ISS?",
-      "Can AEGIS measure IL-6 in orbit?",
+      "Can Cosmo measure IL-6 in orbit?",
       "is this tested in space?",
       "Could the station track these markers on board?",
       "Үүнийг сансарт хэмжиж болох уу?",
@@ -130,7 +130,7 @@ describe("signature T14: get_space_measurability", () => {
       expect(detectSpaceIntent(q), q).toBe(false);
     }
     // the panel intent alone would have taken "IL-6 in orbit" as a panel question; the space intent is checked first
-    expect(detectSignatureIntent("Can AEGIS measure IL-6 in orbit?")).toBe("get_signature_triage");
+    expect(detectSignatureIntent("Can Cosmo measure IL-6 in orbit?")).toBe("get_signature_triage");
   });
 
   it("answers a space question from S1-S3 only (any crew member); model wording only when it shortens", async () => {
@@ -151,12 +151,12 @@ describe("signature T14: get_space_measurability", () => {
       text: renderSpaceTemplate("en"),
       worded: false,
     });
-    expect(await ask("Yes, AEGIS measures IL-6 in orbit.")).toMatchObject({ text: orbitClaimFallback("en"), worded: false });
+    expect(await ask("Yes, Cosmo measures IL-6 in orbit.")).toMatchObject({ text: orbitClaimFallback("en"), worded: false });
   });
 
   it("a triage answer that claims in-flight measurement is replaced by S1 + S3; acceptSignatureAnswer runs the guard", async () => {
     const f = triageFactsFor("C003", "en", { timepoint: "R+1" })!;
-    const claim = `Your index is ${f.fri}. AEGIS measures IL-6 in orbit. ${SIGNATURE_DISCLAIMER.en}`;
+    const claim = `Your index is ${f.fri}. Cosmo measures IL-6 in orbit. ${SIGNATURE_DISCLAIMER.en}`;
     expect(assertNumbersGrounded(claim, f)).toBe(true);
     expect(acceptSignatureAnswer(claim, f, "en")).toBe(false);
     expect(acceptSignatureAnswer(`Your index is ${f.fri}. ${SIGNATURE_DISCLAIMER.en}`, f, "en")).toBe(true);

@@ -1,4 +1,4 @@
-# AEGIS — Signature Triage: specification
+# Cosmo — Signature Triage: specification
 
 Status: decided, ready to build. Author: lead scientist-engineer pass, 2026-11-14.
 **Read `docs/SIGNATURE_ADDENDUM_SECOND_ASSAY.md` too: it corrects §8 point 4, replaces the demo script (§9)
@@ -13,7 +13,7 @@ is marked **ASSUMPTION** or carries a citation. Nothing here is a medical claim.
 
 **Signature Triage** — "Is it the flight, or is it something new?"
 
-> AEGIS turns a scarce blood panel into a three-way answer — *baseline*, *expected flight response* or
+> Cosmo turns a scarce blood panel into a three-way answer — *baseline*, *expected flight response* or
 > *unexpected activation* — by comparing six markers with the astronaut's own pre-flight biology and with the
 > real Inspiration4 crew pattern, says how sure it is, and tells the crew when the next draw is worth a kit.
 
@@ -502,7 +502,7 @@ Not evidence for long-duration missions.
 ### 8.1 In-space measurability (decision D-SPACE)
 
 Every number in the signature comes from ground laboratories: multiplex serum cytokine panels, a chemistry
-panel and a hematology analyzer, run on blood drawn on the ground before and after flight (§1). AEGIS does
+panel and a hematology analyzer, run on blood drawn on the ground before and after flight (§1). Cosmo does
 not claim that the six markers can be measured on orbit today. What is established:
 
 - **White-cell count and differential (our monocyte % marker).** A fingerstick analyzer (HemoCue WBC DIFF)
@@ -514,7 +514,7 @@ not claim that the six markers can be measured on orbit today. What is establish
 - **IL-6, MCP-1, IL-10, IL-27.** We found no demonstrated in-flight assay for these four. In-flight glucose
   and CRP testing were not checked and are not claimed.
 
-Consequence: AEGIS scores a panel when one exists (returned sample, or a future on-board analyzer). For
+Consequence: Cosmo scores a panel when one exists (returned sample, or a future on-board analyzer). For
 flight it is the software layer such an analyzer would feed. The daily check-in is the part that needs no
 laboratory.
 

@@ -42,11 +42,11 @@ function isConnectivity(reason: string): boolean {
 }
 
 export function logTier(tier: TierName | "rules", what: string): void {
-  console.info(`[aegis] ${what} answered by ${tier}`);
+  console.info(`[cosmo] ${what} answered by ${tier}`);
 }
 
 function logRefusal(tier: TierName, what: string): void {
-  console.info(`[aegis] ${what}: ${tier} refused, answered by rules (later tiers not asked)`);
+  console.info(`[cosmo] ${what}: ${tier} refused, answered by rules (later tiers not asked)`);
 }
 
 export class TieredAgent implements Agent {

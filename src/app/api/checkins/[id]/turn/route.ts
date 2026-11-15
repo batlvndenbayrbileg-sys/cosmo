@@ -99,7 +99,7 @@ export function POST(request: Request, context: { params: Promise<{ id: string }
           }
           controller.enqueue(frame(next.value));
         } catch (err) {
-          console.error("[aegis] turn stream failed:", err);
+          console.error("[cosmo] turn stream failed:", err);
           controller.enqueue(
             frame({ type: "error", code: "INTERNAL", message: "Something went wrong. Please try again.", recoverable: true }),
           );

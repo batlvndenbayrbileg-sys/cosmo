@@ -5,7 +5,7 @@ import type { SessionPayload } from "@/lib/types";
 import { getEnv } from "@/server/env";
 import { HttpError } from "@/server/http";
 
-export const SESSION_COOKIE = "aegis_session";
+export const SESSION_COOKIE = "cosmo_session";
 /** 12 hours */
 export const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
 
@@ -81,7 +81,7 @@ export function verifySession(
 
 /* ───────────── secret ───────────── */
 
-const SECRET_KEY = Symbol.for("aegis.sessionSecret");
+const SECRET_KEY = Symbol.for("cosmo.sessionSecret");
 type GlobalWithSecret = typeof globalThis & { [SECRET_KEY]?: string };
 
 /** SESSION_SECRET, else a random value per process (cached on globalThis so dev reloads keep it). */

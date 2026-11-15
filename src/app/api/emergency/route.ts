@@ -13,7 +13,7 @@ export function GET(): Promise<Response> {
   return handle(async () => {
     if (!(await getSession())) throw new HttpError(401, "NO_SESSION", "Sign in first");
     const lib = loadEmergencyLibrary();
-    if (lib.problems.length > 0) console.warn("[aegis] emergency content problems:\n  " + lib.problems.join("\n  "));
+    if (lib.problems.length > 0) console.warn("[cosmo] emergency content problems:\n  " + lib.problems.join("\n  "));
     return ok({ scenarios: lib.scenarios });
   });
 }

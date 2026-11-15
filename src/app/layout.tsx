@@ -23,7 +23,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AEGIS - Cosmo health companion",
+  title: "Cosmo - health companion",
   description:
     "Voice-first daily health check-in with the Cosmo companion. Prototype, not a medical device.",
 };
