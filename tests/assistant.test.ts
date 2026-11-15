@@ -16,6 +16,7 @@ import { initialCtx, parseCtx, serializeCtx, transition, type MachineCtx, type M
 import { ScriptedAgent } from "@/server/agent/scriptedAgent";
 import { createOrResumeAssistant } from "@/server/checkin/service";
 import { setClockForTests } from "@/server/clock";
+import { setSensorFeedForTests } from "@/server/checkin/sensors";
 import { getCrewPublic } from "@/server/db/repos/crew";
 import { listAlerts } from "@/server/db/repos/alert";
 import { listMeasurements } from "@/server/db/repos/measurement";
@@ -32,7 +33,10 @@ beforeEach(async () => {
   setClockForTests(TEST_TODAY);
   await freshSeededDb();
 });
-afterEach(() => setClockForTests(null));
+afterEach(() => {
+  setClockForTests(null);
+  setSensorFeedForTests(null);
+});
 
 /** the check-up's questions, in both languages, as Cosmo asks them */
 const KPI_PROMPT =
@@ -102,7 +106,7 @@ describe("assistant mode: the switches (pure)", () => {
   it("starting resumes where the check-up stands, and entering keeps it", () => {
     expect(startCheckup(ctxIn("GREETING", { assistant: true }))).toMatchObject({ resume: "greeting", ctx: { assistant: false, state: "GREETING" } });
     expect(startCheckup(ctxIn("SMALL_TALK", { assistant: true }))).toMatchObject({ resume: "propose", ctx: { proposed: true } });
-    const mid = ctxIn("KPI_CAPTURE", { assistant: true, filled: ["sleep_hours"], clarifyCount: { mood: 1 } });
+    const mid = ctxIn("KPI_CAPTURE", { assistant: true, filled: ["sleep_hours"], skipped: ["sensor_check"], clarifyCount: { mood: 1 } });
     expect(startCheckup(mid)).toMatchObject({ resume: "question", question: "mood", ctx: { state: "KPI_CAPTURE", clarifyCount: { mood: 1 } } });
     expect(startCheckup(ctxIn("CONFIRM", { assistant: true }))).toMatchObject({ resume: "readBack" });
     expect(startCheckup(ctxIn("DONE", { assistant: true }))).toMatchObject({ resume: "dashboard" });
@@ -220,10 +224,12 @@ describe.each<[Lang, string, string]>([
   });
 
   it("start the check-up, answer, go back to the assistant, continue: the progress is kept", async () => {
+    // no sensor feed here: the check-up's questions do not depend on the day's readings
+    setSensorFeedForTests(false);
     const id = await openAssistant(crewId, lang);
     const say = lang === "en"
-      ? { start: "Start my daily check-up", feel: "pretty good", yes: "yes let's start", sleep: "7 hours", back: "Back to assistant", ask: "what is a normal heart rate?", cont: "Continue my daily check-up", mood: "4" }
-      : { start: "Өдрийн үзлэг эхлүүлье", feel: "сайн байна", yes: "тийм, эхэлье", sleep: "7 цаг", back: "Туслах руу буцах", ask: "хэвийн пульс хэд вэ?", cont: "Өдрийн үзлэгээ үргэлжлүүлье", mood: "дөрөв" };
+      ? { start: "Start my daily check-up", feel: "pretty good", yes: "yes let's start", mood: "4", back: "Back to assistant", ask: "what is a normal heart rate?", cont: "Continue my daily check-up", symptoms: "no" }
+      : { start: "Өдрийн үзлэг эхлүүлье", feel: "сайн байна", yes: "тийм, эхэлье", mood: "дөрөв", back: "Туслах руу буцах", ask: "хэвийн пульс хэд вэ?", cont: "Өдрийн үзлэгээ үргэлжлүүлье", symptoms: "үгүй" };
 
     const started = await playTurn(crewId, id, say.start);
     expect(stateOf(started)).toMatchObject({ assistant: false, state: "GREETING" });
@@ -233,17 +239,17 @@ describe.each<[Lang, string, string]>([
     const proposedOrAsked = await playTurn(crewId, id, say.yes);
     const asked = stateOf(proposedOrAsked).state === "KPI_CAPTURE" ? proposedOrAsked : await playTurn(crewId, id, say.yes);
     // check-up turns do not touch the flag (absent = unchanged); the stored context says it is off
-    expect(stateOf(asked)).toMatchObject({ state: "KPI_CAPTURE", expectedQuestion: "sleep" });
+    expect(stateOf(asked)).toMatchObject({ state: "KPI_CAPTURE", expectedQuestion: "mood" });
     expect(await ctxOf(crewId, id)).toMatchObject({ assistant: false });
-    const slept = await playTurn(crewId, id, say.sleep);
-    expect(eventsOf(slept, "measurement")).toMatchObject([{ key: "sleep_hours", value: 7 }]);
-    expect(stateOf(slept)).toMatchObject({ state: "KPI_CAPTURE", expectedQuestion: "mood" });
+    const felt = await playTurn(crewId, id, say.mood);
+    expect(eventsOf(felt, "measurement")).toMatchObject([{ key: "mood", value: 4 }]);
+    expect(stateOf(felt)).toMatchObject({ state: "KPI_CAPTURE", expectedQuestion: "symptoms" });
 
     const back = await playTurn(crewId, id, say.back);
     expect(stateOf(back)).toMatchObject({ assistant: true, state: "KPI_CAPTURE", expectedQuestion: null });
     expect(eventsOf(back, "action")).toEqual([{ type: "action", action: { kind: "assistant" } }]);
     const paused = await ctxOf(crewId, id);
-    expect(paused).toMatchObject({ assistant: true, state: "KPI_CAPTURE", filled: ["sleep_hours"] });
+    expect(paused).toMatchObject({ assistant: true, state: "KPI_CAPTURE", filled: ["mood"] });
 
     // a question in between is answered by the assistant, and the check-up does not move
     const answered = await playTurn(crewId, id, say.ask);
@@ -251,10 +257,10 @@ describe.each<[Lang, string, string]>([
     expect(await ctxOf(crewId, id)).toMatchObject({ state: "KPI_CAPTURE", clarifyCount: paused.clarifyCount, skipped: paused.skipped });
 
     const resumed = await playTurn(crewId, id, say.cont);
-    expect(stateOf(resumed)).toMatchObject({ assistant: false, state: "KPI_CAPTURE", expectedQuestion: "mood" });
-    expect(assistantText(resumed)).toMatch(lang === "en" ? /mood/iu : /сэтгэл/iu);
-    const mood = await playTurn(crewId, id, say.mood);
-    expect(eventsOf(mood, "measurement")).toMatchObject([{ key: "mood", value: 4 }]);
+    expect(stateOf(resumed)).toMatchObject({ assistant: false, state: "KPI_CAPTURE", expectedQuestion: "symptoms" });
+    expect(assistantText(resumed)).toMatch(lang === "en" ? /headache/iu : /Толгой/iu);
+    const symptoms = await playTurn(crewId, id, say.symptoms);
+    expect(eventsOf(symptoms, "measurement").map((m) => [m.key, m.value])).toContainEqual(["symptom_headache", 0]);
   });
 
   it("show my dashboard opens the latest confirmed check-in; a name of someone else asks to switch", async () => {

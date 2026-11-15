@@ -10,7 +10,7 @@ import type { Db, Queryable } from "./client";
  */
 
 /** Keys whose value is free text (stored in value_text). Ground never sees them. */
-export const TEXT_KEYS: ReadonlySet<KpiKey> = new Set<KpiKey>(["symptom_note", "day_note"]);
+export const TEXT_KEYS: ReadonlySet<KpiKey> = new Set<KpiKey>(["symptom_note", "day_note", "sensor_note"]);
 
 export function isTextKey(key: string): boolean {
   return TEXT_KEYS.has(key as KpiKey);

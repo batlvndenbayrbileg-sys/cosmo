@@ -225,7 +225,171 @@ function acknowledgement(ack: InterpretedRecord[], lang: Lang): string {
 
 /** the registry prompt for q, preceded by a short acknowledgement of what was just recorded */
 export function askQuestion(q: QuestionDef, lang: Lang, ack?: InterpretedRecord[]): string {
-  return join([acknowledgement(ack ?? [], lang), q.prompts[lang]]);
+  return join([acknowledgement(ack ?? [], lang), wellbeingNote(ack ?? [], lang), q.prompts[lang]]);
+}
+
+/* ───────────── the wellbeing check: a warm, non-diagnostic word after a low answer ───────────── */
+
+/** the wellbeing answer counts as low (a yellow "watch" on the dashboard) */
+export function isLowWellbeing(key: KpiKey, value: MeasurementValue): boolean {
+  const n = asNumber(value);
+  if (n === null) return false;
+  if (key === "stress") return n >= 4;
+  if (key === "mood" || key === "sleep_quality" || key === "energy" || key === "connection") return n <= 2;
+  return false;
+}
+
+const WELLBEING_WORDS: Readonly<Record<string, Record<Lang, string>>> = {
+  mood: {
+    en: "Thank you for telling me honestly, that matters.",
+    mn: "Үнэнээ хэлсэнд баярлалаа, энэ чухал.",
+  },
+  sleep_quality: {
+    en: "A rough night makes everything feel harder.",
+    mn: "Муу унтсан шөнийн дараа бүх зүйл хэцүү санагддаг.",
+  },
+  energy: {
+    en: "It sounds like you are running low today.",
+    mn: "Өнөөдөр хүч тамир тань бага байгаа бололтой.",
+  },
+  stress: {
+    en: "That sounds like a lot to carry.",
+    mn: "Их ачаа үүрч байгаа юм шиг сонсогдож байна.",
+  },
+  connection: {
+    en: "Feeling far from people is hard up here.",
+    mn: "Хүмүүсээс хол байгаа мэдрэмж энд үнэхээр хэцүү.",
+  },
+};
+
+const WELLBEING_SUGGESTION: Readonly<Record<string, Record<Lang, string>>> = {
+  mood: {
+    en: "A short break or a talk with a crewmate can help, and the flight surgeon and the support team on Earth are always there to listen.",
+    mn: "Богино завсарлага эсвэл багийн гишүүнтэйгээ ярилцах нь тусалж болно, нислэгийн эмч болон Дэлхий дээрх дэмжлэгийн баг үргэлж сонсоход бэлэн.",
+  },
+  sleep_quality: {
+    en: "If you can, keep tonight's wind-down quiet and the lights low.",
+    mn: "Боломжтой бол өнөө орой тайван, гэрлээ бүдэг байлгаж амраарай.",
+  },
+  energy: {
+    en: "Short rests between tasks and enough water can help.",
+    mn: "Ажлын хооронд богино амрах, хангалттай ус уух нь тусалж болно.",
+  },
+  stress: {
+    en: "A few slow breaths or a short pause can help, and the flight surgeon or the support team on Earth are there if you want to talk.",
+    mn: "Хэдэн удаа удаан амьсгалах эсвэл түр завсарлах нь тусалж болно, ярилцмаар байвал нислэгийн эмч эсвэл Дэлхий дээрх дэмжлэгийн баг бэлэн байна.",
+  },
+  connection: {
+    en: "A chat with a crewmate or a call home could help, and the support team on Earth can set one up.",
+    mn: "Багийн гишүүнтэйгээ ярилцах эсвэл гэр лүүгээ залгах нь тусалж болно, Дэлхий дээрх дэмжлэгийн баг үүнийг зохион байгуулж өгнө.",
+  },
+};
+
+/**
+ * After a low wellbeing answer (mood or sleep quality, energy, feeling connected at 1-2, stress at 4-5): one warm
+ * sentence and one practical suggestion, never a diagnosis or a drug. Only the first low answer of the turn is
+ * spoken to. Empty for everything else. (The crisis path is separate and always wins: companion.ts detectCrisis.)
+ */
+export function wellbeingNote(ack: ReadonlyArray<{ key: KpiKey; value: MeasurementValue }>, lang: Lang): string {
+  const low = ack.find((r) => WELLBEING_WORDS[r.key] && isLowWellbeing(r.key, r.value));
+  if (!low) return "";
+  return join([WELLBEING_WORDS[low.key][lang], WELLBEING_SUGGESTION[low.key][lang]]);
+}
+
+/* ───────────── the sensor feed: what Cosmo says before the first question ───────────── */
+
+type SensorFlagText = { key: KpiKey; value: number; usual: number | null; direction: "high" | "low" };
+
+const SENSOR_NAMES: Readonly<Partial<Record<KpiKey, Record<Lang, string>>>> = {
+  heart_rate: { en: "your resting heart rate", mn: "тайван үеийн пульс" },
+  bp_systolic: { en: "your blood pressure", mn: "цусны даралт" },
+  bp_diastolic: { en: "your blood pressure", mn: "цусны даралт" },
+  temperature_c: { en: "your temperature", mn: "биеийн температур" },
+  glucose_mgdl: { en: "your glucose patch", mn: "сахарын мэдрэгч" },
+  sleep_hours: { en: "your sleep watch", mn: "нойрны цаг" },
+  water_ml: { en: "your drink log", mn: "усны бүртгэл" },
+  exercise_min: { en: "your exercise log", mn: "дасгалын бүртгэл" },
+};
+
+/** "your resting heart rate was 82 beats per minute, higher than your usual 64" */
+function sensorFlagSentence(f: SensorFlagText, values: Partial<Record<KpiKey, MeasurementValue>>, lang: Lang): string {
+  const name = SENSOR_NAMES[f.key]?.[lang] ?? lowerLabel(f.key, lang);
+  let shown: string;
+  if (f.key === "bp_systolic" || f.key === "bp_diastolic") {
+    const s = asNumber(values.bp_systolic);
+    const d = asNumber(values.bp_diastolic);
+    shown =
+      s !== null && d !== null
+        ? lang === "mn"
+          ? `${formatNumber(s, 0)} дээр ${formatNumber(d, 0)}`
+          : `${formatNumber(s, 0)} over ${formatNumber(d, 0)}`
+        : spokenValue(f.key, f.value, lang);
+  } else {
+    shown = spokenValue(f.key, f.value, lang);
+  }
+  // the usual level as a bare number (the unit was just said); for blood pressure it is the upper number
+  const bp = f.key === "bp_systolic" || f.key === "bp_diastolic";
+  const usualNum = f.usual !== null ? formatNumber(roundUsual(f.key, f.usual), KPI_DEFS[f.key].type === "number" ? 1 : 0) : null;
+  const usual = usualNum === null ? null : bp ? (lang === "mn" ? `дээд даралт ${usualNum}` : `upper number of ${usualNum}`) : usualNum;
+  const high = f.direction === "high";
+  if (lang === "mn") {
+    const verb =
+      f.key === "sleep_hours" ? `${shown} унтсан гэж бүртгэсэн` : f.key === "water_ml" || f.key === "exercise_min" ? `${shown} гэж бүртгэсэн` : `${shown} байна`;
+    const cmp = usual
+      ? `ердийнхөөсөө ${high ? "их" : "бага"} байна (таны дундаж ${usual})`
+      : `демо хүрээнээс ${high ? "дээгүүр" : "доогуур"} байна`;
+    return `${name.charAt(0).toLocaleUpperCase("mn")}${name.slice(1)} ${verb}, ${cmp}.`;
+  }
+  const verb =
+    f.key === "sleep_hours"
+      ? `logged ${shown} of sleep`
+      : f.key === "water_ml"
+        ? `shows ${shown} in the last day`
+        : f.key === "exercise_min"
+          ? `shows ${shown}`
+          : f.key === "glucose_mgdl"
+            ? `reads ${shown}`
+            : `was ${shown}`;
+  const cmp = usual ? `${high ? "higher" : "lower"} than your usual ${usual}` : `${high ? "above" : "below"} the demo range`;
+  return `${name.charAt(0).toUpperCase()}${name.slice(1)} ${verb}, ${cmp}.`;
+}
+
+function roundUsual(key: KpiKey, v: number): number {
+  const def = KPI_DEFS[key];
+  if (def.type === "number") return Math.round(v * 10) / 10;
+  if (key === "water_ml") return Math.round(v / 50) * 50;
+  return Math.round(v);
+}
+
+/**
+ * Said before the first question of the check-in when the sensor feed filled values: that the sensors already logged
+ * sleep and the morning vitals (so they are not asked), then the unusual readings, or that everything looks usual.
+ * Every number comes from the stored values and the person's own baseline. Empty without a feed.
+ */
+export function sensorIntro(
+  sensor: { keys: readonly KpiKey[]; flagged: readonly SensorFlagText[] } | null,
+  values: Partial<Record<KpiKey, MeasurementValue>>,
+  lang: Lang,
+): string {
+  if (!sensor || sensor.keys.length === 0) return "";
+  const lead =
+    lang === "mn"
+      ? "Таны мэдрэгчүүд нойр, пульс, даралт, температур, дасгал, усыг аль хэдийн бүртгэсэн тул хэдхэн зүйл л асууя."
+      : "Your sensors already logged your sleep, heart rate, blood pressure, temperature, exercise and water, so I only have a few questions.";
+  if (sensor.flagged.length === 0) {
+    return join([lead, lang === "mn" ? "Бүгд таны ердийн хүрээнд байна." : "Everything looks within your usual range."]);
+  }
+  return join([lead, ...sensor.flagged.map((f) => sensorFlagSentence(f, values, lang))]);
+}
+
+/** the unusual body readings again, said before the sensor follow-up question when it is asked later (resume) */
+export function sensorCheckLead(
+  sensor: { flagged: readonly SensorFlagText[] } | null,
+  values: Partial<Record<KpiKey, MeasurementValue>>,
+  lang: Lang,
+): string {
+  if (!sensor || sensor.flagged.length === 0) return "";
+  return join(sensor.flagged.map((f) => sensorFlagSentence(f, values, lang)));
 }
 
 /** the allowed range for a single-number question, in words: "between 0 and 14 hours" */
@@ -286,15 +450,41 @@ function shortNote(text: string): string {
   return t.length > 80 ? `${t.slice(0, 80).replace(/\s+\S*$/u, "")}…` : t;
 }
 
-/** the compact read-back of everything stored, followed by the confirmation question */
-export function readBack(values: Partial<Record<KpiKey, MeasurementValue>>, lang: Lang): string {
+/**
+ * The compact read-back of everything stored, followed by the confirmation question. With `sources`, the readings
+ * that came from the sensor feed are not read out one by one (they are on the dashboard): one sentence says they are
+ * saved too, so the read-back holds only what the astronaut said.
+ */
+export function readBack(
+  values: Partial<Record<KpiKey, MeasurementValue>>,
+  lang: Lang,
+  sources?: Partial<Record<KpiKey, string>>,
+): string {
   const parts: string[] = [];
+  const fromSensor = (k: KpiKey): boolean => sources?.[k] === "sensor";
+  const sensorCount = (Object.keys(values) as KpiKey[]).filter(fromSensor).length;
   const present = (k: KpiKey): MeasurementValue | undefined => {
+    if (fromSensor(k)) return undefined;
     const v = values[k];
     return v === undefined || v === null || (typeof v === "string" && v.trim().length === 0) ? undefined : v;
   };
 
   for (const q of QUESTIONS) {
+    // what the astronaut said about a sensor reading is an explanation, not a value to confirm
+    if (q.id === "sensor_check") continue;
+    if (q.id === "symptoms" && SYMPTOM_KEYS.every((k) => present(k) !== undefined)) {
+      // one short phrase for the symptom answer: "no symptoms", or the ones that are present (and the note)
+      const yes = SYMPTOM_KEYS.filter((k) => asNumber(present(k) as MeasurementValue) === 1);
+      const vision = asNumber(present("vision_check") ?? null);
+      const blurred = vision !== null && vision > 0;
+      if (yes.length === 0 && !blurred) parts.push(lang === "mn" ? "шинж тэмдэг алга" : "no symptoms");
+      else if (yes.length > 0) parts.push(yes.map((k) => SYMPTOM_NAMES[lang][k]).join(lang === "mn" ? ", " : " and "));
+      const note = present("symptom_note");
+      if (note !== undefined) parts.push(`${lowerLabel("symptom_note", lang)} ${shortNote(String(note))}`);
+      continue;
+    }
+    // vision is asked inside the symptom question: "clear" is already said by "no symptoms"
+    if (q.id === "vision" && asNumber(present("vision_check") ?? null) === 0 && SYMPTOM_KEYS.every((k) => present(k) !== undefined)) continue;
     if (q.id === "blood_pressure") {
       const s = present("bp_systolic");
       const d = present("bp_diastolic");
@@ -313,9 +503,11 @@ export function readBack(values: Partial<Record<KpiKey, MeasurementValue>>, lang
   }
 
   const question = lang === "mn" ? "Бүгд зөв үү?" : "Is everything correct?";
-  if (parts.length === 0) return question;
-  const lead = lang === "mn" ? "Миний тэмдэглэснээр" : "Here is what I have";
-  return `${lead}: ${parts.join(", ")}. ${question}`;
+  const sensorLine =
+    sensorCount > 0 ? (lang === "mn" ? "Мэдрэгчийн үзүүлэлтүүд ч хадгалагдсан." : "Your sensor readings are saved too.") : "";
+  if (parts.length === 0) return join([sensorLine, question]);
+  const lead = sensorCount > 0 ? (lang === "mn" ? "Таны хэлснээр" : "Here is what you told me") : lang === "mn" ? "Миний тэмдэглэснээр" : "Here is what I have";
+  return join([`${lead}: ${parts.join(", ")}.`, sensorLine, question]);
 }
 
 /** confirms a single corrected value, then asks again */

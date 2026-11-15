@@ -27,30 +27,36 @@ import { painScript, relatedItems, type GroundPainReport } from "@/lib/pain";
 import type { KpiKey, TurnEvent } from "@/lib/types";
 import { namesConditionOrDrug } from "@/server/agent/companion";
 import { setClockForTests } from "@/server/clock";
+import { setSensorFeedForTests } from "@/server/checkin/sensors";
 import { setGroundCookie } from "@/server/dashboard/roles";
 import { groundListPainReports } from "@/server/db/repos/ground";
 import { upsertMeasurement } from "@/server/db/repos/measurement";
 import { createPainReport, getPainReport, listPainReports, updatePainReport } from "@/server/db/repos/pain";
 import { listSosAlerts } from "@/server/db/repos/sos";
 import { NotFoundError } from "@/server/http";
-import { assistantText, ctxOf, eventsOf, playTurn, startCheckIn } from "./helpers/agent";
+import { SPOKEN_ANSWERS, assistantText, ctxOf, eventsOf, playTurn, startCheckIn } from "./helpers/agent";
 import { TEST_TODAY, freshSeededDb } from "./helpers/db";
 
 const NOW = TEST_TODAY;
 
 beforeEach(async () => {
+  // these walk to a measurement question, asked only without a sensor feed (a crew member without a wearable)
+  setSensorFeedForTests(false);
   await freshSeededDb();
   mocks.jar.clear();
   mocks.failRaise = false;
   setClockForTests(NOW);
   resetPainStoreForTests();
 });
-afterEach(() => setClockForTests(null));
+afterEach(() => {
+  setClockForTests(null);
+  setSensorFeedForTests(null);
+});
 
 /** to the sleep question (KPI_CAPTURE) */
 async function atSleep(lang: "en" | "mn" = "en"): Promise<string> {
   const id = await startCheckIn("bat", lang);
-  for (const line of lang === "en" ? ["Hi Cosmo", "let's start"] : ["Сайн уу", "эхэлье"]) await playTurn("bat", id, line);
+  for (const line of lang === "en" ? ["Hi Cosmo", "let's start", ...SPOKEN_ANSWERS.en] : ["Сайн уу", "эхэлье", ...SPOKEN_ANSWERS.mn]) await playTurn("bat", id, line);
   return id;
 }
 
@@ -125,7 +131,7 @@ describe("a pain mid check-in (English)", () => {
 
   it("the symptom question's 'I have a headache' is recorded as usual (no pain detour)", async () => {
     const id = await startCheckIn("bat", "en");
-    for (const line of ["Hi Cosmo", "let's start", "6.5 hours", "4"]) await playTurn("bat", id, line);
+    for (const line of ["Hi Cosmo", "let's start", "4"]) await playTurn("bat", id, line);
     expect((await ctxOf("bat", id)).state).toBe("KPI_CAPTURE");
     const events = await playTurn("bat", id, "yes, I have a headache");
     expect(painOf(events)).toBeUndefined();
@@ -134,7 +140,7 @@ describe("a pain mid check-in (English)", () => {
 
   it("a pain that goes with a first-aid guide is never swallowed by the open question (the browser waits for it)", async () => {
     const id = await startCheckIn("bat", "en");
-    for (const line of ["Hi Cosmo", "let's start", "6.5 hours", "4"]) await playTurn("bat", id, line);
+    for (const line of ["Hi Cosmo", "let's start", "4"]) await playTurn("bat", id, line);
     const before = await ctxOf("bat", id);
     const events = await playTurn("bat", id, "yes, I hit my head and it hurts");
     expect(painOf(events)).toMatchObject({ location: "head", guideId: "head-injury" });

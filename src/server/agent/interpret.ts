@@ -18,6 +18,7 @@ import type { KpiKey, Lang, MeasurementValue, QuestionDef, QuestionId } from "@/
 import { KPI_DEFS, MAX_TEXT_LENGTH, getQuestion, validateValue } from "@/lib/kpi/registry";
 import { extractNumbers } from "@/lib/numbers/extract";
 import { MGDL_PER_MMOL, isAgeOrCount, readContainers } from "@/lib/numbers/units";
+import { detectAskedQuestion } from "./questions";
 
 /* ───────────── public types ───────────── */
 
@@ -425,6 +426,12 @@ const KW: Record<QuestionId, RegExp> = {
   vision: sr("vision|eyesight|eyes?|blurr|хараа|нүд"),
   workload: sr("workload|work\\s?load|ачаалал"),
   day_note: sr("note|тэмдэглэл"),
+  sensor_check: sr("sensor|мэдрэгч"),
+  // "sleep quality" outranks the bare "sleep" keyword (same start, longer match)
+  sleep_quality: new RegExp(`${NB}(?:sleep\\s+quality|quality\\s+of\\s+(?:my\\s+)?sleep|нойрны\\s+чанар[\\p{L}]*)${NA}`, "giu"),
+  energy: sr("energy|energetic|эрч\\s+хүч"),
+  stress: sr("stress|стресс"),
+  connection: sr("connected|connection|lonel|ганцаард|ойр\\s+дотно"),
 };
 
 /* ───────────── scale questions (mood, workload) ───────────── */
@@ -482,8 +489,68 @@ const WORKLOAD_WORDS: ReadonlyArray<readonly [RegExp, number]> = [
   [wr("маш\\s+(?:их|хүнд|завгүй|ачаалалтай)|хэт\\s+их|хэтэрхий|дийлэхгүй|дарамттай"), 5],
 ];
 
+/* the wellbeing check (1-5): words map to the scale the prompt says, so "pretty stressed" is a 4 */
+
+const SLEEP_QUALITY_WORDS: ReadonlyArray<readonly [RegExp, number]> = [
+  [wr("(?:very|really|super|so)\\s+(?:well|good|deeply|soundly)|like\\s+a\\s+(?:baby|log|rock)|great|excellent|perfect(?:ly)?|amazing|wonderful"), 5],
+  [wr("well|good|pretty\\s+(?:well|good)|fairly\\s+well|quite\\s+well|rested|deeply|soundly|not\\s+bad"), 4],
+  [wr("ok(?:ay)?|fine|alright|so[\\s-]so|average|normal|on\\s+and\\s+off|decent|could\\s+be\\s+better"), 3],
+  [wr("bad(?:ly)?|poor(?:ly)?|not\\s+(?:very\\s+|so\\s+|that\\s+|too\\s+|really\\s+)?(?:well|good|great)|restless|rough|broken|light(?:ly)?|woke\\s+up\\s+a\\s+lot|kept\\s+waking"), 2],
+  [wr("(?:very|really|so|extremely)\\s+(?:bad(?:ly)?|poor(?:ly)?)|terrible|awful|horrible|barely(?:\\s+slept)?|hardly(?:\\s+slept)?|not\\s+at\\s+all|couldn'?t\\s+sleep"), 1],
+  // Mongolian
+  [wr("маш\\s+сайн|их\\s+сайн|гайхалтай|тайван\\s+сайхан"), 5],
+  [wr("сайн|сайхан|тайван|муугүй|амарсан"), 4],
+  [wr("дунд(?:\\s+зэрэг)?|гайгүй|боломжийн|хэвийн|зүгээр|ердийн"), 3],
+  [wr("муу|тайван\\s+биш|сайн\\s+(?:биш|бус)|сайнгүй|сэрээд\\s+байсан|байн\\s+байн\\s+сэрсэн"), 2],
+  [wr("маш\\s+муу|их\\s+муу|аймшигтай|бараг\\s+унтаагүй|огт\\s+унтаагүй|унтаж\\s+чадаагүй"), 1],
+];
+
+const ENERGY_WORDS: ReadonlyArray<readonly [RegExp, number]> = [
+  [wr("full\\s+of\\s+energy|(?:very|really|super)\\s+(?:energetic|good|great)|energetic|great|excellent|fantastic|buzzing|fully\\s+charged"), 5],
+  [wr("good|pretty\\s+good|fresh|alert|awake|rested|not\\s+bad"), 4],
+  [wr("ok(?:ay)?|fine|alright|so[\\s-]so|average|normal|medium|moderate|decent"), 3],
+  [wr("tired|low|sleepy|a\\s+bit\\s+(?:tired|low|slow)|slow|sluggish|not\\s+(?:very\\s+|so\\s+|that\\s+|too\\s+|really\\s+)?(?:good|great|energetic)|drowsy"), 2],
+  [wr("exhausted|worn\\s+out|drained|wiped(?:\\s+out)?|empty|(?:very|really|so|extremely)\\s+(?:tired|low|sleepy)|no\\s+energy|running\\s+on\\s+empty|dead\\s+tired"), 1],
+  // Mongolian
+  [wr("маш\\s+эрч\\s+хүчтэй|эрч\\s+хүч\\s+дүүрэн|гайхалтай|маш\\s+сайн"), 5],
+  [wr("эрч\\s+хүчтэй|сайн|сэргэг|муугүй"), 4],
+  [wr("дунд(?:\\s+зэрэг)?|гайгүй|боломжийн|хэвийн|зүгээр|ердийн"), 3],
+  [wr("ядарсан|ядраад|ядарч\\s+байна|нойрмог|бага|сул|сайн\\s+(?:биш|бус)|сайнгүй"), 2],
+  [wr("туйлдсан|маш\\s+ядарсан|их\\s+ядарсан|хүчгүй|тэнхээгүй|эрч\\s+хүчгүй"), 1],
+];
+
+const STRESS_WORDS: ReadonlyArray<readonly [RegExp, number]> = [
+  [wr("not\\s+(?:at\\s+all\\s+)?stressed(?:\\s+at\\s+all)?|no\\s+stress|stress[\\s-]free|(?:very\\s+)?calm|relaxed|peaceful|chill(?:ed)?|at\\s+ease|zero"), 1],
+  [wr("a\\s+(?:little|bit|tiny\\s+bit)(?:\\s+stressed)?|slightly(?:\\s+stressed)?|mildly(?:\\s+stressed)?|not\\s+(?:very|really|too|that|so)\\s+stressed|mostly\\s+calm|low"), 2],
+  [wr("some(?:\\s+stress)?|moderate(?:ly)?|medium|so[\\s-]so|average|normal|ok(?:ay)?|manageable|in\\s+the\\s+middle"), 3],
+  [wr("stressed|quite\\s+stressed|pretty\\s+stressed|tense|anxious|worried|under\\s+pressure|busy|high"), 4],
+  [wr("(?:very|really|so|extremely|super)\\s+stressed|overwhelmed|too\\s+much|maxed\\s+out|burn(?:ed|t)\\s+out|at\\s+my\\s+limit|panicking"), 5],
+  // Mongolian
+  [wr("стрессгүй|огт\\s+стресс(?:гүй|\\s+байхгүй)|стресс\\s+(?:байхгүй|алга)|тайван|амар\\s+тайван"), 1],
+  [wr("бага\\s+зэрэг|жаахан|бага|арай\\s+бага"), 2],
+  [wr("дунд(?:\\s+зэрэг)?|гайгүй|боломжийн|хэвийн|ердийн"), 3],
+  [wr("стресстэй|түгшүүртэй|санаа\\s+зовж|дарамттай|их"), 4],
+  [wr("маш\\s+(?:их\\s+)?стресстэй|хэт\\s+их|дийлэхгүй|тэвчихэд\\s+хэцүү|маш\\s+их"), 5],
+];
+
+const CONNECTION_WORDS: ReadonlyArray<readonly [RegExp, number]> = [
+  [wr("(?:very|really|so|super)\\s+(?:connected|close|good)|great|excellent|wonderful|like\\s+family"), 5],
+  [wr("connected|close|good|fine\\s+with\\s+(?:the\\s+)?crew|supported|not\\s+lonely|pretty\\s+good"), 4],
+  [wr("ok(?:ay)?|fine|alright|so[\\s-]so|average|normal|in\\s+between|a\\s+bit\\s+of\\s+both"), 3],
+  [wr("lonely|a\\s+bit\\s+(?:lonely|distant|far|alone)|distant|far\\s+(?:away|from\\s+(?:home|everyone))|homesick|disconnected|miss\\s+(?:home|my\\s+family|everyone)|not\\s+(?:very\\s+|so\\s+|that\\s+|really\\s+)?(?:connected|close)"), 2],
+  [wr("(?:very|really|so|extremely)\\s+(?:lonely|alone|isolated|disconnected)|isolated|cut\\s+off|completely\\s+alone|all\\s+alone"), 1],
+  // Mongolian
+  [wr("маш\\s+ойр|их\\s+ойр|гэр\\s+бүл\\s+шиг|гайхалтай"), 5],
+  [wr("ойр|сайн|дотно|ганцаардаагүй|дэмжлэгтэй"), 4],
+  [wr("дунд(?:\\s+зэрэг)?|гайгүй|боломжийн|хэвийн|зүгээр|ердийн"), 3],
+  [wr("ганцаардаж(?:\\s+байна)?|ганцаардсан|холдсон|хол\\s+санагдаж|гэрээ\\s+санаж|бага\\s+зэрэг\\s+ганцаард[\\p{L}]*"), 2],
+  [wr("маш\\s+ганцаард[\\p{L}]*|их\\s+ганцаард[\\p{L}]*|тусгаарлагдсан|ганцаараа\\s+мэт|хэнтэй\\s+ч\\s+холбоогүй"), 1],
+];
+
+type ScaleKey = "mood" | "workload" | "sleep_quality" | "energy" | "stress" | "connection";
+
 function interpretScale(
-  key: "mood" | "workload",
+  key: ScaleKey,
   text: string,
   words: ReadonlyArray<readonly [RegExp, number]>,
   kw: RegExp,
@@ -980,7 +1047,20 @@ function symptomNote(text: string, mentions: Mention[], anyPositive: boolean): {
   return { value: cap(keptText.join(", ")), source: cap(keptText[0]) };
 }
 
+/** the three symptoms and the note, plus the vision check when the answer speaks about vision (or is a plain "no") */
 function interpretSymptoms(text: string): InterpretResult {
+  const res = interpretSymptomWords(text);
+  if (res.unclear) {
+    // "my vision is a bit blurry" alone answers the question too
+    const vision = visionFromSymptoms(text, false);
+    return vision && vision.value !== 0 ? okResult([...SYMPTOM_KEYS.map((k) => makeRecord(k, 0, vision.sourceText, CONF_WORDS)), vision]) : res;
+  }
+  const allNo = res.records.every((r) => r.key === "symptom_note" || r.value === 0) && !res.records.some((r) => r.key === "symptom_note");
+  const vision = visionFromSymptoms(text, allNo);
+  return vision ? okResult([...res.records, vision]) : res;
+}
+
+function interpretSymptomWords(text: string): InterpretResult {
   const lead = LEAD_MARKER_RE.exec(text);
   const body = lead ? text.slice(lead[0].length) : text;
   const leadWord = lead ? lead[1].toLowerCase() : null;
@@ -1323,6 +1403,56 @@ function interpretDayNote(text: string): InterpretResult {
   return okResult([makeRecord("day_note", v.value, note, CONF_ONE)]);
 }
 
+/**
+ * The answer to the sensor follow-up ("did you exercise, or are you stressed or unwell?"): the astronaut's own words
+ * are kept as the sensor note; "no" / "nothing" is a fine answer with nothing to record (the question is optional).
+ */
+function interpretSensorNote(text: string): InterpretResult {
+  const trimmed = text.trim();
+  if (trimmed.length === 0) return unclearResult("no_value");
+  if (isNothing(trimmed)) return nothingToRecord();
+  // a question back ("why do you ask?", "what does my blood panel mean?") is answered, never kept as the note
+  if (detectAskedQuestion(trimmed, "en") !== null || detectAskedQuestion(trimmed, "mn") !== null) return unclearResult("no_value");
+  let note = trimmed;
+  if (note.length > MAX_TEXT_LENGTH) note = note.slice(0, MAX_TEXT_LENGTH).replace(/\s+\S*$/u, "");
+  const v = check("sensor_note", note);
+  if (!v.ok) return unclearResult(v.reason, ["sensor_note"]);
+  return okResult([makeRecord("sensor_note", v.value, note, CONF_ONE)]);
+}
+
+/* ───────────── vision, inside the symptom answer ───────────── */
+
+const VISION_MENTION_RE = new RegExp(
+  `${NB}(?:blurr(?:y|ed)(?:\\s+vision)?|(?:my\\s+)?(?:vision|eyesight)(?:\\s+(?:is|was|looks?|got|feels?))?(?:\\s+(?:a\\s+bit|slightly|a\\s+little|very|really))?\\s+(?:blurr(?:y|ed)|fuzzy|hazy|off)|fuzzy\\s+vision|хараа(?:\\s+[\\p{L}]+){0,2}?\\s+бүдэг[\\p{L}]*|хараа\\s+бүдгэр[\\p{L}]*|бүдэг\\s+харагд[\\p{L}]*|нүд\\s+бүрэлз[\\p{L}]*)`,
+  "giu",
+);
+const VISION_NEG_BEFORE_RE = new RegExp(ap(`${NB}(?:no|not|without|never|nor)(?:\\s+(?:any|really))?\\s*$`), "iu");
+/** "no headache, nausea or blurry vision": an "or" closing a list that a negation opened */
+const VISION_OR_BEFORE_RE = /(?<![\p{L}])(?:or|nor)\s*$/iu;
+const VISION_NEG_AFTER_RE = /^\s*(?:\p{L}*гүй|үгүй|биш|бус|алга|байхгүй)(?![\p{L}])/iu;
+const VISION_SEVERE_RE = /very|really|clearly|can'?t\s+see|маш|их/iu;
+
+/**
+ * The symptom question also asks about blurry vision (vision is screened periodically on the station, not with a daily
+ * self-test): "blurry vision" / "хараа бүдэг" is a vision check of "slightly blurred" (or "clearly blurred" with
+ * "very"), a denial of it ("no blurry vision", "хараа бүдгэрээгүй") or a plain "no" to the whole question is "clear".
+ * Null when the answer says nothing about vision.
+ */
+function visionFromSymptoms(body: string, allNo: boolean): InterpretedRecord | null {
+  const m = matchesOf(VISION_MENTION_RE, body)[0];
+  if (!m) return allNo ? makeRecord("vision_check", 0, body.length > 200 ? body.slice(0, 200) : body, CONF_WORDS) : null;
+  const start = m.index ?? 0;
+  const before = body.slice(Math.max(0, start - 24), start);
+  const after = body.slice(start + m[0].length, start + m[0].length + 16);
+  const cyr = /\p{Script=Cyrillic}/u.test(m[0]);
+  const listNegated = VISION_OR_BEFORE_RE.test(before) && NEG_PRE_RE.test(body.slice(0, start));
+  const negated = cyr
+    ? VISION_NEG_AFTER_RE.test(after) || /гүй(?![\p{L}])/u.test(m[0])
+    : VISION_NEG_BEFORE_RE.test(before) || listNegated;
+  const value = negated ? 0 : VISION_SEVERE_RE.test(m[0]) ? 2 : 1;
+  return makeRecord("vision_check", value, m[0], CONF_WORDS);
+}
+
 /* ───────────── dispatch ───────────── */
 
 /**
@@ -1337,9 +1467,17 @@ function interpretDayNote(text: string): InterpretResult {
  * still picked up by interpretOpportunistic. Symptoms and the day note keep the whole text.
  * (Team feedback 2026-11-15: answers in any order; before this, "даралт 120 дээр 80" also stored blood sugar = 120.)
  */
+/**
+ * The wellbeing answers talk about each other ("I slept badly so I'm tired, maybe a 2"): while one of them is open, the
+ * others' keywords (and sleep's) are part of the answer, not another measurement.
+ */
+const WELLBEING_IDS: ReadonlySet<QuestionId> = new Set<QuestionId>(["mood", "sleep_quality", "energy", "stress", "connection"]);
+
 function ownPart(question: QuestionDef, text: string): string {
-  if (question.id === "symptoms" || question.id === "day_note") return text;
-  const others = OPPORTUNISTIC.filter((o) => o.id !== question.id).map(({ id }) => [KW[id], id] as const);
+  if (question.id === "symptoms" || question.id === "day_note" || question.id === "sensor_check") return text;
+  const wellbeing = WELLBEING_IDS.has(question.id);
+  const others = OPPORTUNISTIC.filter((o) => o.id !== question.id && !(wellbeing && (WELLBEING_IDS.has(o.id) || o.id === "sleep")))
+    .map(({ id }) => [KW[id], id] as const);
   const hits = resolveHits(text, [...others, [KW[question.id], question.id] as const]);
   if (!hits.some((h) => h.value !== question.id)) return text;
   let out = "";
@@ -1368,6 +1506,7 @@ export function interpretAnswer(question: QuestionDef, text: string, lang: Lang)
     question.id !== "blood_pressure" &&
     question.id !== "symptoms" &&
     question.id !== "day_note" &&
+    question.id !== "sensor_check" &&
     BP_PAIR_RE.test(t) &&
     !/\d/u.test(t.replace(BP_PAIR_RE, ""))
   ) {
@@ -1398,6 +1537,16 @@ export function interpretAnswer(question: QuestionDef, text: string, lang: Lang)
       return interpretScale("workload", t, WORKLOAD_WORDS, KW.workload);
     case "day_note":
       return interpretDayNote(t);
+    case "sensor_check":
+      return interpretSensorNote(t);
+    case "sleep_quality":
+      return interpretScale("sleep_quality", t, SLEEP_QUALITY_WORDS, KW.sleep_quality);
+    case "energy":
+      return interpretScale("energy", t, ENERGY_WORDS, KW.energy);
+    case "stress":
+      return interpretScale("stress", t, STRESS_WORDS, KW.stress);
+    case "connection":
+      return interpretScale("connection", t, CONNECTION_WORDS, KW.connection);
   }
 }
 
@@ -1413,6 +1562,10 @@ const CORRECTION_ORDER: QuestionId[] = [
   "exercise",
   "vision",
   "workload",
+  "sleep_quality",
+  "energy",
+  "stress",
+  "connection",
   "symptoms",
   "mood",
 ];
@@ -1564,6 +1717,10 @@ const OPPORTUNISTIC: ReadonlyArray<{ id: QuestionId; pre: boolean }> = [
   { id: "exercise", pre: true },
   { id: "mood", pre: false },
   { id: "workload", pre: false },
+  { id: "sleep_quality", pre: false },
+  { id: "energy", pre: false },
+  { id: "stress", pre: false },
+  { id: "connection", pre: false },
 ];
 
 const UNIT_LETTERS_RE = /(?:hours?|hrs?|minutes?|mins?|litres?|liters?|ml|цаг|минут|мин|литр|мл|л)(?![\p{L}])/iu;

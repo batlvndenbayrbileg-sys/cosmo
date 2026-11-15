@@ -297,7 +297,7 @@ describe("GET /api/ground/crew/[crewId]/dashboard", () => {
     expect(p.overall).toBe("red");
     expect(p.alerts).toHaveLength(1);
     expect(p.link).toMatchObject({ state: "online", delayMs: 0, simulated: true });
-    expect(p.kpis).toHaveLength(16);
+    expect(p.kpis).toHaveLength(21);
   });
 
   it("carries the delay into the link and the visible check-in", async () => {

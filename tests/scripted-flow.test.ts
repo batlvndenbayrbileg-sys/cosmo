@@ -8,14 +8,19 @@ import { listAlerts } from "@/server/db/repos/alert";
 import { listMeasurements } from "@/server/db/repos/measurement";
 import { listTurns } from "@/server/db/repos/turn";
 import { getSnapshot } from "@/server/checkin/service";
-import { assistantText, ctxOf, eventsOf, playTurn, startCheckIn } from "./helpers/agent";
+import { setSensorFeedForTests } from "@/server/checkin/sensors";
+import { SENSOR_KEYS } from "@/lib/kpi/registry";
+import { SPOKEN_ANSWERS, assistantText, ctxOf, eventsOf, playTurn, startCheckIn } from "./helpers/agent";
 import { TEST_TODAY, freshSeededDb } from "./helpers/db";
 
 beforeEach(async () => {
   setClockForTests(TEST_TODAY);
   await freshSeededDb();
 });
-afterEach(() => setClockForTests(null));
+afterEach(() => {
+  setClockForTests(null);
+  setSensorFeedForTests(null);
+});
 
 /** plays every astronaut line of a script through the real turn pipeline (scripted agent, in-memory database) */
 async function runScript(lang: Lang) {
@@ -27,7 +32,7 @@ async function runScript(lang: Lang) {
 }
 
 describe.each<Lang>(["en", "mn"])("scripted demo flow (%s)", (lang) => {
-  it("walks GREETING to DONE, stores every non-text key and corrects sleep to 6", async () => {
+  it("walks GREETING to DONE, stores the sensor readings and the spoken answers, and corrects energy to 2", async () => {
     const { script, checkInId, all } = await runScript(lang);
 
     const checkIn = await getCheckIn("bat", checkInId);
@@ -36,18 +41,33 @@ describe.each<Lang>(["en", "mn"])("scripted demo flow (%s)", (lang) => {
     expect(checkIn.summaryJson).not.toBeNull();
     expect((await ctxOf("bat", checkInId)).state).toBe("DONE");
 
-    const stored = new Map<KpiKey, number | string>((await listMeasurements("bat", checkInId)).map((m) => [m.key, m.value]));
+    const rows = await listMeasurements("bat", checkInId);
+    const stored = new Map<KpiKey, number | string>(rows.map((m) => [m.key, m.value]));
     for (const [key, value] of Object.entries(script.values) as Array<[KpiKey, number]>) {
       expect(stored.get(key), key).toBe(value);
     }
-    expect(stored.get("sleep_hours")).toBe(6);
-    expect(stored.has("day_note")).toBe(false); // "nothing today" is a skip, not a stored note
-    expect([...stored.keys()].filter((k) => k !== "symptom_note" && k !== "day_note")).toHaveLength(14);
+    expect([...stored.keys()].sort()).toEqual(Object.keys(script.values).sort());
+    // the measurements a wearable gives come from the (simulated) sensor feed, never from a question
+    for (const key of SENSOR_KEYS) expect(rows.find((m) => m.key === key)?.source, key).toBe("sensor");
+    expect(stored.has("day_note")).toBe(false);
 
     const corrections = eventsOf(all, "measurement").filter((e) => e.change === "corrected");
-    expect(corrections.map((e) => [e.key, e.value])).toEqual([["sleep_hours", 6]]);
-    const first = eventsOf(all, "measurement").find((e) => e.key === "sleep_hours");
-    expect(first).toMatchObject({ value: lang === "en" ? 5.5 : 5.5, change: "recorded" });
+    expect(corrections.map((e) => [e.key, e.value])).toEqual([["energy", 2]]);
+    const first = eventsOf(all, "measurement").find((e) => e.key === "energy");
+    expect(first).toMatchObject({ value: 3, change: "recorded" });
+    // no measurement event for a sensor reading: nothing was heard
+    expect(eventsOf(all, "measurement").some((e) => (SENSOR_KEYS as readonly string[]).includes(e.key))).toBe(false);
+  });
+
+  it("reads the unusual sensor reading back before the first question, and a low wellbeing answer gets a kind word", async () => {
+    const { turns } = await runScript(lang);
+    const start = assistantText(turns[2]);
+    expect(start).toMatch(lang === "en" ? /^Your sensors already logged/u : /^Таны мэдрэгчүүд/u);
+    expect(start).toMatch(lang === "en" ? /resting heart rate was 82 beats per minute, higher than your usual 66\./u : /пульс минутад 82 удаа байна, ердийнхөөсөө их байна \(таны дундаж 66\)/u);
+    expect(start).toMatch(lang === "en" ? /Did you exercise, or are you feeling stressed or unwell\?$/u : /биеэ тавгүй байна уу\?$/u);
+    const lowSleep = assistantText(turns[6]);
+    expect(lowSleep).toMatch(lang === "en" ? /A rough night makes everything feel harder\./u : /Муу унтсан шөнийн дараа/u);
+    expect(lowSleep).not.toMatch(/diagnos|medicat|онош/iu);
   });
 
   it("emits transcript, measurement|clarification, state, assistant, summary?, show?, timing, done in order on every turn", async () => {
@@ -84,14 +104,14 @@ describe.each<Lang>(["en", "mn"])("scripted demo flow (%s)", (lang) => {
     }
   });
 
-  it("produces a sensible summary for Bat's demo values: yellow, sleep and water, no red flag, no alert", async () => {
+  it("produces a sensible summary for Bat's demo values: yellow, pulse and sleep quality, no red flag, no alert", async () => {
     const { turns, checkInId } = await runScript(lang);
     const last = turns[turns.length - 1];
     const summary = eventsOf(last, "summary")[0]?.summary;
     expect(summary).toBeDefined();
     expect(summary.overall).toBe("yellow");
     expect(summary.redFlags).toEqual([]);
-    expect(summary.findings.map((f) => f.key).sort()).toEqual(["sleep_hours", "water_ml"]);
+    expect(summary.findings.map((f) => f.key).sort()).toEqual(["heart_rate", "sleep_quality"]);
     expect(summary.recommendations.length).toBeGreaterThanOrEqual(1);
     expect(summary.recommendations.length).toBeLessThanOrEqual(2);
     expect(summary.spoken.language).toBe(lang);
@@ -124,20 +144,8 @@ describe.each<Lang>(["en", "mn"])("scripted demo flow (%s)", (lang) => {
       .flatMap((events) => eventsOf(events, "state"))
       .map((s) => s.expectedQuestion)
       .filter((q): q is NonNullable<typeof q> => q !== null);
-    expect(questions).toEqual([
-      "sleep",
-      "mood",
-      "symptoms",
-      "blood_pressure",
-      "heart_rate",
-      "temperature",
-      "glucose",
-      "water",
-      "exercise",
-      "vision",
-      "workload",
-      "day_note",
-    ]);
+    // the sensor follow-up (Bat's resting pulse is up) and the six spoken questions; no measurement is asked
+    expect(questions).toEqual(["sensor_check", "mood", "symptoms", "sleep_quality", "energy", "stress", "connection"]);
   });
 
   it("refuses writes after DONE: a late message only gets a closing reply", async () => {
@@ -157,32 +165,38 @@ describe.each<Lang>(["en", "mn"])("scripted demo flow (%s)", (lang) => {
     expect(snapshot.checkIn.state).toBe("DONE");
     expect(snapshot.checkIn.confirmedAt).not.toBeNull();
     const byKey = new Map(snapshot.measurements.map((m) => [m.key, m]));
-    expect(byKey.get("sleep_hours")?.status).toBe("yellow");
-    expect(byKey.get("heart_rate")?.status).toBe("green");
-    expect(snapshot.measurements.every((m) => m.source === "simulated")).toBe(true);
-    expect(snapshot.turns.filter((t) => t.speaker === "cosmo").length).toBeGreaterThan(10);
+    expect(byKey.get("sleep_hours")?.status).toBe("green");
+    expect(byKey.get("heart_rate")?.status).toBe("yellow");
+    expect(byKey.get("sleep_quality")?.status).toBe("yellow");
+    for (const m of snapshot.measurements) {
+      expect(m.source, m.key).toBe((SENSOR_KEYS as readonly string[]).includes(m.key) ? "sensor" : "simulated");
+    }
+    expect(snapshot.turns.filter((t) => t.speaker === "cosmo").length).toBeGreaterThanOrEqual(10);
   });
 });
 
+/** without a sensor feed every measurement is asked after the six spoken questions (the path these tests walk) */
+const SAID_TO_SLEEP = ["hello", "I'm fine", "let's start", ...SPOKEN_ANSWERS.en];
+const SAID_AFTER_SLEEP = ["120 over 80", "70", "36.6", "95", "2300 ml", "45 minutes"];
+
 describe("red flag path: alerts", () => {
+  beforeEach(() => setSensorFeedForTests(false));
+
   async function playRed() {
     const checkInId = await startCheckIn("bat", "en");
+    // "blurry vision" is part of the symptom question now (vision is not asked as a separate daily test)
     const said = [
       "hello",
       "I'm fine",
       "let's start",
-      "6 hours",
       "4",
-      "I have a headache",
-      "120 over 80",
-      "70",
-      "36.6",
-      "95",
-      "2300 ml",
-      "45 minutes",
-      "slightly blurred",
-      "3",
-      "nothing",
+      "I have a headache and blurry vision",
+      "4",
+      "4",
+      "2",
+      "4",
+      "6 hours",
+      ...SAID_AFTER_SLEEP,
       "yes",
     ];
     const turns: TurnEvent[][] = [];
@@ -208,7 +222,7 @@ describe("red flag path: alerts", () => {
 
   it("a failure while writing the summary rolls the confirmation back, and the next turn finishes the job with its alert", async () => {
     const checkInId = await startCheckIn("bat", "en");
-    const said = ["hello", "I'm fine", "let's start", "6 hours", "4", "I have a headache", "120 over 80", "70", "36.6", "95", "2300 ml", "45 minutes", "slightly blurred", "3", "nothing"];
+    const said = ["hello", "I'm fine", "let's start", "4", "I have a headache and blurry vision", "4", "4", "2", "4", "6 hours", ...SAID_AFTER_SLEEP];
     for (const text of said) await playTurn("bat", checkInId, text);
     expect((await ctxOf("bat", checkInId)).state).toBe("CONFIRM");
 
@@ -264,9 +278,10 @@ describe("red flag path: alerts", () => {
       await freshSeededDb();
       setClockForTests(TEST_TODAY);
       const checkInId = await startCheckIn("bat", lang);
+      setSensorFeedForTests(false);
       const said = lang === "en"
-        ? ["hello", "I'm fine", "let's start", "4 hours", "2", "no", "120 over 80", "70", "36.6", "95", "2300 ml", "45 minutes", "sharp", "3", "nothing", "yes"]
-        : ["Сайн байна, баярлалаа.", "Сайхан байна.", "Тийм, хийцгээе.", "Дөрөв цаг унтсан.", "Хоёр байна.", "Үгүй, юу ч байхгүй.", "124 дээр 82.", "Пульс жаран найм.", "36.7 градус.", "98.", "Ус нэг мянга найман зуун мл.", "40 минут.", "Тод байна.", "Гурав.", "Юу ч үгүй.", "Тийм, зөв."];
+        ? ["hello", "I'm fine", "let's start", "2", "no", "4", "4", "2", "4", "4 hours", ...SAID_AFTER_SLEEP, "yes"]
+        : ["Сайн байна, баярлалаа.", "Сайхан байна.", "Тийм, хийцгээе.", "Хоёр байна.", "Үгүй, юу ч байхгүй.", "Дөрөв.", "Дөрөв.", "Хоёр.", "Дөрөв.", "Дөрөв цаг унтсан.", "124 дээр 82.", "Пульс жаран найм.", "36.7 градус.", "98.", "Ус нэг мянга найман зуун мл.", "40 минут.", "Тийм, зөв."];
       let last: TurnEvent[] = [];
       for (const text of said) last = await playTurn("bat", checkInId, text);
       const summary = eventsOf(last, "summary")[0]?.summary;
@@ -318,12 +333,14 @@ describe("red flag path: alerts", () => {
 });
 
 describe("conversation edge cases (scripted agent)", () => {
+  beforeEach(() => setSensorFeedForTests(false));
+
+  /** to the sleep question (no sensor feed: it follows the six spoken questions) */
   async function toCapture(): Promise<string> {
     const id = await startCheckIn("bat", "en");
-    await playTurn("bat", id, "hello");
-    await playTurn("bat", id, "I'm fine");
-    const start = await playTurn("bat", id, "let's start");
-    expect(eventsOf(start, "state")[0]).toMatchObject({ state: "KPI_CAPTURE", expectedQuestion: "sleep" });
+    let last: TurnEvent[] = [];
+    for (const say of SAID_TO_SLEEP) last = await playTurn("bat", id, say);
+    expect(eventsOf(last, "state")[0]).toMatchObject({ state: "KPI_CAPTURE", expectedQuestion: "sleep" });
     return id;
   }
 
@@ -341,23 +358,23 @@ describe("conversation edge cases (scripted agent)", () => {
     expect((await ctxOf("bat", id)).clarifyCount.sleep).toBe(2);
 
     const third = await playTurn("bat", id, "no idea really");
-    expect(eventsOf(third, "state")[0]).toMatchObject({ state: "KPI_CAPTURE", expectedQuestion: "mood" });
+    expect(eventsOf(third, "state")[0]).toMatchObject({ state: "KPI_CAPTURE", expectedQuestion: "blood_pressure" });
     expect(assistantText(third)).toMatch(/add it when we confirm/i);
-    expect((await ctxOf("bat", id)).skipped).toEqual(["sleep"]);
+    expect((await ctxOf("bat", id)).skipped).toEqual(["sensor_check", "sleep"]);
     expect((await listMeasurements("bat", id)).some((m) => m.key === "sleep_hours")).toBe(false);
   });
 
   it("a skipped value can be added at the read-back as a correction", async () => {
     const id = await toCapture();
     await playTurn("bat", id, "skip");
-    expect((await ctxOf("bat", id)).skipped).toEqual(["sleep"]);
-    for (const say of ["4", "no", "120 over 80", "70", "36.6", "95", "2300 ml", "45 minutes", "sharp", "3", "nothing"]) {
+    expect((await ctxOf("bat", id)).skipped).toEqual(["sensor_check", "sleep"]);
+    for (const say of SAID_AFTER_SLEEP) {
       await playTurn("bat", id, say);
     }
     expect((await ctxOf("bat", id)).state).toBe("CONFIRM");
     const fix = await playTurn("bat", id, "No, I slept 7 hours");
     expect(eventsOf(fix, "measurement")[0]).toMatchObject({ key: "sleep_hours", value: 7, change: "corrected" });
-    expect((await ctxOf("bat", id)).skipped).toEqual(["day_note"]); // sleep is no longer skipped; the empty day note stays so
+    expect((await ctxOf("bat", id)).skipped).toEqual(["sensor_check"]); // sleep is no longer skipped
     expect((await ctxOf("bat", id)).state).toBe("CONFIRM");
   });
 
@@ -385,7 +402,7 @@ describe("conversation edge cases (scripted agent)", () => {
 
   it("at the read-back a plain 'no' asks what to change, and something unclear repeats the question", async () => {
     const id = await toCapture();
-    for (const say of ["6 hours", "4", "no", "120 over 80", "70", "36.6", "95", "2300 ml", "45 minutes", "sharp", "3", "nothing"]) {
+    for (const say of ["6 hours", ...SAID_AFTER_SLEEP]) {
       await playTurn("bat", id, say);
     }
     expect((await ctxOf("bat", id)).state).toBe("CONFIRM");
@@ -400,7 +417,7 @@ describe("conversation edge cases (scripted agent)", () => {
 
   it("a rejected correction at the read-back is explained and the read-back stays open (not 'what would you like to change')", async () => {
     const id = await toCapture();
-    for (const say of ["6 hours", "4", "no", "120 over 80", "70", "36.6", "95", "2300 ml", "45 minutes", "sharp", "3", "nothing"]) {
+    for (const say of ["6 hours", ...SAID_AFTER_SLEEP]) {
       await playTurn("bat", id, say);
     }
     expect((await ctxOf("bat", id)).state).toBe("CONFIRM");
@@ -434,25 +451,25 @@ describe("conversation edge cases (scripted agent)", () => {
       const events = await playTurn("bat", id, "actually I slept 8 hours");
       expect(eventsOf(events, "clarification")).toEqual([]);
       expect(eventsOf(events, "measurement")).toEqual([]);
-      expect(eventsOf(events, "state")[0]).toMatchObject({ state: "KPI_CAPTURE", expectedQuestion: "mood" });
+      expect(eventsOf(events, "state")[0]).toMatchObject({ state: "KPI_CAPTURE", expectedQuestion: "blood_pressure" });
       expect(assistantText(events)).toMatch(/you can change that when we confirm/i);
-      expect(assistantText(events)).toContain("How is your mood");
+      expect(assistantText(events)).toContain("What is your blood pressure");
       expect(assistantText(events)).not.toMatch(/didn't catch/i);
       const ctx = await ctxOf("bat", id);
-      expect(ctx.clarifyCount.mood).toBeUndefined();
-      expect(ctx.skipped).toEqual([]);
+      expect(ctx.clarifyCount.blood_pressure).toBeUndefined();
+      expect(ctx.skipped).toEqual(["sensor_check"]);
     }
-    // the stored value is untouched, and mood is still answered normally
+    // the stored value is untouched, and the blood pressure is still answered normally
     expect((await listMeasurements("bat", id)).find((m) => m.key === "sleep_hours")?.value).toBe(7);
-    const mood = await playTurn("bat", id, "4");
-    expect(eventsOf(mood, "measurement")[0]).toMatchObject({ key: "mood", value: 4 });
+    const bp = await playTurn("bat", id, "120 over 80");
+    expect(eventsOf(bp, "measurement")[0]).toMatchObject({ key: "bp_systolic", value: 120 });
   });
 
   it("at the read-back the astronaut hears which skipped questions are still missing", async () => {
     const id = await toCapture();
     await playTurn("bat", id, "skip");
     let last: TurnEvent[] = [];
-    for (const say of ["4", "no", "120 over 80", "70", "36.6", "95", "2300 ml", "45 minutes", "sharp", "3", "nothing"]) {
+    for (const say of SAID_AFTER_SLEEP) {
       last = await playTurn("bat", id, say);
     }
     expect((await ctxOf("bat", id)).state).toBe("CONFIRM");

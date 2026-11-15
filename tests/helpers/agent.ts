@@ -68,6 +68,16 @@ export function toolContext(
   };
 }
 
+/**
+ * Answers to the six spoken questions of the redesigned check-in (mood, symptoms, sleep quality, energy, stress,
+ * feeling connected), all calm and in range. With the sensor feed off (setSensorFeedForTests(false)) the old
+ * measurement questions follow them: sleep, blood pressure, pulse, temperature, glucose, water, exercise.
+ */
+export const SPOKEN_ANSWERS: Record<"en" | "mn", string[]> = {
+  en: ["4", "no headache, no dizziness, no nausea", "4", "4", "2", "4"],
+  mn: ["дөрөв", "толгой өвдөхгүй, эргэхгүй, дотор муухайрахгүй", "дөрөв", "дөрөв", "хоёр", "дөрөв"],
+};
+
 /** SSE text -> events (one "data:" line per event, blank line between) */
 export function parseSse(body: string): TurnEvent[] {
   const events: TurnEvent[] = [];

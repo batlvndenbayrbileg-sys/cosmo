@@ -38,6 +38,8 @@ function suite(id: QuestionId, lang: Lang, rows: Row[]): void {
 }
 
 const NO_SYMPTOMS: Values = { symptom_headache: 0, symptom_dizziness: 0, symptom_nausea: 0 };
+/** a plain "no" to "any headache, dizziness, nausea or blurry vision?" also says the vision is clear */
+const NO_SYMPTOMS_CLEAR: Values = { ...NO_SYMPTOMS, vision_check: 0 };
 
 /* ───────────── sleep ───────────── */
 
@@ -165,11 +167,11 @@ describe("mood: edge cases", () => {
 /* ───────────── symptoms ───────────── */
 
 suite("symptoms", "en", [
-  ["No", NO_SYMPTOMS],
-  ["none", NO_SYMPTOMS],
-  ["No symptoms", NO_SYMPTOMS],
-  ["nothing at all", NO_SYMPTOMS],
-  ["no headache, dizziness or nausea", NO_SYMPTOMS],
+  ["No", NO_SYMPTOMS_CLEAR],
+  ["none", NO_SYMPTOMS_CLEAR],
+  ["No symptoms", NO_SYMPTOMS_CLEAR],
+  ["nothing at all", NO_SYMPTOMS_CLEAR],
+  ["no headache, dizziness or nausea", NO_SYMPTOMS_CLEAR],
   ["just a mild headache", { ...NO_SYMPTOMS, symptom_headache: 1 }],
   ["I feel dizzy and a bit nauseous", { ...NO_SYMPTOMS, symptom_dizziness: 1, symptom_nausea: 1 }],
   ["No headache but I feel nauseous", { ...NO_SYMPTOMS, symptom_nausea: 1 }],
@@ -180,13 +182,13 @@ suite("symptoms", "en", [
 ]);
 
 suite("symptoms", "mn", [
-  ["Үгүй", NO_SYMPTOMS],
-  ["байхгүй", NO_SYMPTOMS],
-  ["юу ч үгүй", NO_SYMPTOMS],
+  ["Үгүй", NO_SYMPTOMS_CLEAR],
+  ["байхгүй", NO_SYMPTOMS_CLEAR],
+  ["юу ч үгүй", NO_SYMPTOMS_CLEAR],
   ["Толгой өвдөж байна", { ...NO_SYMPTOMS, symptom_headache: 1 }],
   ["Толгой эргэж, дотор муухайрч байна", { ...NO_SYMPTOMS, symptom_dizziness: 1, symptom_nausea: 1 }],
-  ["Толгой өвдөхгүй, толгой эргэхгүй, дотор муухайрахгүй", NO_SYMPTOMS],
-  ["Толгой өвдөх, толгой эргэх, дотор муухайрах зүйл байхгүй", NO_SYMPTOMS],
+  ["Толгой өвдөхгүй, толгой эргэхгүй, дотор муухайрахгүй", NO_SYMPTOMS_CLEAR],
+  ["Толгой өвдөх, толгой эргэх, дотор муухайрах зүйл байхгүй", NO_SYMPTOMS_CLEAR],
   ["Толгой өвдөхгүй ч дотор муухайрч байна", { ...NO_SYMPTOMS, symptom_nausea: 1 }],
   ["Үгүй, харин жаахан толгой эргэж байна", { ...NO_SYMPTOMS, symptom_dizziness: 1 }],
 ]);
@@ -212,10 +214,10 @@ describe("symptoms: notes and unclear cases", () => {
   });
 
   it("a denied complaint is never a note (it must not raise the serious-word alert)", () => {
-    expect(valuesOf(run("symptoms", "no pain"))).toEqual(NO_SYMPTOMS);
-    expect(valuesOf(run("symptoms", "No, I don't have chest pain"))).toEqual(NO_SYMPTOMS);
+    expect(valuesOf(run("symptoms", "no pain"))).toEqual(NO_SYMPTOMS_CLEAR);
+    expect(valuesOf(run("symptoms", "No, I don't have chest pain"))).toEqual(NO_SYMPTOMS_CLEAR);
     expect(valuesOf(run("symptoms", "headache, but no chest pain"))).toEqual({ ...NO_SYMPTOMS, symptom_headache: 1 });
-    expect(valuesOf(run("symptoms", "Цээж өвдөхгүй", "mn"))).toEqual(NO_SYMPTOMS);
+    expect(valuesOf(run("symptoms", "Цээж өвдөхгүй", "mn"))).toEqual(NO_SYMPTOMS_CLEAR);
   });
 
   it("keeps a Mongolian note", () => {
@@ -1195,12 +1197,19 @@ describe("review: opportunistic extraction never reads small talk as a duration"
   it.each([
     "I fell asleep around 11",
     "I went to sleep at 11",
-    "sleep quality 3",
     "I did exercise 2 times",
     "I slept 6",
     "water 2",
   ])("%s -> nothing", (text) => {
     expect(pairs(text)).toEqual([]);
+  });
+
+  it("'sleep quality 3' is the wellbeing answer, never 3 hours of sleep", () => {
+    expect(pairs("sleep quality 3")).toEqual([["sleep_quality", 3]]);
+    expect(pairs("my stress is 4 and energy 2")).toEqual([
+      ["stress", 4],
+      ["energy", 2],
+    ]);
   });
 
   it("drops a key spoken with two different values", () => {

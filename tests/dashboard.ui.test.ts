@@ -21,6 +21,7 @@ import {
   axisIndicators,
   axisKeys,
   buildKpiCards,
+  wellbeingSummary,
   buildTimeline,
   cycleAxis,
   demoTarget,
@@ -138,11 +139,11 @@ describe("values and units", () => {
 });
 
 describe("vital card grouping", () => {
-  it("collapses blood pressure and symptoms into one card each (crew viewer)", () => {
+  it("collapses blood pressure, symptoms and the wellbeing check into one card each (crew viewer)", () => {
     const cards = buildKpiCards(batYellow.kpis, "crew");
     expect(cards.map((c) => c.id)).toEqual([
       "sleep_hours",
-      "mood",
+      "wellbeing",
       "symptoms",
       "bp",
       "heart_rate",
@@ -153,7 +154,11 @@ describe("vital card grouping", () => {
       "vision_check",
       "workload",
       "day_note",
+      "sensor_note",
     ]);
+    const wellbeing = cards.find((c) => c.id === "wellbeing");
+    expect(wellbeing).toMatchObject({ kind: "wellbeing", keys: ["mood", "sleep_quality", "energy", "stress", "connection"] });
+    expect(wellbeingSummary(new Map(batYellow.kpis.map((k) => [k.key, k])))).toEqual({ status: "green", flagged: [] });
     const bp = cards.find((c) => c.id === "bp");
     expect(bp?.keys).toEqual(["bp_systolic", "bp_diastolic"]);
     const symptoms = cards.find((c) => c.id === "symptoms");
@@ -212,9 +217,9 @@ describe("hazard to card mapping", () => {
 
   it("sorts related cards first and keeps the original order inside each group", () => {
     const sorted = sortCardsForHazard(cards, hazard("isolation_confinement"));
-    expect(sorted.map((c) => c.id).slice(0, 3)).toEqual(["sleep_hours", "mood", "workload"]);
+    expect(sorted.map((c) => c.id).slice(0, 3)).toEqual(["sleep_hours", "wellbeing", "workload"]);
     const rest = sorted.slice(3).map((c) => c.id);
-    expect(rest).toEqual(cards.map((c) => c.id).filter((id) => !["sleep_hours", "mood", "workload"].includes(id)));
+    expect(rest).toEqual(cards.map((c) => c.id).filter((id) => !["sleep_hours", "wellbeing", "workload"].includes(id)));
   });
 
   it("changes nothing without a hazard or for a hazard nothing is linked to", () => {
@@ -669,7 +674,7 @@ describe("body map helpers", () => {
 
   it("maps each axis to its indicators and its most linked NASA hazard", () => {
     expect(axisKeys("cardio")).toEqual(["bp_systolic", "bp_diastolic", "heart_rate"]);
-    expect(axisKeys("sleep")).toEqual(["sleep_hours"]);
+    expect(axisKeys("sleep")).toEqual(["sleep_hours", "sleep_quality", "energy"]);
     expect(axisHazard("sleep")).toBe("isolation_confinement");
     expect(axisHazard("cardio")).toBe("gravity");
     expect(axisHazard("metabolic")).toBe("hostile_closed_environment");

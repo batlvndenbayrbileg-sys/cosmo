@@ -7,7 +7,8 @@ import { asksToSee, decideShow, showEvent, showTopics, type ShowInput } from "@/
 import { parseTurnEvent } from "@/components/checkin/sse";
 import { checkInReducer, initialCheckInState } from "@/components/checkin/state";
 import { setClockForTests } from "@/server/clock";
-import { eventsOf, playTurn, startCheckIn } from "./helpers/agent";
+import { setSensorFeedForTests } from "@/server/checkin/sensors";
+import { SPOKEN_ANSWERS, eventsOf, playTurn, startCheckIn } from "./helpers/agent";
 import { TEST_TODAY, freshSeededDb } from "./helpers/db";
 
 /** 14 confirmed past days with gently varying values (oldest first) */
@@ -283,13 +284,21 @@ describe("drawing helpers", () => {
 /* ───────────── through the real turn pipeline ───────────── */
 
 describe("the turn pipeline emits the show event", () => {
+  // the sleep question is asked only without a sensor feed (with one, the watch logs the hours)
   beforeEach(async () => {
     setClockForTests(TEST_TODAY);
+    setSensorFeedForTests(false);
     await freshSeededDb();
   });
-  afterEach(() => setClockForTests(null));
+  afterEach(() => {
+    setClockForTests(null);
+    setSensorFeedForTests(null);
+  });
 
-  const START: Record<Lang, string[]> = { en: ["Hi Cosmo", "let's start"], mn: ["Сайн уу", "эхэлье"] };
+  const START: Record<Lang, string[]> = {
+    en: ["Hi Cosmo", "let's start", ...SPOKEN_ANSWERS.en],
+    mn: ["Сайн уу", "эхэлье", ...SPOKEN_ANSWERS.mn],
+  };
   const SLEEP: Record<Lang, string> = { en: "6.5 hours", mn: "6 цаг хагас" };
   const ASK: Record<Lang, string> = { en: "How did I sleep over the past two weeks?", mn: "Сүүлийн 14 хоногийн нойр ямар байна?" };
 

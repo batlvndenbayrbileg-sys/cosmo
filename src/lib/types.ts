@@ -29,6 +29,13 @@ export const KPI_KEYS = [
   "vision_check",
   "workload",
   "day_note",
+  // wellbeing check (docs/research/checkin-nasa.md): asked, never sensed
+  "sleep_quality",
+  "energy",
+  "stress",
+  "connection",
+  // what the astronaut said about a sensor reading that looked unusual
+  "sensor_note",
 ] as const;
 export type KpiKey = (typeof KPI_KEYS)[number];
 
@@ -45,6 +52,11 @@ export const QUESTION_IDS = [
   "vision",
   "workload",
   "day_note",
+  "sensor_check",
+  "sleep_quality",
+  "energy",
+  "stress",
+  "connection",
 ] as const;
 export type QuestionId = (typeof QUESTION_IDS)[number];
 
@@ -56,7 +68,12 @@ export type ValueType = "number" | "integer" | "boolean" | "scale" | "category" 
 /** value as stored/transported: booleans are 0 | 1, text keys are strings */
 export type MeasurementValue = number | string;
 
-export type MeasurementSource = "typed" | "voice" | "simulated";
+/**
+ * typed / voice: the astronaut said or typed it; simulated: scripted demo input; sensor: filled from the (simulated)
+ * wearable and device feed for the day (src/lib/sensors), never asked (stored as "simulated" with a tag, see
+ * src/server/db/repos/measurement.ts, so the database CHECK constraint does not change)
+ */
+export type MeasurementSource = "typed" | "voice" | "simulated" | "sensor";
 
 /* ───────────── status model (docs/DASHBOARD_PLAN.md §2) ───────────── */
 
@@ -119,6 +136,16 @@ export interface QuestionDef {
   /** optional questions may be skipped without clarification loops */
   optional: boolean;
   prompts: Bilingual;
+  /**
+   * How the value is normally obtained (docs/research/checkin-nasa.md):
+   *  - "ask": a spoken question in the daily check-in (what no sensor can know);
+   *  - "sensor": filled from the day's wearable / device feed, asked only when the feed has no value;
+   *  - "volunteer": never asked by the cursor, but taken when the astronaut says it ("my workload was heavy").
+   * Absent = "ask".
+   */
+  capture?: "ask" | "sensor" | "volunteer";
+  /** part of the short wellbeing (mental-health) check */
+  wellbeing?: boolean;
 }
 
 /* ───────────── crew / check-in ───────────── */

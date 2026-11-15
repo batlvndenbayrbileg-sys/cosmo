@@ -5,6 +5,9 @@ import {
   KPI_DEFS,
   NUMERIC_KEYS,
   QUESTIONS,
+  SENSOR_KEYS,
+  SPOKEN_QUESTIONS,
+  WELLBEING_KEYS,
   formatValue,
   getKpi,
   getQuestion,
@@ -20,15 +23,51 @@ describe("registry: shape", () => {
     for (const key of KPI_KEYS) expect(getKpi(key).key).toBe(key);
   });
 
-  it("has 12 questions in the documented order", () => {
-    expect(QUESTIONS).toHaveLength(12);
-    expect(QUESTIONS.map((q) => q.id)).toEqual([...QUESTION_IDS]);
-    expect(QUESTIONS.map((q) => q.order)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
-    expect(QUESTIONS.map((q) => q.slot)).toEqual([
-      "morning", "morning", "morning", "morning", "morning", "morning",
-      "midday", "midday", "afternoon", "afternoon", "evening", "evening",
+  it("has the redesigned questions in spoken order: what only the person knows first, sensor values last", () => {
+    // docs/research/checkin-nasa.md: the sensor follow-up (only when a reading looks unusual), six spoken questions,
+    // then the values a wearable or station device provides (asked only without a feed), then volunteered-only ones
+    expect(QUESTIONS.map((q) => q.id)).toEqual([
+      "sensor_check",
+      "mood",
+      "symptoms",
+      "sleep_quality",
+      "energy",
+      "stress",
+      "connection",
+      "sleep",
+      "blood_pressure",
+      "heart_rate",
+      "temperature",
+      "glucose",
+      "water",
+      "exercise",
+      "vision",
+      "workload",
+      "day_note",
     ]);
+    expect([...QUESTIONS.map((q) => q.id)].sort()).toEqual([...QUESTION_IDS].sort());
+    expect(QUESTIONS.map((q) => q.order)).toEqual(QUESTIONS.map((_, i) => i + 1));
+    expect(SPOKEN_QUESTIONS.map((q) => q.id)).toEqual(["sensor_check", "mood", "symptoms", "sleep_quality", "energy", "stress", "connection"]);
+    // at most six questions are spoken, plus the follow-up when a sensor reading is unusual
+    expect(SPOKEN_QUESTIONS.filter((q) => q.id !== "sensor_check")).toHaveLength(6);
+    expect(QUESTIONS.filter((q) => q.capture === "sensor").map((q) => q.id)).toEqual([
+      "sleep", "blood_pressure", "heart_rate", "temperature", "glucose", "water", "exercise",
+    ]);
+    expect(QUESTIONS.filter((q) => q.capture === "volunteer").map((q) => q.id)).toEqual(["vision", "workload", "day_note"]);
+    expect(WELLBEING_KEYS).toEqual(["mood", "sleep_quality", "energy", "stress", "connection"]);
     expect(getQuestion("vision").id).toBe("vision");
+  });
+
+  it("asks the wellbeing check in plain words with a 1-5 scale in both languages, never a number to look up", () => {
+    for (const id of ["mood", "sleep_quality", "energy", "stress", "connection"] as const) {
+      const q = getQuestion(id);
+      expect(q.wellbeing).toBe(true);
+      expect(q.prompts.en).toMatch(/1.*5/u);
+      expect(q.prompts.mn).toMatch(/1.*5/u);
+      expect(KPI_DEFS[q.keys[0]]).toMatchObject({ type: "scale", min: 1, max: 5 });
+    }
+    // a low answer is a gentle "watch", never a red alert of its own (mood keeps its existing rules)
+    for (const key of ["sleep_quality", "energy", "stress", "connection"] as const) expect(KPI_DEFS[key].maxLevel).toBe("yellow");
   });
 
   it("covers every key with exactly one question, and each key names that question", () => {
@@ -45,10 +84,11 @@ describe("registry: shape", () => {
     }
   });
 
-  it("splits the keys into 14 non-text keys and 2 text keys", () => {
-    expect(NUMERIC_KEYS).toHaveLength(14);
+  it("splits the keys into 18 non-text keys and 3 text keys", () => {
+    expect(NUMERIC_KEYS).toHaveLength(18);
     expect(NUMERIC_KEYS).not.toContain("symptom_note");
     expect(NUMERIC_KEYS).not.toContain("day_note");
+    expect(NUMERIC_KEYS).not.toContain("sensor_note");
     expect(CHECKIN_TARGET_KEYS).toEqual(NUMERIC_KEYS);
   });
 
@@ -240,30 +280,46 @@ describe("registry: formatValue and rangeText", () => {
 });
 
 describe("registry: question flow", () => {
-  it("starts at sleep and walks the questions in order as keys get filled", () => {
+  it("starts at the sensor follow-up and walks the asked and sensor questions in order; volunteered ones are never asked", () => {
     const filled = new Set<KpiKey>();
     const skipped = new Set<QuestionId>();
     const order: QuestionId[] = [];
-    for (let guard = 0; guard < 20; guard++) {
+    for (let guard = 0; guard < 30; guard++) {
       const q = nextQuestion(filled, skipped);
       if (!q) break;
       order.push(q.id);
-      // answering a question fills its required keys
-      for (const k of q.keys) if (k !== "symptom_note" && k !== "day_note") filled.add(k);
-      if (q.id === "day_note") skipped.add(q.id);
+      // answering a question fills its required keys; the optional sensor follow-up is answered with "no"
+      for (const k of q.keys) if (k !== "symptom_note" && k !== "day_note" && k !== "sensor_note") filled.add(k);
+      if (q.id === "sensor_check") skipped.add(q.id);
     }
-    expect(order).toEqual([...QUESTION_IDS]);
+    expect(order).toEqual([
+      "sensor_check", "mood", "symptoms", "sleep_quality", "energy", "stress", "connection",
+      "sleep", "blood_pressure", "heart_rate", "temperature", "glucose", "water", "exercise",
+    ]);
     expect(nextQuestion(filled, skipped)).toBeNull();
+  });
+
+  it("with the sensor values filled and nothing unusual, only the six spoken questions are asked", () => {
+    const filled = new Set<KpiKey>(SENSOR_KEYS);
+    const skipped = new Set<QuestionId>(["sensor_check"]);
+    const order: QuestionId[] = [];
+    for (let guard = 0; guard < 30; guard++) {
+      const q = nextQuestion(filled, skipped);
+      if (!q) break;
+      order.push(q.id);
+      for (const k of q.keys) if (k !== "symptom_note") filled.add(k);
+    }
+    expect(order).toEqual(["mood", "symptoms", "sleep_quality", "energy", "stress", "connection"]);
   });
 
   it("skips questions whose keys are all filled", () => {
     const filled = new Set<KpiKey>(["sleep_hours", "mood"]);
-    expect(nextQuestion(filled, new Set())?.id).toBe("symptoms");
+    expect(nextQuestion(filled, new Set<QuestionId>(["sensor_check"]))?.id).toBe("symptoms");
   });
 
   it("skips explicitly skipped questions", () => {
     const filled = new Set<KpiKey>(["sleep_hours"]);
-    expect(nextQuestion(filled, new Set<QuestionId>(["mood"]))?.id).toBe("symptoms");
+    expect(nextQuestion(filled, new Set<QuestionId>(["sensor_check", "mood"]))?.id).toBe("symptoms");
   });
 
   it("does not require the optional symptom note", () => {
@@ -278,10 +334,11 @@ describe("registry: question flow", () => {
     expect(questionFilled(q, new Set<KpiKey>(["bp_systolic", "bp_diastolic"]))).toBe(true);
   });
 
-  it("never blocks on the optional day note: a skip ends the flow", () => {
-    const filled = new Set<KpiKey>(KPI_KEYS.filter((k) => k !== "day_note" && k !== "symptom_note"));
-    expect(nextQuestion(filled, new Set())?.id).toBe("day_note");
-    expect(nextQuestion(filled, new Set<QuestionId>(["day_note"]))).toBeNull();
+  it("never asks the volunteered-only questions (vision, workload, day note); the optional follow-up never blocks", () => {
+    const left = ["day_note", "symptom_note", "sensor_note", "vision_check", "workload"];
+    const filled = new Set<KpiKey>(KPI_KEYS.filter((k) => !left.includes(k)));
+    expect(nextQuestion(filled, new Set())?.id).toBe("sensor_check");
+    expect(nextQuestion(filled, new Set<QuestionId>(["sensor_check"]))).toBeNull();
     expect(questionFilled(getQuestion("day_note"), new Set<KpiKey>(["day_note"]))).toBe(true);
   });
 

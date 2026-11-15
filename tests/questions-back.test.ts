@@ -76,10 +76,11 @@ describe("questions back: live flow (rules only)", () => {
     for (const line of ["fine", "let's start"]) await playTurn("alex", id, line);
     const before = await ctxOf("alex", id);
     expect(before.state).toBe("KPI_CAPTURE");
-    await playTurn("alex", id, "seven hours");
+    // Alex's sensors show a higher blood pressure: the follow-up comes first; "nothing special" moves on to the mood
+    await playTurn("alex", id, "no, nothing special");
     const ev = await playTurn("alex", id, "How many hours should I sleep?");
     expect(assistantText(ev)).toMatch(/sleep of ≥ 7 h counts as normal/i);
-    expect(assistantText(ev)).toMatch(/mood/i);
+    expect(assistantText(ev)).toMatch(/how are you feeling today, from 1 to 5\?$/i);
   });
 
   it("'what does my blood panel mean?' mid check-in is answered by Signature Triage, then the open question again", async () => {
@@ -88,7 +89,8 @@ describe("questions back: live flow (rules only)", () => {
     const ev = await playTurn("alex", id, "What does my blood panel mean?");
     const text = assistantText(ev);
     expect(text).toMatch(/Decision support, not a diagnosis\./);
-    expect(text).toMatch(/How many hours did you sleep\?$/);
+    // the open question is the sensor follow-up (Alex's blood pressure reads higher than usual)
+    expect(text).toMatch(/Did you exercise, or are you feeling stressed or unwell\?$/);
     expect((await ctxOf("alex", id)).state).toBe("KPI_CAPTURE");
   });
 

@@ -201,7 +201,7 @@ export function DashboardView({ payload, viewer, dockSlot, dockOpen }: Dashboard
           </section>
           <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:min-h-0 lg:auto-rows-[minmax(0,1fr)] lg:grid-flow-row-dense lg:grid-cols-4 lg:gap-[clamp(8px,1.2vh,14px)]">
             {ordered.map((card) => (
-              <li key={card.id} className={cn("min-h-0 min-w-0", (card.kind === "bp" || card.kind === "symptoms") && "lg:row-span-2")}>
+              <li key={card.id} className={cn("min-h-0 min-w-0", (card.kind === "bp" || card.kind === "symptoms" || card.kind === "wellbeing") && "lg:row-span-2")}>
                 <KpiCard card={card} byKey={byKey} viewer={viewer} highlighted={related.has(card.id)} compact />
               </li>
             ))}

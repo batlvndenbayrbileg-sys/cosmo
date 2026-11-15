@@ -336,10 +336,17 @@ describe("machine: the companion flag", () => {
   });
 
   it("leaving resumes the same question, the read-back, the dashboard, or proposes the measurements", () => {
-    const capture = ctxIn("KPI_CAPTURE", { filled: ["sleep_hours"], companion: true, companionTurns: 2, clarifyCount: { mood: 1 } });
+    // the sensor follow-up was skipped (nothing unusual) and the mood is answered: the symptom question is open
+    const capture = ctxIn("KPI_CAPTURE", {
+      filled: ["mood"],
+      skipped: ["sensor_check"],
+      companion: true,
+      companionTurns: 2,
+      clarifyCount: { symptoms: 1 },
+    });
     const left = transition(capture, { type: "COMPANION_LEAVE" });
     expect(left.ctx).toEqual({ ...capture, companion: false, companionTurns: 0 });
-    expect(left.effects).toEqual([{ type: "reply", kind: "companionLeave", resume: "question", question: "mood" }]);
+    expect(left.effects).toEqual([{ type: "reply", kind: "companionLeave", resume: "question", question: "symptoms" }]);
 
     expect(transition(ctxIn("CONFIRM", { companion: true }), { type: "COMPANION_LEAVE" }).effects[0]).toMatchObject({ resume: "readBack" });
     expect(transition(ctxIn("DONE", { companion: true }), { type: "COMPANION_LEAVE" }).effects[0]).toMatchObject({ resume: "dashboard" });

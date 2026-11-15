@@ -68,6 +68,34 @@ export interface MachineCtx {
   assistantOffer: AssistantOffer | null;
   /** turns of friend talk inside assistant mode (varies the offline replies) */
   assistantTalkTurns: number;
+  /**
+   * The day's sensor feed (src/lib/sensors, src/server/checkin/sensors.ts): null until it has been read into this
+   * check-in, then which keys it filled and which readings looked unusual (said before the first question).
+   */
+  sensor: SensorState | null;
+  /**
+   * Keys whose stored value came from the sensor feed (reconciled from the database at the start of every turn, like
+   * `filled`): a value the astronaut says for one of these replaces the sensor reading instead of being "already recorded".
+   */
+  sensorFilled: KpiKey[];
+}
+
+/** a sensor reading outside the demo range or the person's own usual band */
+export interface SensorFlag {
+  key: KpiKey;
+  value: number;
+  /** the person's 14-day mean, null without a baseline */
+  usual: number | null;
+  direction: "high" | "low";
+}
+
+export interface SensorState {
+  /** the keys the feed filled in this check-in */
+  keys: KpiKey[];
+  /** unusual readings, most notable first (at most a few) */
+  flagged: SensorFlag[];
+  /** true when one of the flagged readings is a body reading worth a follow-up question (sensor_check) */
+  ask: boolean;
 }
 
 /** what assistant mode asked the astronaut to confirm */
@@ -148,6 +176,8 @@ export type Effect =
       resume?: ResumePoint;
       /** crisis: what was heard */
       crisis?: CrisisKind;
+      /** ask: the first question of the check-in (Cosmo first says what the sensors already logged) */
+      intro?: boolean;
     }
   | { type: "computeSummary" }
   | { type: "refused"; reason: "done" | "illegal_state" };
@@ -173,7 +203,31 @@ export function initialCtx(): MachineCtx {
     assistant: false,
     assistantOffer: null,
     assistantTalkTurns: 0,
+    sensor: null,
+    sensorFilled: [],
   };
+}
+
+function parseSensor(v: unknown): SensorState | null {
+  if (typeof v !== "object" || v === null) return null;
+  const o = v as Record<string, unknown>;
+  if (!Array.isArray(o.keys)) return null;
+  const keys = o.keys.filter((k): k is KpiKey => typeof k === "string" && KEY_SET.has(k));
+  const flagged: SensorFlag[] = [];
+  for (const f of Array.isArray(o.flagged) ? (o.flagged as unknown[]) : []) {
+    if (typeof f !== "object" || f === null) continue;
+    const x = f as Record<string, unknown>;
+    if (typeof x.key !== "string" || !KEY_SET.has(x.key)) continue;
+    if (typeof x.value !== "number" || !Number.isFinite(x.value)) continue;
+    if (x.direction !== "high" && x.direction !== "low") continue;
+    flagged.push({
+      key: x.key as KpiKey,
+      value: x.value,
+      usual: typeof x.usual === "number" && Number.isFinite(x.usual) ? x.usual : null,
+      direction: x.direction,
+    });
+  }
+  return { keys, flagged, ask: o.ask === true };
 }
 
 function parseOffer(v: unknown): AssistantOffer | null {
@@ -251,6 +305,11 @@ export function parseCtx(state: ConversationState, json: string | null | undefin
   if (typeof o.assistantTalkTurns === "number" && Number.isFinite(o.assistantTalkTurns) && o.assistantTalkTurns >= 0) {
     ctx.assistantTalkTurns = Math.trunc(o.assistantTalkTurns);
   }
+  // the sensor feed (absent in contexts written before it existed: not read yet)
+  ctx.sensor = parseSensor(o.sensor);
+  if (Array.isArray(o.sensorFilled)) {
+    ctx.sensorFilled = o.sensorFilled.filter((k): k is KpiKey => typeof k === "string" && KEY_SET.has(k));
+  }
   return ctx;
 }
 
@@ -293,7 +352,7 @@ function reply(effect: Omit<Extract<Effect, { type: "reply" }>, "type">): Effect
 }
 
 /** the next step after something was filled or skipped: ask the cursor question, or move on to the read-back */
-function advance(ctx: MachineCtx, extra: { keys?: KpiKey[]; skippedQuestion?: QuestionId }): TransitionResult {
+function advance(ctx: MachineCtx, extra: { keys?: KpiKey[]; skippedQuestion?: QuestionId; intro?: boolean }): TransitionResult {
   const next = cursorQuestion(ctx);
   if (next === null) {
     return {
@@ -303,7 +362,7 @@ function advance(ctx: MachineCtx, extra: { keys?: KpiKey[]; skippedQuestion?: Qu
   }
   return {
     ctx: { ...ctx, state: "KPI_CAPTURE" },
-    effects: [reply({ kind: "ask", question: next, keys: extra.keys, skippedQuestion: extra.skippedQuestion })],
+    effects: [reply({ kind: "ask", question: next, keys: extra.keys, skippedQuestion: extra.skippedQuestion, intro: extra.intro })],
   };
 }
 
@@ -439,9 +498,9 @@ function fromSmallTalk(ctx: MachineCtx, event: MachineEvent): TransitionResult {
           return { ctx: { ...ctx, smallTalkTurns: turns }, effects: [reply({ kind: "proposeAgain" })] };
         }
         // yes, or anything that is not an explicit refusal, moves on
-        return advance({ ...ctx, smallTalkTurns: turns }, {});
+        return advance({ ...ctx, smallTalkTurns: turns }, { intro: true });
       }
-      if (event.start === "yes") return advance({ ...ctx, smallTalkTurns: turns }, {});
+      if (event.start === "yes") return advance({ ...ctx, smallTalkTurns: turns }, { intro: true });
       if (turns >= SMALL_TALK_TURNS) {
         return {
           ctx: { ...ctx, smallTalkTurns: turns, proposed: true },

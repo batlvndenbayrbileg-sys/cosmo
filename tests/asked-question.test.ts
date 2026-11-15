@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { Lang, TurnEvent } from "@/lib/types";
 import { setClockForTests } from "@/server/clock";
+import { setSensorFeedForTests } from "@/server/checkin/sensors";
 import { askedQuestionReply, isSaneAskedAnswer } from "@/server/agent/turn";
-import { assistantText, ctxOf, eventsOf, playTurn, startCheckIn } from "./helpers/agent";
+import { SPOKEN_ANSWERS, assistantText, ctxOf, eventsOf, playTurn, startCheckIn } from "./helpers/agent";
 import { TEST_TODAY, freshSeededDb } from "./helpers/db";
 
 /**
@@ -12,14 +13,19 @@ import { TEST_TODAY, freshSeededDb } from "./helpers/db";
  */
 
 beforeEach(async () => {
+  // these walk to a measurement question, asked only without a sensor feed (a crew member without a wearable)
+  setSensorFeedForTests(false);
   setClockForTests(TEST_TODAY);
   await freshSeededDb();
 });
-afterEach(() => setClockForTests(null));
+afterEach(() => {
+  setClockForTests(null);
+  setSensorFeedForTests(null);
+});
 
 const TO_GLUCOSE: Record<Lang, string[]> = {
-  en: ["Hi Cosmo", "let's start", "6.5 hours", "4", "no headache, no dizziness, no nausea", "124 over 82", "68", "36.7"],
-  mn: ["Сайн уу", "эхэлье", "6 цаг хагас", "дөрөв", "толгой өвдөхгүй, эргэхгүй, дотор муухайрахгүй", "124 дээр 82", "68", "36.7"],
+  en: ["Hi Cosmo", "let's start", ...SPOKEN_ANSWERS.en, "6.5 hours", "124 over 82", "68", "36.7"],
+  mn: ["Сайн уу", "эхэлье", ...SPOKEN_ANSWERS.mn, "6 цаг хагас", "124 дээр 82", "68", "36.7"],
 };
 
 async function atGlucose(lang: Lang): Promise<string> {

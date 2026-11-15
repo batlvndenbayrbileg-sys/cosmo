@@ -17,8 +17,8 @@ export const VITAL_RED_KEYS: KpiKey[] = [
   "glucose_mgdl",
 ];
 
-/** the two free-text keys scanned for serious words */
-export const NOTE_KEYS: KpiKey[] = ["symptom_note", "day_note"];
+/** the free-text keys scanned for serious words (the sensor note too: "I had chest pain on the treadmill") */
+export const NOTE_KEYS: KpiKey[] = ["symptom_note", "day_note", "sensor_note"];
 
 /** editable keyword lists (lower case). English words match whole words; Mongolian stems match as substrings. */
 export const SERIOUS_WORDS_EN: string[] = [

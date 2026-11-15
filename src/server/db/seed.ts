@@ -45,6 +45,26 @@ export const SEED_KEYS = [
 ] as const satisfies readonly KpiKey[];
 export type SeedKey = (typeof SEED_KEYS)[number];
 
+/**
+ * The wellbeing check's keys (docs/research/checkin-nasa.md), seeded every day too so their baselines exist. They are
+ * drawn from their own random stream, so the values of SEED_KEYS above are exactly what they were before.
+ */
+export const SEED_WELLBEING_KEYS = ["sleep_quality", "energy", "stress", "connection"] as const satisfies readonly KpiKey[];
+export type SeedWellbeingKey = (typeof SEED_WELLBEING_KEYS)[number];
+
+/** usual level and spread per crew member (1-5 scales; stress: higher = more stressed) */
+const WELLBEING_SPEC: Readonly<Record<string, Record<SeedWellbeingKey, { mean: number; sd: number }>>> = {
+  bat: { sleep_quality: { mean: 3.9, sd: 0.5 }, energy: { mean: 3.8, sd: 0.5 }, stress: { mean: 2.3, sd: 0.5 }, connection: { mean: 4, sd: 0.4 } },
+  saraa: { sleep_quality: { mean: 4.2, sd: 0.4 }, energy: { mean: 4.1, sd: 0.4 }, stress: { mean: 1.9, sd: 0.4 }, connection: { mean: 4.3, sd: 0.4 } },
+  alex: { sleep_quality: { mean: 3.8, sd: 0.5 }, energy: { mean: 3.7, sd: 0.5 }, stress: { mean: 2.6, sd: 0.5 }, connection: { mean: 3.9, sd: 0.4 } },
+  mira: { sleep_quality: { mean: 4, sd: 0.4 }, energy: { mean: 3.9, sd: 0.4 }, stress: { mean: 2.2, sd: 0.4 }, connection: { mean: 4.1, sd: 0.4 } },
+};
+
+/** the last seeded day sits at the person's usual level on the wellbeing check (it must keep evaluating as it did before) */
+function calmWellbeing(spec: { mean: number }): number {
+  return Math.round(spec.mean);
+}
+
 const UNITS: Record<SeedKey, string | null> = {
   sleep_hours: "h",
   mood: null,
@@ -277,7 +297,25 @@ interface SeedDay {
   /** 0 = oldest of the 14 days, 13 = yesterday */
   index: number;
   values: Record<SeedKey, number>;
+  wellbeing: Record<SeedWellbeingKey, number>;
   note: string | null;
+}
+
+/** the wellbeing answers of the 14 days, from their own stream (standardised like the continuous keys) */
+function generateWellbeing(p: Profile): Array<Record<SeedWellbeingKey, number>> {
+  const rng = mulberry32(hashSeed(`${p.avatarSeed}:wellbeing`));
+  const spec = WELLBEING_SPEC[p.id] ?? WELLBEING_SPEC.bat;
+  const z = {} as Record<SeedWellbeingKey, number[]>;
+  for (const key of SEED_WELLBEING_KEYS) z[key] = standardise(Array.from({ length: SEED_DAYS }, () => gaussian(rng)));
+  return Array.from({ length: SEED_DAYS }, (_, i) => {
+    const out = {} as Record<SeedWellbeingKey, number>;
+    for (const key of SEED_WELLBEING_KEYS) {
+      let v = Math.min(5, Math.max(1, Math.round(spec[key].mean + spec[key].sd * z[key][i])));
+      if (i === SEED_DAYS - 1) v = calmWellbeing(spec[key]);
+      out[key] = v;
+    }
+    return out;
+  });
 }
 
 /** Pure and deterministic: depends only on the profile. */
@@ -294,6 +332,7 @@ function generateDays(p: Profile): SeedDay[] {
   while (noteDays.size < 3) noteDays.add(Math.floor(rng() * (SEED_DAYS - 1)));
   const noteChoice = Array.from({ length: SEED_DAYS }, () => Math.floor(rng() * NOTES[p.preferredLanguage].length));
 
+  const wellbeing = generateWellbeing(p);
   const days: SeedDay[] = [];
   for (let i = 0; i < SEED_DAYS; i++) {
     const values = {} as Record<SeedKey, number>;
@@ -331,6 +370,7 @@ function generateDays(p: Profile): SeedDay[] {
     days.push({
       index: i,
       values,
+      wellbeing: wellbeing[i],
       note: noteDays.has(i) ? NOTES[p.preferredLanguage][noteChoice[i]] : null,
     });
   }
@@ -440,12 +480,16 @@ export async function seedDatabase(db: Db, opts: SeedOptions = {}): Promise<Seed
         measurementRows.push([`${checkInId}:${key}`, checkInId, profile.id, key, day.values[key], null, UNITS[key], at()]);
         result.measurements += 1;
       }
+      for (const key of SEED_WELLBEING_KEYS) {
+        measurementRows.push([`${checkInId}:${key}`, checkInId, profile.id, key, day.wellbeing[key], null, null, at()]);
+        result.measurements += 1;
+      }
       if (day.note !== null) {
         measurementRows.push([`${checkInId}:day_note`, checkInId, profile.id, "day_note", null, day.note, null, at()]);
         result.measurements += 1;
       }
 
-      const values: HistoryDay["values"] = { ...day.values };
+      const values: HistoryDay["values"] = { ...day.values, ...day.wellbeing };
       if (day.note !== null) values.day_note = day.note;
 
       if (day.index === SEED_DAYS - 1) {

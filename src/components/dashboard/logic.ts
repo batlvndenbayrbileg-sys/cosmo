@@ -20,7 +20,7 @@ import type {
   Task,
 } from "@/lib/types";
 import { KPI_KEYS } from "@/lib/types";
-import { KPI_DEFS, asNumber, formatValue } from "@/lib/kpi/registry";
+import { KPI_DEFS, WELLBEING_KEYS, asNumber, formatValue } from "@/lib/kpi/registry";
 import { formatNumber } from "@/lib/health/format";
 import { MIN_AXES_FOR_READINESS, computeOverall } from "@/lib/health/scores";
 import { computeBaselines, type HistoryDay } from "@/lib/health/baseline";
@@ -159,11 +159,11 @@ export function statusColorVar(status: Status): string {
 
 /* ───────────── vital cards: BP and symptoms collapse into one card each ───────────── */
 
-export type KpiCardId = KpiKey | "bp" | "symptoms";
+export type KpiCardId = KpiKey | "bp" | "symptoms" | "wellbeing";
 
 export interface KpiCardModel {
   id: KpiCardId;
-  kind: "single" | "bp" | "symptoms" | "note";
+  kind: "single" | "bp" | "symptoms" | "note" | "wellbeing";
   /** the numeric/boolean keys shown on the card (hazard mapping looks at these) */
   keys: KpiKey[];
   /** free-text key shown on the card for the crew viewer only */
@@ -200,6 +200,11 @@ export function buildKpiCards(kpis: readonly KpiStat[], viewer: Viewer): KpiCard
       });
     } else if (key === "bp_diastolic") {
       continue; // folded into the blood-pressure card
+    } else if (key === "mood") {
+      // the short wellbeing check: mood, sleep quality, energy, stress, feeling connected
+      cards.push({ id: "wellbeing", kind: "wellbeing", keys: WELLBEING_KEYS.filter((k) => present.has(k)), noteKey: null });
+    } else if (WELLBEING_KEYS.includes(key)) {
+      continue; // folded into the wellbeing card
     } else if (KPI_DEFS[key].type === "text") {
       if (viewer === "ground") continue; // day_note: never shown to ground
       cards.push({ id: key, kind: "note", keys: [key], noteKey: null });
@@ -208,6 +213,16 @@ export function buildKpiCards(kpis: readonly KpiStat[], viewer: Viewer): KpiCard
     }
   }
   return cards;
+}
+
+/**
+ * The wellbeing check at a glance: its worst status and the items worth a look (yellow / red), in question order.
+ * no_data when nothing was answered.
+ */
+export function wellbeingSummary(byKey: ReadonlyMap<KpiKey, KpiStat>): { status: Status; flagged: KpiKey[] } {
+  const stats = WELLBEING_KEYS.map((k) => byKey.get(k)).filter((s): s is KpiStat => s !== undefined);
+  const flagged = stats.filter((s) => s.status === "yellow" || s.status === "red").map((s) => s.key);
+  return { status: worstOf(stats.map((s) => s.status)), flagged };
 }
 
 /** worst member status of a card (the card's pill) */

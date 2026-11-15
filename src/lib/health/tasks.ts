@@ -227,6 +227,8 @@ function breakTask(ctx: TaskContext): Candidate | null {
   const keys: KpiKey[] = [];
   if (moodLow) keys.push("mood");
   if (workHigh) keys.push("workload");
+  // the wellbeing check's other answers that are flagged (high stress, feeling far from people) are part of the same task
+  for (const k of ["stress", "connection"] as const) if (val(ctx, k) !== null && isFlagged(ctx, k)) keys.push(k);
   return {
     severity: Math.max(...keys.map((k) => severityOf(ctx, k))),
     absZ: Math.max(...keys.map((k) => absZ(ctx, k))),
@@ -239,6 +241,46 @@ function breakTask(ctx: TaskContext): Candidate | null {
         mn: "Богино амарч, багийн гишүүн эсвэл гэр бүлтэйгээ ярилцаарай",
       },
       why,
+    },
+  };
+}
+
+/**
+ * The wellbeing check (docs/research/checkin-nasa.md): high stress or feeling far from people, when mood and workload
+ * did not already raise the break task. A lifestyle step and who to talk to, never a diagnosis.
+ */
+function wellbeingTask(ctx: TaskContext): Candidate | null {
+  if (breakTask(ctx)) return null;
+  const stress = val(ctx, "stress");
+  const conn = val(ctx, "connection");
+  const stressHigh = stress !== null && isFlagged(ctx, "stress") && stress > (KPI_DEFS.stress.thresholds?.high?.yellow ?? 3);
+  const connLow = conn !== null && isFlagged(ctx, "connection") && isLowSide(ctx, "connection");
+  if (!stressHigh && !connLow) return null;
+  const keys: KpiKey[] = [];
+  if (stressHigh) keys.push("stress");
+  if (connLow) keys.push("connection");
+  const parts: Bilingual[] = [];
+  if (stressHigh) {
+    parts.push({ en: `You rated your stress ${formatNumber(stress as number, 0)} out of 5.`, mn: `Стрессээ ${formatNumber(stress as number, 0)}/5 гэж үнэлсэн.` });
+  }
+  if (connLow) {
+    parts.push({ en: `You rated feeling connected ${formatNumber(conn as number, 0)} out of 5.`, mn: `Ойр дотно байдлаа ${formatNumber(conn as number, 0)}/5 гэж үнэлсэн.` });
+  }
+  return {
+    severity: 1,
+    absZ: Math.max(...keys.map((k) => absZ(ctx, k))),
+    task: {
+      id: "wellbeing_connect",
+      hazard: "isolation_confinement",
+      relatedKeys: keys,
+      title: {
+        en: connLow ? "Plan a call home or time with a crewmate" : "Take a short pause and talk it through with someone",
+        mn: connLow ? "Гэр лүүгээ залгах эсвэл багийн гишүүнтэйгээ цагийг төлөвлөөрэй" : "Түр завсарлаж, хэн нэгэнтэй ярилцаарай",
+      },
+      why: {
+        en: `${parts.map((p) => p.en).join(" ")} The flight surgeon and the psychological support team on Earth are there to talk any time.`,
+        mn: `${parts.map((p) => p.mn).join(" ")} Нислэгийн эмч болон Дэлхий дээрх сэтгэл зүйн дэмжлэгийн баг хүссэн үед ярилцахад бэлэн.`,
+      },
     },
   };
 }
@@ -424,6 +466,7 @@ export function buildTasks(ctx: TaskContext): Task[] {
     hydrationTask,
     exerciseTask,
     breakTask,
+    wellbeingTask,
     visionTask,
     glucoseTask,
     vitalsTask,

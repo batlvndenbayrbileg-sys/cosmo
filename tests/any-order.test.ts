@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { getQuestion } from "@/lib/kpi/registry";
 import { interpretAnswer } from "@/server/agent/interpret";
 import { setClockForTests } from "@/server/clock";
+import { setSensorFeedForTests } from "@/server/checkin/sensors";
 import { assistantText, eventsOf, playTurn, startCheckIn } from "./helpers/agent";
 import { TEST_TODAY, freshSeededDb } from "./helpers/db";
 
@@ -29,15 +30,20 @@ describe("interpretAnswer ignores numbers that belong to another named measureme
 });
 
 describe("a skipped question answered later, while another one is open", () => {
+  // the measurement questions are asked only without a sensor feed
   beforeEach(async () => {
     setClockForTests(TEST_TODAY);
+    setSensorFeedForTests(false);
     await freshSeededDb();
   });
-  afterEach(() => setClockForTests(null));
+  afterEach(() => {
+    setClockForTests(null);
+    setSensorFeedForTests(null);
+  });
 
   it("stores the blood pressure only, re-asks blood sugar, then takes the next number as blood sugar", async () => {
     const id = await startCheckIn("bat", "mn");
-    for (const line of ["Сайн уу", "эхэлье", "7 цаг", "4", "үгүй", "алгасъя", "70", "36.6"]) await playTurn("bat", id, line);
+    for (const line of ["Сайн уу", "эхэлье", "4", "үгүй", "4", "4", "2", "4", "7 цаг", "алгасъя", "70", "36.6"]) await playTurn("bat", id, line);
 
     const late = await playTurn("bat", id, "өө миний даралт 120 дээр 80 байна шүү дээ");
     expect(eventsOf(late, "measurement").map((e) => [e.key, e.value])).toEqual([

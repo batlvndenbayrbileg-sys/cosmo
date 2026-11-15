@@ -339,6 +339,74 @@ function SymptomsBody({
   );
 }
 
+/** the wellbeing check: one line per answer (1-5) with its status, the items worth a look first, and what it is not */
+function WellbeingBody({ stats, lang, compact }: { stats: KpiStat[]; lang: Lang; compact: boolean }) {
+  const { t } = useI18n();
+  const answered = stats.filter((s) => s.status !== "no_data" && s.value !== null);
+  const flagged = answered.filter((s) => s.status === "yellow" || s.status === "red");
+  const headline =
+    answered.length === 0
+      ? null
+      : flagged.length === 0
+        ? t("dashboard.kpi.wellbeing.good")
+        : t("dashboard.kpi.wellbeing.watch", { items: flagged.map((s) => KPI_DEFS[s.key].labels[lang].toLowerCase()).join(", ") });
+  return (
+    <>
+      {headline !== null ? (
+        <p
+          data-slot="wellbeing-headline"
+          className={cn(
+            "leading-tight font-semibold text-foreground",
+            compact ? "line-clamp-2 text-[clamp(15px,2vh,20px)] dash-tight:line-clamp-1" : "text-2xl",
+          )}
+        >
+          {headline}
+        </p>
+      ) : (
+        <NoValue compact={compact} />
+      )}
+      <ul className={cn("flex flex-col", compact ? "gap-0.5" : "gap-1.5")}>
+        {stats.map((s) => (
+          <li
+            key={s.key}
+            className={cn("flex items-center justify-between gap-2", compact ? "text-[12px] leading-tight" : "text-base")}
+          >
+            <span className="truncate text-foreground">{KPI_DEFS[s.key].labels[lang]}</span>
+            <span className={cn("tnum flex shrink-0 items-center text-muted-foreground", compact ? "gap-1" : "gap-2")}>
+              {s.value === null ? "–" : formatValue(s.key, s.value, lang)}
+              <StatusGlyph status={s.status} size={compact ? 13 : 16} />
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p className={cn("text-muted-foreground", compact ? "line-clamp-2 text-[10.5px] leading-tight" : "text-xs")}>
+        {t("dashboard.kpi.wellbeing.note")}
+      </p>
+    </>
+  );
+}
+
+/** small chip that says the value was filled from the (simulated) sensor feed, not asked */
+function SensorChip() {
+  const { t } = useI18n();
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <span
+            tabIndex={0}
+            data-slot="sensor-chip"
+            className="inline-flex h-5 shrink-0 items-center rounded-full border border-border bg-muted px-2 text-xs text-muted-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+          />
+        }
+      >
+        {t("dashboard.kpi.sensor")}
+      </TooltipTrigger>
+      <TooltipContent>{t("dashboard.kpi.sensorTip")}</TooltipContent>
+    </Tooltip>
+  );
+}
+
 function NoteBody({ stat, compact }: { stat: KpiStat | undefined; compact: boolean }) {
   const { t } = useI18n();
   const text = stat && typeof stat.value === "string" && stat.value.trim() !== "" ? stat.value : null;
@@ -378,7 +446,10 @@ export function KpiCard({
   const titleId = useId();
   const status = cardStatus(card, byKey);
   const stats = card.keys.map((k) => byKey.get(k)).filter((s): s is KpiStat => s !== undefined);
-  const simulated = stats.some((s) => s.source === "simulated");
+  // a reading from the sensor feed says so ("from your sensors"); seeded demo data says "simulated"
+  const sensor = stats.length > 0 && stats.every((s) => s.source === "sensor");
+  const simulated = !sensor && stats.some((s) => s.source === "simulated");
+  const chip = sensor ? <SensorChip /> : simulated ? <SimulatedChip /> : null;
   // compact cards print the demo-parameter range(s) in one footer line next to the "simulated" chip
   const compactRange = !compact
     ? ""
@@ -398,7 +469,9 @@ export function KpiCard({
       ? t("dashboard.kpi.bp.title")
       : card.kind === "symptoms"
         ? t("dashboard.kpi.symptoms.title")
-        : KPI_DEFS[card.keys[0]].labels[lang];
+        : card.kind === "wellbeing"
+          ? t("dashboard.kpi.wellbeing.title")
+          : KPI_DEFS[card.keys[0]].labels[lang];
 
   let body: ReactNode;
   if (card.kind === "bp") {
@@ -414,6 +487,8 @@ export function KpiCard({
         compact={compact}
       />
     );
+  } else if (card.kind === "wellbeing") {
+    body = <WellbeingBody stats={stats} lang={lang} compact={compact} />;
   } else if (card.kind === "note") {
     body = viewer === "crew" ? <NoteBody stat={byKey.get(card.keys[0])} compact={compact} /> : null;
   } else {
@@ -450,7 +525,7 @@ export function KpiCard({
         </header>
         {body}
         {compact ? (
-          compactRange !== "" || simulated ? (
+          compactRange !== "" || chip ? (
             <div className="mt-auto flex items-end justify-between gap-2 pt-0.5">
               {compactRange !== "" ? (
                 <p data-slot="kpi-range" className="min-w-0 text-[10.5px] leading-tight text-muted-foreground">
@@ -459,13 +534,11 @@ export function KpiCard({
               ) : (
                 <span />
               )}
-              {simulated ? <SimulatedChip /> : null}
+              {chip}
             </div>
           ) : null
-        ) : simulated ? (
-          <div className="mt-auto pt-1">
-            <SimulatedChip />
-          </div>
+        ) : chip ? (
+          <div className="mt-auto pt-1">{chip}</div>
         ) : null}
       </article>
     </Card>

@@ -8,7 +8,7 @@ import { statusWordKey } from "@/components/status/statusClasses";
 import { useI18n } from "@/i18n/I18nProvider";
 import { isReadinessAvailable } from "@/lib/health/scores";
 import { cn } from "@/lib/utils";
-import { formatClockLabel, type Viewer } from "./logic";
+import { formatClockLabel, wellbeingSummary, type Viewer } from "./logic";
 import { MascotPicture } from "./parts";
 
 /** crew name in two lines (name / role) with the mission-day label on the right, plus the check-in meta line */
@@ -58,6 +58,8 @@ export function CrewHeading({
 export function StatPills({ payload, className }: { payload: DashboardPayload; className?: string }) {
   const { t } = useI18n();
   const readinessAvailable = isReadinessAvailable(payload.axes);
+  // the short wellbeing check at a glance (details on the Vitals tab)
+  const wellbeing = wellbeingSummary(new Map(payload.kpis.map((k) => [k.key, k])));
   return (
     <ul className={cn("flex flex-wrap items-center gap-1.5", className)}>
       <li className="pill min-h-[32px]! gap-1! px-2.5! text-[14px]! dash-tight:min-h-[28px]! dash-tight:px-2! dash-tight:text-[13px]!" data-status={payload.overall}>
@@ -70,6 +72,19 @@ export function StatPills({ payload, className }: { payload: DashboardPayload; c
           {t("dashboard.profile.readiness")}
         </span>
       </li>
+      {wellbeing.status !== "no_data" ? (
+        <li
+          data-slot="wellbeing-pill"
+          data-status={wellbeing.status}
+          className="pill min-h-[32px]! gap-1! px-2.5! text-[14px]! dash-tight:min-h-[28px]! dash-tight:px-2! dash-tight:text-[13px]!"
+          aria-label={t("dashboard.profile.wellbeingAria", { status: t(statusWordKey(wellbeing.status)) })}
+        >
+          <StatusGlyph status={wellbeing.status} size={13} labelled={false} />
+          <span aria-hidden="true" className="text-[11px] font-normal text-[var(--cosmo-label)]">
+            {t("dashboard.profile.wellbeing")}
+          </span>
+        </li>
+      ) : null}
       <li className="pill min-h-[32px]! gap-1! px-2.5! text-[14px]! dash-tight:min-h-[28px]! dash-tight:px-2! dash-tight:text-[13px]! tnum">
         <span>{payload.missionDay}</span>
         <span className="text-[11px] font-normal text-[var(--cosmo-label)]">{t("dashboard.profile.day")}</span>

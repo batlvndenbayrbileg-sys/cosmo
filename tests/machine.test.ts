@@ -49,16 +49,17 @@ describe("GREETING and SMALL_TALK (PLAN 4.1)", () => {
     expect(replyOf(r.effects).kind).toBe("smallTalkPropose");
   });
 
-  it("an explicit request to start before the proposal goes straight to the first question", () => {
+  it("an explicit request to start before the proposal goes straight to the first question, with the sensor intro", () => {
     const r = transition(ctxIn("SMALL_TALK", { smallTalkTurns: 1 }), { type: "USER_TURN", start: "yes" });
     expect(r.ctx.state).toBe("KPI_CAPTURE");
-    expect(replyOf(r.effects)).toMatchObject({ kind: "ask", question: "sleep" });
+    // the sensor follow-up is first while it is not skipped (an unusual reading); the intro flag says the sensors first
+    expect(replyOf(r.effects)).toMatchObject({ kind: "ask", question: "sensor_check", intro: true });
   });
 
   it("after the proposal a yes moves to KPI_CAPTURE and asks the first question", () => {
-    const r = transition(ctxIn("SMALL_TALK", { smallTalkTurns: 2, proposed: true }), { type: "USER_TURN", start: "yes" });
+    const r = transition(ctxIn("SMALL_TALK", { smallTalkTurns: 2, proposed: true, skipped: ["sensor_check"] }), { type: "USER_TURN", start: "yes" });
     expect(r.ctx.state).toBe("KPI_CAPTURE");
-    expect(replyOf(r.effects)).toMatchObject({ kind: "ask", question: "sleep" });
+    expect(replyOf(r.effects)).toMatchObject({ kind: "ask", question: "mood", intro: true });
   });
 
   it("after the proposal anything that is not an explicit refusal also moves on", () => {
@@ -85,15 +86,15 @@ describe("GREETING and SMALL_TALK (PLAN 4.1)", () => {
     }
   });
 
-  it("the cursor skips questions that were volunteered: sleep and mood filled -> the first question is symptoms", () => {
-    let ctx = ctxIn("SMALL_TALK", { smallTalkTurns: 2, proposed: true });
+  it("the cursor skips questions that were volunteered: mood filled -> the first question is symptoms", () => {
+    let ctx = ctxIn("SMALL_TALK", { smallTalkTurns: 2, proposed: true, skipped: ["sensor_check"] });
     ctx = transition(ctx, { type: "MEASUREMENT_ACCEPTED", keys: ["sleep_hours", "mood"] }).ctx;
     const r = transition(ctx, { type: "USER_TURN", start: "yes" });
     expect(replyOf(r.effects)).toMatchObject({ kind: "ask", question: "symptoms" });
   });
 
   it("everything volunteered: the start goes straight to the read-back", () => {
-    const ctx = ctxIn("SMALL_TALK", { smallTalkTurns: 2, proposed: true, filled: [...NUMERIC_KEYS, "day_note"] });
+    const ctx = ctxIn("SMALL_TALK", { smallTalkTurns: 2, proposed: true, filled: [...NUMERIC_KEYS], skipped: ["sensor_check"] });
     const r = transition(ctx, { type: "USER_TURN", start: "yes" });
     expect(r.ctx.state).toBe("CONFIRM");
     expect(replyOf(r.effects).kind).toBe("readBack");
@@ -107,123 +108,150 @@ describe("GREETING and SMALL_TALK (PLAN 4.1)", () => {
 });
 
 describe("KPI_CAPTURE (PLAN 4.1)", () => {
-  const capture = (over: Partial<MachineCtx> = {}) => ctxIn("KPI_CAPTURE", { smallTalkTurns: 2, proposed: true, ...over });
+  // a check-in whose sensor feed showed nothing unusual: the follow-up question is skipped, the mood comes first
+  const capture = (over: Partial<MachineCtx> = {}) =>
+    ctxIn("KPI_CAPTURE", { smallTalkTurns: 2, proposed: true, skipped: ["sensor_check"], ...over });
 
   it("an accepted value recomputes the cursor and asks the next question, acknowledging the keys", () => {
-    const r = transition(capture({ filled: [] }), { type: "MEASUREMENT_ACCEPTED", keys: ["sleep_hours"] });
+    const r = transition(capture({ filled: [] }), { type: "MEASUREMENT_ACCEPTED", keys: ["mood"] });
     expect(r.ctx.state).toBe("KPI_CAPTURE");
-    expect(r.ctx.filled).toEqual(["sleep_hours"]);
-    expect(replyOf(r.effects)).toMatchObject({ kind: "ask", question: "mood", keys: ["sleep_hours"] });
+    expect(r.ctx.filled).toEqual(["mood"]);
+    expect(replyOf(r.effects)).toMatchObject({ kind: "ask", question: "symptoms", keys: ["mood"] });
   });
 
-  it("walks every question in the canonical order when answered one by one", () => {
+  it("walks every asked and sensor question in order when answered one by one, then reads back", () => {
+    const order: QuestionId[] = [
+      "mood", "symptoms", "sleep_quality", "energy", "stress", "connection",
+      "sleep", "blood_pressure", "heart_rate", "temperature", "glucose", "water", "exercise",
+    ];
     let ctx = capture();
     const asked: string[] = [];
-    for (const q of QUESTIONS) {
-      const keys = q.keys.filter((k) => k !== "symptom_note");
+    let last: Effect[] = [];
+    for (const id of order) {
+      const keys = QUESTIONS.find((q) => q.id === id)!.keys.filter((k) => k !== "symptom_note");
       const r = transition(ctx, { type: "MEASUREMENT_ACCEPTED", keys });
       ctx = r.ctx;
-      if (q.id === "day_note") continue;
+      last = r.effects;
       const reply = replyOf(r.effects);
       if (reply.question) asked.push(reply.question);
     }
-    expect(asked).toEqual(QUESTIONS.slice(1, -1).map((q) => q.id).concat("day_note"));
+    expect(asked).toEqual(order.slice(1));
+    // vision, workload and the day note are only taken when volunteered: never asked
+    expect(replyOf(last).kind).toBe("readBack");
+    expect(ctx.state).toBe("CONFIRM");
+  });
+
+  it("with the sensor values filled, only the six spoken questions remain", () => {
+    const sensorKeys: KpiKey[] = QUESTIONS.filter((q) => q.capture === "sensor").flatMap((q) => q.keys);
+    let ctx = capture({ filled: sensorKeys });
+    const asked: string[] = [cursorQuestion(ctx) as string];
+    for (let i = 0; i < 10 && ctx.state === "KPI_CAPTURE"; i++) {
+      const q = QUESTIONS.find((x) => x.id === cursorQuestion(ctx))!;
+      const r = transition(ctx, { type: "MEASUREMENT_ACCEPTED", keys: q.keys.filter((k) => k !== "symptom_note") });
+      ctx = r.ctx;
+      const reply = replyOf(r.effects);
+      if (reply.question) asked.push(reply.question);
+    }
+    expect(asked).toEqual(["mood", "symptoms", "sleep_quality", "energy", "stress", "connection"]);
+    expect(ctx.state).toBe("CONFIRM");
   });
 
   it("the question after an already filled one is skipped (BP filled: heart rate comes after blood pressure's predecessor)", () => {
-    const ctx = capture({ filled: ["sleep_hours", "mood", "symptom_headache", "symptom_dizziness", "symptom_nausea", "bp_systolic", "bp_diastolic"] });
+    const ctx = capture({
+      filled: [
+        "mood", "symptom_headache", "symptom_dizziness", "symptom_nausea", "sleep_quality", "energy", "stress", "connection",
+        "sleep_hours", "bp_systolic", "bp_diastolic",
+      ],
+    });
     expect(cursorQuestion(ctx)).toBe("heart_rate");
     expect(expectedQuestion(ctx)).toBe("heart_rate");
   });
 
   it("when no question remains the machine moves to CONFIRM with a read-back", () => {
-    const ctx = capture({ filled: filledExcept("heart_rate", "day_note") });
+    const ctx = capture({ filled: filledExcept("heart_rate") });
     const r = transition(ctx, { type: "MEASUREMENT_ACCEPTED", keys: ["heart_rate"] });
-    // only the optional day_note is left: it is still offered once
-    expect(replyOf(r.effects)).toMatchObject({ kind: "ask", question: "day_note" });
-    const done = transition(r.ctx, { type: "SKIP", question: "day_note" });
-    expect(done.ctx.state).toBe("CONFIRM");
-    expect(replyOf(done.effects).kind).toBe("readBack");
+    expect(r.ctx.state).toBe("CONFIRM");
+    expect(replyOf(r.effects).kind).toBe("readBack");
   });
 
   it("a rejected answer is clarified on the same cursor: clarifyCount goes 0 -> 1 -> 2", () => {
     let ctx = capture();
-    const first = transition(ctx, { type: "MEASUREMENT_REJECTED", question: "sleep", reason: "range" });
-    expect(replyOf(first.effects)).toMatchObject({ kind: "clarify", question: "sleep", attempt: 0, reason: "range" });
-    expect(first.ctx.clarifyCount.sleep).toBe(1);
+    const first = transition(ctx, { type: "MEASUREMENT_REJECTED", question: "mood", reason: "range" });
+    expect(replyOf(first.effects)).toMatchObject({ kind: "clarify", question: "mood", attempt: 0, reason: "range" });
+    expect(first.ctx.clarifyCount.mood).toBe(1);
     expect(first.ctx.state).toBe("KPI_CAPTURE");
     ctx = first.ctx;
-    const second = transition(ctx, { type: "CLARIFICATION", question: "sleep", reason: "type" });
+    const second = transition(ctx, { type: "CLARIFICATION", question: "mood", reason: "type" });
     expect(replyOf(second.effects)).toMatchObject({ kind: "clarify", attempt: 1 });
-    expect(second.ctx.clarifyCount.sleep).toBe(MAX_CLARIFICATIONS);
-    expect(cursorQuestion(second.ctx)).toBe("sleep");
+    expect(second.ctx.clarifyCount.mood).toBe(MAX_CLARIFICATIONS);
+    expect(cursorQuestion(second.ctx)).toBe("mood");
   });
 
   it("after 2 failed clarifications the question is skipped, Cosmo says it can be added at the confirmation, and the cursor advances", () => {
-    const ctx = capture({ clarifyCount: { sleep: 2 } });
-    const r = transition(ctx, { type: "MEASUREMENT_REJECTED", question: "sleep", reason: "unclear" });
-    expect(r.ctx.skipped).toEqual(["sleep"]);
-    expect(replyOf(r.effects)).toMatchObject({ kind: "ask", question: "mood", skippedQuestion: "sleep" });
+    const ctx = capture({ clarifyCount: { mood: 2 } });
+    const r = transition(ctx, { type: "MEASUREMENT_REJECTED", question: "mood", reason: "unclear" });
+    expect(r.ctx.skipped).toEqual(["sensor_check", "mood"]);
+    expect(replyOf(r.effects)).toMatchObject({ kind: "ask", question: "symptoms", skippedQuestion: "mood" });
     expect(r.ctx.state).toBe("KPI_CAPTURE");
   });
 
-  it("clarifyCount is per question: a failure on mood does not use up sleep's budget", () => {
-    let ctx = capture({ filled: ["sleep_hours"] });
-    ctx = transition(ctx, { type: "MEASUREMENT_REJECTED", question: "mood", reason: "unclear" }).ctx;
-    ctx = transition(ctx, { type: "MEASUREMENT_REJECTED", question: "mood", reason: "unclear" }).ctx;
-    expect(ctx.clarifyCount).toEqual({ mood: 2 });
-    const r = transition(ctx, { type: "MEASUREMENT_REJECTED", question: "mood", reason: "unclear" });
-    expect(r.ctx.skipped).toEqual(["mood"]);
+  it("clarifyCount is per question: a failure on symptoms does not use up the mood's budget", () => {
+    let ctx = capture({ filled: ["mood"] });
+    ctx = transition(ctx, { type: "MEASUREMENT_REJECTED", question: "symptoms", reason: "unclear" }).ctx;
+    ctx = transition(ctx, { type: "MEASUREMENT_REJECTED", question: "symptoms", reason: "unclear" }).ctx;
+    expect(ctx.clarifyCount).toEqual({ symptoms: 2 });
+    const r = transition(ctx, { type: "MEASUREMENT_REJECTED", question: "symptoms", reason: "unclear" });
+    expect(r.ctx.skipped).toEqual(["sensor_check", "symptoms"]);
   });
 
   it("skipping the last open question goes to the read-back and still carries the skip notice", () => {
-    const ctx = capture({ filled: filledExcept("workload", "day_note"), clarifyCount: { workload: 2 }, skipped: [] });
-    const withNote = { ...ctx, skipped: ["day_note" as QuestionId] };
-    const r = transition(withNote, { type: "MEASUREMENT_REJECTED", question: "workload", reason: "unclear" });
+    const ctx = capture({ filled: filledExcept("exercise"), clarifyCount: { exercise: 2 } });
+    const r = transition(ctx, { type: "MEASUREMENT_REJECTED", question: "exercise", reason: "unclear" });
     expect(r.ctx.state).toBe("CONFIRM");
-    expect(replyOf(r.effects)).toMatchObject({ kind: "readBack", skippedQuestion: "workload" });
+    expect(replyOf(r.effects)).toMatchObject({ kind: "readBack", skippedQuestion: "exercise" });
   });
 
   it("an accepted answer resets the clarification counter of its question", () => {
-    const ctx = capture({ clarifyCount: { sleep: 1 } });
-    const r = transition(ctx, { type: "MEASUREMENT_ACCEPTED", keys: ["sleep_hours"] });
-    expect(r.ctx.clarifyCount.sleep).toBeUndefined();
+    const ctx = capture({ clarifyCount: { mood: 1 } });
+    const r = transition(ctx, { type: "MEASUREMENT_ACCEPTED", keys: ["mood"] });
+    expect(r.ctx.clarifyCount.mood).toBeUndefined();
   });
 
-  it("optional questions never block: a failed day_note answer is skipped at once, with no clarification", () => {
-    const ctx = capture({ filled: filledExcept("day_note") });
-    const r = transition(ctx, { type: "MEASUREMENT_REJECTED", question: "day_note", reason: "type" });
-    expect(r.ctx.skipped).toEqual(["day_note"]);
-    expect(r.ctx.clarifyCount.day_note).toBeUndefined();
+  it("the optional sensor follow-up never blocks: a failed answer is skipped at once, with no clarification", () => {
+    const ctx = capture({ filled: filledExcept(), skipped: [] });
+    expect(cursorQuestion(ctx)).toBe("sensor_check");
+    const r = transition(ctx, { type: "MEASUREMENT_REJECTED", question: "sensor_check", reason: "type" });
+    expect(r.ctx.skipped).toEqual(["sensor_check"]);
+    expect(r.ctx.clarifyCount.sensor_check).toBeUndefined();
     expect(r.ctx.state).toBe("CONFIRM");
     expect(replyOf(r.effects)).toMatchObject({ kind: "readBack" });
     expect(replyOf(r.effects).skippedQuestion).toBeUndefined();
   });
 
   it("symptom_note is optional: the symptoms question is filled by the three symptom keys alone", () => {
-    const ctx = capture({ filled: ["sleep_hours", "mood", "symptom_headache", "symptom_dizziness", "symptom_nausea"] });
-    expect(cursorQuestion(ctx)).toBe("blood_pressure");
+    const ctx = capture({ filled: ["mood", "symptom_headache", "symptom_dizziness", "symptom_nausea"] });
+    expect(cursorQuestion(ctx)).toBe("sleep_quality");
   });
 
   it("an explicit SKIP advances without a notice", () => {
-    const r = transition(capture(), { type: "SKIP", question: "sleep" });
-    expect(r.ctx.skipped).toEqual(["sleep"]);
-    expect(replyOf(r.effects)).toMatchObject({ kind: "ask", question: "mood" });
+    const r = transition(capture(), { type: "SKIP", question: "mood" });
+    expect(r.ctx.skipped).toEqual(["sensor_check", "mood"]);
+    expect(replyOf(r.effects)).toMatchObject({ kind: "ask", question: "symptoms" });
     expect(replyOf(r.effects).skippedQuestion).toBeUndefined();
   });
 
   it("restating an already recorded value is not a failed answer: the same question is asked again, nothing is counted", () => {
-    const ctx = capture({ filled: ["sleep_hours"], clarifyCount: { mood: 1 } });
+    const ctx = capture({ filled: ["mood"], clarifyCount: { symptoms: 1 } });
     const r = transition(ctx, { type: "ALREADY_RECORDED" });
     expect(r.ctx).toEqual(ctx);
-    expect(r.ctx.clarifyCount).toEqual({ mood: 1 });
-    expect(r.ctx.skipped).toEqual([]);
-    expect(replyOf(r.effects)).toMatchObject({ kind: "restated", question: "mood" });
+    expect(r.ctx.clarifyCount).toEqual({ symptoms: 1 });
+    expect(r.ctx.skipped).toEqual(["sensor_check"]);
+    expect(replyOf(r.effects)).toMatchObject({ kind: "restated", question: "symptoms" });
     // however often it happens, the question is never skipped because of it
     let next = r.ctx;
     for (let i = 0; i < 5; i++) next = transition(next, { type: "ALREADY_RECORDED" }).ctx;
-    expect(next.skipped).toEqual([]);
-    expect(cursorQuestion(next)).toBe("mood");
+    expect(next.skipped).toEqual(["sensor_check"]);
+    expect(cursorQuestion(next)).toBe("symptoms");
   });
 
   it("corrections are not taken during capture", () => {
@@ -347,6 +375,8 @@ describe("purity and persistence", () => {
       filled: ["sleep_hours", "mood"],
       skipped: ["glucose"],
       clarifyCount: { water: 1 },
+      sensor: { keys: ["heart_rate", "sleep_hours"], flagged: [{ key: "heart_rate", value: 82, usual: 66, direction: "high" }], ask: true },
+      sensorFilled: ["heart_rate"],
     });
     const json = serializeCtx(ctx);
     expect(JSON.parse(json)).not.toHaveProperty("state");
@@ -372,8 +402,9 @@ describe("purity and persistence", () => {
   it("helpers: questionOfKey, missingKeys and expectedQuestion", () => {
     expect(questionOfKey("bp_diastolic")).toBe("blood_pressure");
     expect(questionOfKey("symptom_note")).toBe("symptoms");
-    expect(missingKeys({ filled: ["sleep_hours"] })[0]).toBe("mood");
+    expect(missingKeys({ filled: ["sensor_note"] })[0]).toBe("mood");
     expect(expectedQuestion(ctxIn("CONFIRM"))).toBeNull();
-    expect(expectedQuestion(ctxIn("KPI_CAPTURE"))).toBe("sleep");
+    expect(expectedQuestion(ctxIn("KPI_CAPTURE"))).toBe("sensor_check");
+    expect(expectedQuestion(ctxIn("KPI_CAPTURE", { skipped: ["sensor_check"] }))).toBe("mood");
   });
 });

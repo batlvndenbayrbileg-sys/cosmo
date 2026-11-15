@@ -95,18 +95,23 @@ export const MEASUREMENT_COLUMNS =
   "key, value, value_text, unit, source_text, confidence, source, created_at";
 
 /** Text keys use value_text; everything else (booleans as 0/1) uses value. */
+/** source_text prefix of a reading from the (simulated) sensor feed; the row's source column says "simulated" */
+export const SENSOR_TAG = "[sensor] ";
+
 export function mapMeasurement(r: MeasurementDbRow, opts?: { redactText?: boolean }): MeasurementRow {
   if (!isKpiKey(r.key)) throw new Error(`Unknown measurement key in database: ${r.key}`);
   const isText = r.value_text !== null;
   const value = isText ? (opts?.redactText ? "" : (r.value_text as string)) : (r.value as number);
+  const sensor = r.source === "simulated" && typeof r.source_text === "string" && r.source_text.startsWith(SENSOR_TAG);
+  const sourceText = sensor ? (r.source_text as string).slice(SENSOR_TAG.length) : r.source_text;
   return {
     key: r.key as KpiKey,
     value,
     unit: r.unit,
     // ground reads never carry the verbatim transcript snippet, for any key
-    sourceText: opts?.redactText ? null : r.source_text,
+    sourceText: opts?.redactText ? null : sourceText,
     confidence: r.confidence,
-    source: r.source as MeasurementSource,
+    source: sensor ? "sensor" : (r.source as MeasurementSource),
     createdAt: r.created_at,
   };
 }

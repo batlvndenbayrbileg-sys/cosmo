@@ -28,8 +28,8 @@ describe("env", () => {
 });
 
 describe("contract constants", () => {
-  it("has the 16 stored keys and 12 questions from docs/DASHBOARD_PLAN.md", () => {
-    expect(KPI_KEYS).toHaveLength(16);
-    expect(QUESTION_IDS).toHaveLength(12);
+  it("has the 21 stored keys and 17 questions (DASHBOARD_PLAN.md plus the wellbeing check, docs/research/checkin-nasa.md)", () => {
+    expect(KPI_KEYS).toHaveLength(21);
+    expect(QUESTION_IDS).toHaveLength(17);
   });
 });
