@@ -12,6 +12,7 @@ import { detectAskedQuestion } from "./questions";
 import type { ClarifyReason } from "./templates";
 import { TOOL_DEFINITIONS, type ToolResult } from "./tools";
 import type { ResultsFacts } from "./resultsFacts";
+import { SIGNATURE_PROMPT_ADDITION, type SignatureAnswerArgs } from "./signature";
 
 /**
  * The live agent: Claude through the Messages API with tool use (docs/PLAN.md sections 4.2 to 4.4).
@@ -355,6 +356,32 @@ export class ClaudeAgent implements Agent {
       "Thresholds are demo parameters, not clinical limits; say so if asked whether something is dangerous.",
       "If the question is not about the results, answer briefly and kindly and offer to explain any part of the dashboard. Do not call any tool.",
       `facts: ${JSON.stringify(facts)}`,
+      `astronaut_question: ${JSON.stringify(question)}`,
+    ].join("\n");
+    try {
+      const message = await this.call([{ role: "user", content: prompt }]);
+      const out = textOf(message).trim();
+      return out.length > 0 ? out : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Signature Triage (signature.ts): one call with the frozen system prompt and tool list (cached prefix unchanged); the
+   * code-run tool's result is the only source, the T6 system-prompt addition rides in this directive. Only the text is
+   * returned; the pipeline checks it (acceptSignatureAnswer) and otherwise speaks the template.
+   */
+  async answerAboutSignature(args: SignatureAnswerArgs): Promise<string | null> {
+    const { tool, facts, question, lang } = args;
+    const prompt = [
+      "DIRECTIVE (written by the system, not by the astronaut)",
+      "state: DONE - the daily check-in is complete; the astronaut asks about a blood panel or a blood draw (Signature Triage).",
+      `reply_language: ${lang === "mn" ? "Mongolian (Cyrillic)" : "English"}`,
+      `instruction: ${SIGNATURE_PROMPT_ADDITION}`,
+      "Speak calmly and kindly. The panels are Inspiration4 reference data (NASA OSDR); never present them as the astronaut's own blood. Quote numbers exactly as written in the tool result. Never diagnose, never name a disease, drug, dose or treatment. Do not call any tool.",
+      `tool_called: ${tool}`,
+      `tool_result: ${JSON.stringify(facts)}`,
       `astronaut_question: ${JSON.stringify(question)}`,
     ].join("\n");
     try {

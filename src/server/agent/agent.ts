@@ -13,6 +13,7 @@ import type { ClarifyReason } from "./templates";
 import type { ToolResult } from "./tools";
 import type { ResultsFacts } from "./resultsFacts";
 import type { AskedKind } from "./questions";
+import type { SignatureAnswerArgs } from "./signature";
 
 /**
  * The seam between the conversation and whoever understands the astronaut's words.
@@ -110,6 +111,12 @@ export interface Agent {
    * companion.isSaneCompanionReply; null (or a throw) means "use the template".
    */
   companionReply?(args: CompanionReplyArgs): Promise<string | null>;
+  /**
+   * Optional: Signature Triage (signature.ts). Word the answer to a question about the blood panel or a blood draw from
+   * the result of get_signature_triage / get_draw_advice only. The pipeline accepts the text only when it passes
+   * signature.acceptSignatureAnswer (numbers grounded, disclaimer last); null (or a throw) means "use the template".
+   */
+  answerAboutSignature?(args: SignatureAnswerArgs): Promise<string | null>;
 }
 
 export interface CompanionReplyArgs {
