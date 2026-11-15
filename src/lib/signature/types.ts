@@ -54,6 +54,11 @@ export interface PanelResult {
   borderline: boolean;
   markers: Record<string, MarkerResult>;
   otherLargeChanges: { analyte: string; fold: number }[];
+  /**
+   * second-assay cross-check (addendum T12); present only when the panel was scored with the second-assay matrix
+   * (`scorePanelWithSecondAssay`). Absent = no second assay was looked at, the spec templates apply unchanged.
+   */
+  secondAssay?: SecondAssayResult;
 }
 
 /** one change made by QC-1 / QC-2 (spec section 1.5); `new: null` = value deleted */

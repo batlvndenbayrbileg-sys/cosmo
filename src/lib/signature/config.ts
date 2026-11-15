@@ -119,6 +119,20 @@ export const RETEST_MAX = 21;
 /** A5 (A): an UNEXPECTED_ACTIVATION panel sets a re-test this many days later */
 export const UNEXPECTED_RETEST_DAYS = 3;
 
+/* ───────────── second-assay cross-check (docs/SIGNATURE_ADDENDUM_SECOND_ASSAY.md section 2) ───────────── */
+
+/** A: a change counts on either platform when it is at least 0.5 log2 units (about +41 % / -29 %) */
+export const CONFIRM_LOG2 = 0.5;
+
+/** the two markers cross-checked: primary analyte (Eve multiplex) -> second-assay analyte (Alamar NULISAseq NPQ) */
+export const SECOND_ASSAY_PAIRS = {
+  il6: { primary: "immune:il_6", second: "il6" },
+  il8: { primary: "immune:il_8", second: "cxcl8" },
+} as const satisfies Record<string, { primary: MarkerKey; second: string }>;
+
+/** signature markers the second assay does not confirm (addendum section 2): tagged "single-assay marker" in the UI */
+export const SINGLE_ASSAY_MARKERS: readonly MarkerKey[] = ["immune:mcp_1", "immune:il_10", "immune:il_27"];
+
 /* ───────────── daily strain score and draw advisor (spec sections 4.9-4.10, all A) ───────────── */
 
 /** the five DSS inputs of the spec */

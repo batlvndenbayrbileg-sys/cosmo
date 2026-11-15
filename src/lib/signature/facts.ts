@@ -15,7 +15,16 @@ import {
 } from "./config";
 import { recoveryFor } from "./recovery";
 import type { DrawAdvice, DrawRule } from "./strain";
-import type { MarkerResult, PanelResult, QcEntry, Timepoint, TriageClass } from "./types";
+import type {
+  MarkerResult,
+  PanelResult,
+  QcEntry,
+  SecondAssayBadge,
+  SecondAssayCheck,
+  SecondAssayStatus,
+  Timepoint,
+  TriageClass,
+} from "./types";
 
 /* ───────────── fixed wording ───────────── */
 
@@ -154,9 +163,33 @@ export interface SignatureFacts {
   qcNotes: string[];
   /** spec section 7.3, keyed by class */
   actions: readonly string[];
+  /** second-assay cross-check (addendum T12); null when the panel was scored without the second assay */
+  secondAssay: FactsSecondAssay | null;
   disclaimer: string;
   /** every number above as the exact string that may be spoken, plus the fixed reference numbers */
   allowedNumbers: string[];
+}
+
+/** one marker of the two-key check, folds as spoken */
+export interface FactsSecondAssayMarker {
+  marker: string;
+  status: SecondAssayStatus;
+  /** fold on the primary platform vs own pre-flight median, as spoken */
+  primaryFoldRounded: string | null;
+  /** fold on the second platform vs own pre-flight median, as spoken */
+  secondFoldRounded: string | null;
+}
+
+/**
+ * Keys carry no digits on purpose: the facts JSON is handed to the model, and every digit sequence in it (outside
+ * names such as IL-6) must be one of `allowedNumbers`.
+ */
+export interface FactsSecondAssay {
+  /** IL-6, the marker that decides the badge */
+  lead: FactsSecondAssayMarker;
+  /** IL-8 (CXCL8 on the second platform) */
+  chemokine: FactsSecondAssayMarker;
+  badge: SecondAssayBadge | null;
 }
 
 export interface FactsContext {
@@ -241,6 +274,17 @@ export function buildFacts(panel: PanelResult, context: FactsContext): Signature
 
   const daysSinceLanding = add(String(TIMEPOINT_DAY[panel.timepoint] ?? panel.missionDay)) as string;
 
+  const sa = panel.secondAssay;
+  const saMarker = (marker: string, c: SecondAssayCheck): FactsSecondAssayMarker => ({
+    marker,
+    status: c.status,
+    primaryFoldRounded: c.primaryFold === null ? null : add(spokenFold(c.primaryFold)),
+    secondFoldRounded: c.secondFold === null ? null : add(spokenFold(c.secondFold)),
+  });
+  const secondAssay: FactsSecondAssay | null = sa
+    ? { lead: saMarker("IL-6", sa.il6), chemokine: saMarker("IL-8", sa.il8), badge: sa.badge }
+    : null;
+
   return {
     kind: "triage",
     lang,
@@ -262,6 +306,7 @@ export function buildFacts(panel: PanelResult, context: FactsContext): Signature
     otherLargeChanges,
     qcNotes: qcNotesFor(panel, context.qcLog ?? [], lang),
     actions: ACTIONS[panel.cls][lang],
+    secondAssay,
     disclaimer: SIGNATURE_DISCLAIMER[lang],
     allowedNumbers: [...allowed],
   };
