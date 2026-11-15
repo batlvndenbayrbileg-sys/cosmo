@@ -12,9 +12,9 @@ function placeholders(text: string): string[] {
 }
 
 describe("area dictionaries", () => {
-  it("covers the five expected areas", () => {
+  it("covers the six expected areas", () => {
     expect(Object.keys(areaDictionaries).sort()).toEqual(
-      ["checkin", "crew", "dashboard", "earth", "shell"].sort(),
+      ["checkin", "crew", "dashboard", "earth", "emergency", "shell"].sort(),
     );
   });
 

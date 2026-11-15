@@ -61,3 +61,24 @@ Limits, stated plainly:
 ## Not clinically validated
 
 Thresholds, the readiness score, the radar axes and the task suggestions are transparent heuristics for decision support in a prototype. The product states: *Prototype, not a medical device. Decision support, not a diagnosis.* Mongolian wording and Mongolian number-word spellings (`src/lib/numbers/mn.ts`) need review by a native speaker.
+
+## Emergency guide (built-in lay first-aid content)
+
+Checked 2026-11-15. Each page was read and the built-in steps in `src/lib/emergency/guides/<id>.ts` were compared with it; every guide stores its sources (title, URL, date checked) in its data. Paraphrased, never copied. `https://www.nhs.uk/conditions/first-aid/cpr/` now redirects to the St John Ambulance page, so St John Ambulance is the main source. ERC and AHA pages were not fetched; the American Red Cross page was used as the second CPR source.
+
+| Guide (`id`) | Sources |
+|---|---|
+| Not breathing: CPR (`not-breathing`) | St John Ambulance, How to do CPR, https://www.sja.org.uk/first-aid-advice/cpr/ (100 to 120 a minute, 5-6 cm, 30:2 if trained, swap every 1-2 minutes, use the defibrillator); American Red Cross, CPR steps, https://www.redcross.org/take-a-class/cpr/performing-cpr/cpr-steps (100 to 120 a minute) |
+| Fainting or feeling faint (`fainting`) | St John Ambulance, Fainting, https://www.sja.org.uk/first-aid-advice/fainting/; recovery position line from the St John Ambulance CPR page |
+| Choking (`choking`) | St John Ambulance, Choking, https://www.sja.org.uk/first-aid-advice/choking/ |
+| Severe bleeding (`severe-bleeding`) | St John Ambulance, Severe bleeding, https://www.sja.org.uk/first-aid-advice/severe-bleeding/ |
+| Burns and scalds (`burns`) | St John Ambulance, Burns and scalds, https://www.sja.org.uk/first-aid-advice/burns-and-scalds/ |
+| Seizure (`seizure`) | St John Ambulance, Seizures, https://www.sja.org.uk/first-aid-advice/seizure/ |
+| Chest pain (`chest-pain`) | St John Ambulance, Heart attack, https://www.sja.org.uk/first-aid-advice/heart-attack/ (its medicine steps are left out on purpose) |
+| Severe allergic reaction (`anaphylaxis`) | St John Ambulance, Anaphylaxis, https://www.sja.org.uk/first-aid-advice/anaphylaxis/ (source of the one medicine line: the person's own adrenaline auto-injector; no dose, no repeat timing) |
+| Head injury (`head-injury`) | St John Ambulance, Head injury, https://www.sja.org.uk/first-aid-advice/head-injury/ |
+| Get help now (`call-for-help`) | none: no medical content, only "get help, stay together, follow the crew's procedures" |
+
+Rules the tests enforce (`tests/emergency-guides.test.ts`): step 1 is always getting help (crew medical officer and flight surgeon; the local emergency number on Earth); lay first aid only; no diagnosis; no medicine or dose names except the auto-injector line; English and Mongolian have the same steps and sentence count; every guide is `reviewedBy: "PENDING"` and the app shows "not yet reviewed by a medical professional".
+
+Not from the cited pages (written for the space setting, flagged as such in the UI under "In space"): the notes that the station's own procedures decide how to hold a person for CPR and how to cool a burn (no running tap on the station), and that after landing or a long time in weightlessness standing up can make a person feel faint (orthostatic intolerance). These need review by the flight surgeon. The Mongolian texts need review by a native speaker with first-aid training.

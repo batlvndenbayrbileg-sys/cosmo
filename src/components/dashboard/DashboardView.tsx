@@ -9,7 +9,11 @@ import { StatusGlyph } from "@/components/status";
 import { usePrefersReducedMotion } from "@/components/cosmo/usePrefersReducedMotion";
 import { useI18n } from "@/i18n/I18nProvider";
 import { cn } from "@/lib/utils";
+import { suggestGuides } from "@/lib/emergency";
+import { EmergencyGuidePanel } from "@/components/emergency/EmergencyGuidePanel";
+import { useEmergencyLibrary } from "@/components/emergency/hooks";
 import { AlertsStrip } from "./AlertsStrip";
+import { IfWorseCard } from "./IfWorseCard";
 import { BodyHero } from "./BodyHero";
 import { CosmoDock } from "./CosmoDock";
 import { DayArc } from "./DayArc";
@@ -43,7 +47,7 @@ import { TwoToneTitle } from "./parts";
  * Layout (docs/DESIGN_V2.md section 2), single screen like an app:
  * - desktop (>= 1024 px): the dashboard is exactly one viewport high (100dvh) and the page never scrolls. The top
  *   bar's pills are tabs that switch the view inside the glass frame (Overview / Vitals / Plan / Trends / Earth
- *   link) with a crossfade. Every view is sized from the frame's height (flex, clamp() and vh based sizes).
+ *   link / Emergency guide) with a crossfade. Every view is sized from the frame's height (flex, clamp() and vh based sizes).
  * - phones and small tablets: the same tabs, the active view as one scrolling column.
  * - crew viewer: the bottom of the frame (--dashboard-bottom-reserve) stays free for the floating conversation
  *   bar (check-in lane) and Cosmo's dock, which collapses to a compact pill.
@@ -67,13 +71,13 @@ const CREW_BOTTOM_RESERVE = "clamp(84px, calc(124px - clamp(12px, 1.6vw, 24px)),
 const GROUND_BOTTOM_RESERVE = "clamp(14px, 2.2vh, 28px)";
 
 export function DashboardView({ payload, viewer, dockSlot, dockOpen }: DashboardViewProps) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const reduced = usePrefersReducedMotion();
   const [selectedHazard, setSelectedHazard] = useState<HazardKey | null>(null);
   const [section, setSection] = useState<NavSection>("overview");
 
   useShellHeader({
-    crewName: `${payload.crew.name} · ${payload.crew.role}`,
+    crewName: `${payload.crew.name} Â· ${payload.crew.role}`,
     missionDay: payload.missionDay,
   });
 
@@ -87,6 +91,15 @@ export function DashboardView({ payload, viewer, dockSlot, dockOpen }: Dashboard
   const related = useMemo(() => cardsRelatedToHazard(cards, hazardStat), [cards, hazardStat]);
 
   const navigate = useCallback((next: NavSection) => setSection(next), []);
+
+  // emergency guide: built-in guides at once (works offline), team content when the server has it
+  const emergencyLib = useEmergencyLibrary();
+  const [guideId, setGuideId] = useState<string | null>(null);
+  const suggestions = useMemo(() => suggestGuides(payload, emergencyLib), [payload, emergencyLib]);
+  const openGuide = useCallback((id: string) => {
+    setGuideId(id);
+    setSection("guide");
+  }, []);
 
   const openAlerts = payload.alerts.filter((a) => a.acknowledgedAt === null);
   const alertsChip =
@@ -122,8 +135,18 @@ export function DashboardView({ payload, viewer, dockSlot, dockOpen }: Dashboard
               </span>
             ) : null}
             {alertsChip}
+            <IfWorseCard suggestion={suggestions[0]} scenarios={emergencyLib} onOpen={openGuide} />
           </>
         }
+      />
+    ),
+    guide: () => (
+      <EmergencyGuidePanel
+        scenarios={emergencyLib}
+        lang={lang}
+        openId={guideId}
+        onOpenId={setGuideId}
+        suggested={suggestions.map((s) => s.scenarioId)}
       />
     ),
     vitals: () => (

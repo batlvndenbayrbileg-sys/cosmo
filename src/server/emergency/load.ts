@@ -2,17 +2,19 @@ import "server-only";
 import fs from "node:fs";
 import path from "node:path";
 import {
-  BUILTIN_CALL_FOR_HELP,
   SCENARIO_ID_RE,
   STEP_IMAGE_RE,
+  mergeScenarios,
   scenarioSchema,
   type EmergencyScenario,
 } from "@/lib/emergency";
 
 /**
- * Reads the team's emergency guidance from AEGIS_EMERGENCY_DIR (default: the sibling folder
+ * The emergency library: the built-in guides that ship with the app (src/lib/emergency/guides), plus the team's
+ * optional content from AEGIS_EMERGENCY_DIR (default: the sibling folder
  * ../aegis-assets/emergency next to the repo, i.e. C:/dev/aegis-assets/emergency). Read on every request (a handful of
- * small files) so the team can drop in new content without restarting the app. Invalid folders are skipped and
+ * small files) so the team can drop in new content without restarting the app. A team folder whose id equals a built-in
+ * guide replaces that guide. Invalid folders are skipped and
  * reported in `problems`, never shown half-broken.
  */
 
@@ -35,7 +37,7 @@ export function loadEmergencyLibrary(dir = emergencyDir()): EmergencyLibrary {
   try {
     entries = fs.readdirSync(dir, { withFileTypes: true });
   } catch {
-    // no folder yet: only the built-in card
+    // no folder (always the case on Vercel): only the built-in guides
   }
   for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
     if (!entry.isDirectory() || entry.name.startsWith("_") || entry.name.startsWith(".")) continue;
@@ -67,14 +69,13 @@ export function loadEmergencyLibrary(dir = emergencyDir()): EmergencyLibrary {
         const exists = step.image ? fs.existsSync(path.join(dir, entry.name, step.image)) : false;
         if (step.image && !exists) problems.push(`${entry.name}: ${step.image} is listed but not found`);
         return {
-          text: step.text,
-          image: step.image,
+          ...step,
           imageUrl: step.image && exists ? `/api/emergency/${entry.name}/image/${step.image}` : null,
         };
       }),
     });
   }
-  return { scenarios: [...scenarios, BUILTIN_CALL_FOR_HELP], problems, dir };
+  return { scenarios: mergeScenarios(scenarios), problems, dir };
 }
 
 /** absolute path of a step image, or null when the id/file is not allowed or does not exist (no path traversal) */

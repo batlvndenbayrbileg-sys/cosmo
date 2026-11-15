@@ -388,3 +388,24 @@
     @slot;
   }
 }
+
+/* emergency guide: the CPR helper's arms push in time with the metronome (stopped by the reduced-motion rule above) */
+@keyframes aegis-compress {
+  0%, 100% { transform: translateY(0); }
+  35% { transform: translateY(5px); }
+}
+.aegis-compress {
+  animation: aegis-compress 545ms ease-in-out infinite;
+  transform-box: fill-box;
+}
+/* one beat of the metronome: the ring swells and fades (re-keyed on every beat) */
+@keyframes aegis-beat {
+  0% { transform: scale(0.82); opacity: 0.9; }
+  100% { transform: scale(1.35); opacity: 0; }
+}
+.aegis-beat {
+  animation: aegis-beat 420ms ease-out forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .aegis-compress, .aegis-beat { animation: none; }
+}

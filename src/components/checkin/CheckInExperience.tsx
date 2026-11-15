@@ -36,7 +36,9 @@ import {
 import { ApiClientError, fetchDashboard, fetchHealth, postTour, type TourFocus } from "./api";
 import { DashboardTalk, type TalkStatus } from "./DashboardTalk";
 import { EmergencyOverlay } from "@/components/emergency/EmergencyOverlay";
-import { BUILTIN_CALL_FOR_HELP, matchEmergency, type EmergencyScenario } from "@/lib/emergency";
+import { EMERGENCY_REQUEST_EVENT } from "@/components/emergency/EmergencyGuidePanel";
+import { useEmergencyLibrary } from "@/components/emergency/hooks";
+import { matchEmergency } from "@/lib/emergency";
 import { ShieldAlert } from "lucide-react";
 import { bubbleItems, computeStageLayout } from "./bubbles";
 import type { CheckInError } from "./state";
@@ -523,28 +525,14 @@ export function CheckInExperience() {
 
   /* ───────────── emergency guidance (team-prepared content, opened by SOS or by what is said) ───────────── */
 
-  const [emergencyLib, setEmergencyLib] = useState<EmergencyScenario[]>([BUILTIN_CALL_FOR_HELP]);
+  // the built-in guides at once (no network needed), then the server's list with the team's content
+  const emergencyLib = useEmergencyLibrary();
   const [emergency, setEmergency] = useState<{ open: boolean; id: string | null; alerted: boolean }>({
     open: false,
     id: null,
     alerted: false,
   });
   const checkInIdNow = state.checkInId;
-
-  useEffect(() => {
-    let cancelled = false;
-    void fetch("/api/emergency", { credentials: "same-origin" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((body: { scenarios?: EmergencyScenario[] } | null) => {
-        if (!cancelled && body?.scenarios?.length) setEmergencyLib(body.scenarios);
-      })
-      .catch(() => {
-        // the built-in "get help" card stays available
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const openEmergency = useCallback(
     (id: string | null) => {
@@ -568,6 +556,18 @@ export function CheckInExperience() {
     },
     [cancelRecorder, stopSpeech, checkInIdNow],
   );
+
+  // the dashboard's "Emergency guide" tab asks for help through a window event (DashboardView knows no check-in)
+  useEffect(() => {
+    const onRequest = (e: Event) => {
+      const id = (e as CustomEvent<{ scenarioId?: string }>).detail?.scenarioId;
+      if (typeof id !== "string") return;
+      e.preventDefault();
+      openEmergency(id);
+    };
+    window.addEventListener(EMERGENCY_REQUEST_EVENT, onRequest);
+    return () => window.removeEventListener(EMERGENCY_REQUEST_EVENT, onRequest);
+  }, [openEmergency]);
 
   // what the astronaut says can open the matching guidance by itself (each crew line is checked once)
   const checkedLines = useRef(0);
@@ -607,6 +607,7 @@ export function CheckInExperience() {
             lang={state.language ?? lang}
             alerted={emergency.alerted}
             onSelect={(id) => openEmergency(id)}
+            onCallHelp={() => openEmergency("call-for-help")}
             onClose={() => setEmergency((prev) => ({ ...prev, open: false }))}
           />
         ) : null}
