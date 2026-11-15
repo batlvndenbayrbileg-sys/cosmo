@@ -130,6 +130,22 @@ export const SECOND_ASSAY_PAIRS = {
   il8: { primary: "immune:il_8", second: "cxcl8" },
 } as const satisfies Record<string, { primary: MarkerKey; second: string }>;
 
+/**
+ * Every immune analyte measured on both platforms: primary bare name (Eve multiplex) -> second-assay analyte (Alamar
+ * NPQ); `MAP_ALL` of docs/signature_reference/reference_second_assay.py, same order. Used only to recompute the
+ * agreement statistics the Evidence card shows (src/lib/signature/secondAssayAgreement.ts).
+ */
+export const SECOND_ASSAY_MAP_ALL: Readonly<Record<string, string>> = {
+  il_6: "il6", mcp_1: "ccl2", il_10: "il10", il_27: "il27", "tnfα": "tnf", ip_10: "cxcl10", il_8: "cxcl8", il_1ra: "il1rn",
+  "il_1β": "il1b", il_18: "il18", il_4: "il4", il_5: "il5", il_7: "il7", il_13: "il13", il_17a: "il17a", "ifnγ": "ifng",
+  mcp_2: "ccl8", mcp_3: "ccl7", mcp_4: "ccl13", "mip_1α": "ccl3", "mip_1β": "ccl4", rantes: "ccl5", tarc: "ccl17",
+  mdc: "ccl22", i_309: "ccl1", "groα": "cxcl1", ena_78: "cxcl5", fractalkine: "cx3cl1", g_csf: "csf3", m_csf: "csf1",
+  vegf_a: "vegfa", egf: "egf", fgf_2: "fgf2", flt_3l: "flt3lg", il_12p70: "il12p70", il_12p40: "il12b", il_33: "il33",
+  il_22: "il22", il_23: "il23", il_9: "il9", lif: "lif", tslp: "tslp", tpo: "thpo", trail: "tnfsf10", scf: "kitlg",
+  "sdf_1α_plus_β": "cxcl12", mig_per_cxcl9: "cxcl9", bca_1: "cxcl13", eotaxin_2: "ccl24", "mip_1δ": "ccl15", il_16: "il16",
+  il_20: "il20", il_17f: "il17f", "ifn_α2": "ifna2", pdgf_aa: "pdgfa",
+};
+
 /** signature markers the second assay does not confirm (addendum section 2): tagged "single-assay marker" in the UI */
 export const SINGLE_ASSAY_MARKERS: readonly MarkerKey[] = ["immune:mcp_1", "immune:il_10", "immune:il_27"];
 
