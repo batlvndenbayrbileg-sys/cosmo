@@ -23,7 +23,10 @@ import { getEnv } from "@/server/env";
 import { ALERT_SPOKEN_NOTICE } from "@/server/alerts";
 import { loadHistory, loadTodayValues } from "@/server/checkin/service";
 import { appendTurn } from "@/server/db/repos/turn";
-import { detectCrisis, namesConditionOrDrug } from "./companion";
+import { matchEmergency } from "@/lib/emergency";
+import { loadEmergencyLibrary } from "@/server/emergency/load";
+import { companionTopic, detectCrisis, namesConditionOrDrug } from "./companion";
+import { interpretAnswer, interpretStart } from "./interpret";
 import { cursorQuestion, type MachineCtx } from "./machine";
 import { showTopics, type ShowTopic } from "./show";
 import { referenceCrewFor, signatureFollowUp } from "./signature";
@@ -59,10 +62,15 @@ const TODAY_MN =
 const ABOUT_COSMO = /\bhow\s+are\s+you\b|\byou\b.*\btoday\b|(?<![\p{L}])(?:та|чи|таны|чиний|танд|чамд)(?![\p{L}])/iu;
 
 const BEFORE_EN =
-  /(?:was|is)\s+(?:it|this|that)\s+(?:like\s+this|this\s+way|the\s+same|so)\s+before|been\s+like\s+this\s+before|has\s+(?:it|this)\s+(?:always\s+)?been\s+(?:like\s+this|this\s+way)|like\s+this\s+before|(?:is|was)\s+(?:this|that)\s+(?:usual|normal|typical)\s+for\s+me|compared?\s+(?:to|with)\s+(?:before|my\s+usual|last\s+week|the\s+last\s+(?:two\s+)?weeks)|(?:did|have)\s+i\s+(?:have|had)\s+(?:this|that)\s+before/iu;
+  /(?:was|is)\s+(?:it|this|that)\s+(?:like\s+this|this\s+way|the\s+same|so)\s+before|(?:has|have|had)\s+(?:it|this|that|i)\s+(?:ever\s+|always\s+)?been\s+like\s+this\s+before|has\s+(?:it|this)\s+(?:always\s+)?been\s+(?:like\s+this|this\s+way)|(?:is|was)\s+(?:this|that)\s+(?:usual|normal|typical)\s+for\s+me|compared?\s+(?:to|with)\s+(?:before|my\s+usual|last\s+week|the\s+last\s+(?:two\s+)?weeks)|(?:did|have)\s+i\s+(?:have|had)\s+(?:this|that)\s+before/iu;
 /** "өмнө нь ийм байсан уу?", "урьд нь ингэж байсан уу", "өмнөх өдрүүдтэй харьцуулбал", "ердийнхөөсөө өөр үү" */
 const BEFORE_MN =
   /өмнө\s*нь\s+(?:ч\s+)?(?:ийм|ингэж|иймэрхүү|ийм\s+л)|урьд\s+нь\s+(?:ийм|ингэж)|өмнөх\s+өдрүүд(?:тэй|ээс|тэйгээ)|ердийнхөөсөө|ердийн\s+(?:үү|юм\s+уу)|өмнө\s+нь\s+байсан\s+уу/iu;
+/**
+ * "I've never felt like this before", "өмнө нь ийм байгаагүй": a statement of how the person feels, not a question about
+ * their numbers (friend mode or the open question takes it, never a chart)
+ */
+const BEFORE_STATEMENT = /\bnever\b|\bfirst\s+time\b|байгаагүй|хэзээ\s*ч|анх\s+удаа/iu;
 
 const WHY_EN =
   /why\s+(?:do|am|did|have)\s+i\s+(?:feel(?:ing)?|been\s+feeling|so|always|this|been)|why\s+(?:do|does)\s+(?:my\s+)?(?:head|body)\s+(?:hurt|ache|feel)|what(?:'s|\s+is|\s+could\s+be|\s+might\s+be|\s+may\s+be)\s+(?:behind|causing|making\s+me\s+feel)|behind\s+how\s+i\s+feel|why\s+i\s+feel|why\s+(?:am|do)\s+i\s+(?:tired|exhausted|dizzy|stressed|low|down|weak|sleepy)/iu;
@@ -74,8 +82,10 @@ const WHY_MN =
 export function explainIntent(text: string): Exclude<ExplainIntent, "summary"> | null {
   const t = text.trim();
   if (t.length === 0 || t.length > 240) return null;
+  // a feeling to share ("why am I so lonely?", "how am I today? I'm so stressed"): friend mode listens, not a chart
+  if (companionTopic(t) !== "general") return null;
   if (WHY_EN.test(t) || WHY_MN.test(t)) return "why";
-  if (BEFORE_EN.test(t) || BEFORE_MN.test(t)) return "before";
+  if (BEFORE_EN.test(t) || BEFORE_MN.test(t)) return BEFORE_STATEMENT.test(t) ? null : "before";
   if ((TODAY_EN.test(t) || TODAY_MN.test(t)) && !ABOUT_COSMO.test(t)) {
     // "how is my sleep today?" names one value: the small panels answer it (show.ts), not a walkthrough
     const topics = showTopics(t).filter((x) => x !== "body");
@@ -413,6 +423,19 @@ function flaggedKey(stats: Map<KpiKey, KpiStat>, item: Item): KpiKey {
     : "bp_systolic";
 }
 
+/** the direction each tail is about: "shorter sleep" is never said of a long night */
+const WHY_TAIL_DIRECTION: Partial<Record<KpiKey, "high" | "low">> = {
+  sleep_hours: "low",
+  water_ml: "low",
+  workload: "high",
+  exercise_min: "low",
+};
+
+function whyTail(key: KpiKey, direction: "high" | "low" | null, lang: Lang): string {
+  const tail = WHY_TAIL[key];
+  return tail && direction === WHY_TAIL_DIRECTION[key] ? tail[lang] : GENERIC_WHY_TAIL[lang];
+}
+
 const WHY_TAIL: Partial<Record<KpiKey, Bilingual>> = {
   sleep_hours: {
     en: "Shorter sleep than usual often goes with feeling tired.",
@@ -550,7 +573,7 @@ function itemCaption(stats: Map<KpiKey, KpiStat>, item: Item, intent: ExplainInt
     }
     let tail = "";
     if (intent === "before" && !isDaysKey(item.key)) tail = comparison(stats, item, lang, facts);
-    else if (intent === "why") tail = (WHY_TAIL[key]?.[lang] ?? GENERIC_WHY_TAIL[lang]);
+    else if (intent === "why") tail = whyTail(key, item.direction, lang);
     else if (firstChart && !isDaysKey(item.key) && personalBand(stat) !== null) tail = BAND_TAIL[lang];
     caption[lang] = upper(join(base, tail), lang);
   }
@@ -848,8 +871,9 @@ export function buildStoryboard(input: StoryboardInput): Storyboard | null {
     const steps = (lang: Lang) =>
       actions.map((a, i) => `${ORDINAL[lang][i]}: ${lower(a.title[lang].replace(/[.!]$/u, ""), lang)}.`).join(" ");
     const caption: Bilingual = {
+      // with no step to suggest, no "here is what I suggest" in front of nothing
       en: join(
-        "Here is what I suggest.",
+        actions.length > 0 ? "Here is what I suggest." : "",
         steps("en"),
         alert ? ALERT_SPOKEN_NOTICE.en : "",
         guide ? `If anything gets worse, the ${guide.title.en} guide is right here.` : "",
@@ -857,7 +881,7 @@ export function buildStoryboard(input: StoryboardInput): Storyboard | null {
         DISCLAIMER.en,
       ),
       mn: join(
-        "Миний санал.",
+        actions.length > 0 ? "Миний санал." : "",
         steps("mn"),
         alert ? ALERT_SPOKEN_NOTICE.mn : "",
         guide ? `Бие муудвал "${guide.title.mn}" заавар энд байна.` : "",
@@ -954,6 +978,22 @@ export async function explainSummaryEvent(p: {
   }
 }
 
+/** an utterance that begins with a plain yes or no ("yes, why does my head hurt?", "үгүй, яагаад ядраад байна?") */
+const LEADING_YES_NO = /^\s*(?:yes|yeah|yep|no|nope|not\s+really|тийм|үгүй|байхгүй|байгаа|за(?![\p{L}]))(?![\p{L}])/iu;
+
+/**
+ * Do the words answer the open question with a value? A clear reading (a number, a named value) or a leading yes/no
+ * counts; the symptoms question's free-text reading does not ("why do I feel so tired?" would otherwise be stored as
+ * "no headache, no dizziness, no nausea" plus a note, found in the browser check).
+ */
+function answersOpen(question: Parameters<typeof getQuestion>[0], text: string, lang: Lang): boolean {
+  const records = interpretAnswer(getQuestion(question), text, lang).records.filter(
+    (r) => !String(r.key).endsWith("_note") && typeof r.value !== "string",
+  );
+  if (records.length === 0) return false;
+  return LEADING_YES_NO.test(text) || records.some((r) => r.confidence >= 0.7);
+}
+
 const PROPOSE_SHORT: Bilingual = {
   en: "Shall we log today's measurements now?",
   mn: "Одоо өнөөдрийн хэмжилтүүдээ тэмдэглэх үү?",
@@ -982,6 +1022,14 @@ export async function explainQuestionTurn(p: {
   // "why am I tired? I slept 5 hours" answers the open question: recorded as usual
   if (/\d/u.test(p.text)) return null;
   if (detectCrisis(p.text, true)) return null;
+  // "why does my chest hurt?": the emergency guidance opens from these words (CheckInExperience matches every crew
+  // line); a walkthrough on top of it would cover the guide and talk over it
+  if (matchEmergency(p.text, loadEmergencyLibrary().scenarios)) return null;
+  // "yes, why does my head hurt?" to the headache question, "yes let's start, how am I today?" to the proposal: the
+  // words answer what is open and are recorded as usual
+  const open = ctx.state === "KPI_CAPTURE" ? cursorQuestion(ctx) : null;
+  if (open && answersOpen(open, p.text, p.lang)) return null;
+  if ((ctx.state === "SMALL_TALK" || ctx.state === "GREETING") && ctx.proposed && interpretStart(p.text, p.lang) === "yes") return null;
 
   const values = (await loadTodayValues(p.crewId, p.checkInId)).values;
   const history = await loadHistory(p.crewId, p.localDate);

@@ -234,8 +234,13 @@ export function ExplainerStage({
 
   // focus moves into the walkthrough when it opens (screen readers hear the region; keys work at once)
   const dialogRef = useRef<HTMLDivElement>(null);
+  // and goes back to where it was when the walkthrough closes (a keyboard user is not dropped at the page's top)
   useEffect(() => {
+    const before = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     dialogRef.current?.focus({ preventScroll: true });
+    return () => {
+      if (before && before.isConnected) before.focus({ preventScroll: true });
+    };
   }, []);
 
   if (!beat) return null;
@@ -832,7 +837,7 @@ function DaysPanel({ panel, header, reduced }: { panel: Extract<ExplainPanel, { 
             className="ml-1 flex size-8 items-center justify-center rounded-full border-2 text-[10px] font-semibold"
             style={(panel.today ?? 0) > 0 ? { background: color, borderColor: color, color: "#04122B" } : { borderColor: CYAN, color: CYAN }}
           >
-            {t("checkin.explain.days.today").slice(0, 2)}
+            {t("checkin.explain.days.todayShort")}
           </li>
         </ol>
         <p className="text-[13px] text-white/65">{t("checkin.explain.days.count", { count: panel.count, n: panel.days.length })}</p>

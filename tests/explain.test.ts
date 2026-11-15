@@ -159,6 +159,15 @@ describe("which words ask for a walkthrough", () => {
     "I slept 7 hours",
     "Сайн уу",
     "how fast is the station going?",
+    // review fixes: a feeling shared, or a statement about how it feels, is friend mode's (or the open question's),
+    // never a chart
+    "I've never felt like this before",
+    "I feel like this before every launch, it's the first time I say it",
+    "Өмнө нь ийм муу байгаагүй",
+    "Why am I so lonely?",
+    "why do I feel so stressed",
+    "How am I today? I feel so homesick",
+    "Яагаад ийм гунигтай байна?",
   ])("not for %s", (text) => {
     expect(explainIntent(text)).toBeNull();
   });
@@ -281,6 +290,30 @@ describe("the storyboard", () => {
     expect(kinds(b)[kinds(b).length - 1]).toBe("actions");
     const calm = buildStoryboard({ intent: "why", values: STEADY_DAY, history: history(), final: false })!;
     expect(ids(calm)).toContain("note-nothing");
+  });
+
+  it("'why?' only links a value to the feeling in the direction it is about (a long night is not 'shorter sleep')", () => {
+    const long = buildStoryboard({ intent: "why", values: { ...STEADY_DAY, sleep_hours: 11 }, history: history(), final: false })!;
+    const sleep = long.beats.find((x) => x.id === "item-sleep_hours")!;
+    expect(sleep.panel).toMatchObject({ direction: "high" });
+    expect(sleep.caption.en).not.toMatch(/shorter sleep/i);
+    expect(sleep.caption.mn).not.toMatch(/бага унтах/);
+    expect(sleep.caption.en).toMatch(/may be part of how you feel/);
+    const wet = buildStoryboard({ intent: "why", values: { ...STEADY_DAY, water_ml: 4000 }, history: history(), final: false })!;
+    for (const b of wet.beats) expect(b.caption.en).not.toMatch(/less water/i);
+  });
+
+  it("the actions never open with 'here is what I suggest' in front of no step", () => {
+    for (const intent of ["why", "summary", "today"] as const) {
+      for (const values of [STEADY_DAY, BUSY_DAY]) {
+        const b = buildStoryboard({ intent, values, history: history(), final: intent !== "why" });
+        const actions = b?.beats.find((x) => x.panel.kind === "actions");
+        if (!actions || actions.panel.kind !== "actions") continue;
+        const empty = actions.panel.actions.length === 0;
+        expect(/Here is what I suggest/.test(actions.caption.en)).toBe(!empty);
+        expect(/Миний санал/.test(actions.caption.mn)).toBe(!empty);
+      }
+    }
   });
 
   it("mid check-in: no actions unless something is urgent", () => {
@@ -536,6 +569,36 @@ describe("the turn pipeline", () => {
     const answered = await playTurn("bat", id, "why am I so tired, I slept 5 hours");
     expect(eventsOf(answered, "explain")).toEqual([]);
     expect(eventsOf(answered, "measurement").map((m) => m.key)).toContain("sleep_hours");
+  });
+
+  it.each<[Lang, string]>([
+    // guide trigger words that are not on the serious-symptom list (detectCrisis already covers those)
+    ["en", "Why do I feel like my chest hurts?"],
+    ["mn", "Яагаад зүрх өвдөөд байна?"],
+  ])("emergency words never get a walkthrough on top of the guidance (%s)", async (lang, words) => {
+    const id = await startCheckIn("bat", lang);
+    for (const line of DEMO_SCRIPTS[lang].lines.slice(0, 4)) await playTurn("bat", id, line.say);
+    expect(explainIntent(words)).toBe("why");
+    expect(eventsOf(await playTurn("bat", id, words), "explain")).toEqual([]);
+  });
+
+  it("a 'why?' that also answers the open question is recorded, not explained", async () => {
+    const id = await startCheckIn("bat", "en");
+    for (const line of ["Hi Cosmo", "let's start", "6.5 hours", "4"]) await playTurn("bat", id, line);
+    const ctx = await ctxOf("bat", id);
+    expect(ctx.state).toBe("KPI_CAPTURE");
+    // the symptoms question is open: "yes, ... my head hurts" answers it (without the fix the walkthrough took it)
+    // a bare "why?" is not an answer, though the symptoms question reads any words as a note (browser check: it was
+    // stored as "no headache, no dizziness, no nausea")
+    const asked = await playTurn("bat", id, "Why do I feel so tired?");
+    expect(eventsOf(asked, "explain")).toHaveLength(1);
+    expect(eventsOf(asked, "measurement")).toEqual([]);
+    expect(await ctxOf("bat", id)).toEqual(ctx);
+    const words = "yes, why does my head hurt so much?";
+    expect(explainIntent(words)).toBe("why");
+    const answered = await playTurn("bat", id, words);
+    expect(eventsOf(answered, "explain")).toEqual([]);
+    expect(eventsOf(answered, "measurement").map((m) => m.key)).toContain("symptom_headache");
   });
 
   it("the audio route voices one line of the walkthrough turn (?part=n), and nothing past its end", async () => {
