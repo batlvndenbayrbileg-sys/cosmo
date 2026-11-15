@@ -183,7 +183,23 @@ function validateTurnEvent(type: string, raw: Rec): TurnEvent | null {
         state: raw.state,
         expectedQuestion: expected,
         ...(typeof raw.companion === "boolean" ? { companion: raw.companion } : {}),
+        ...(typeof raw.assistant === "boolean" ? { assistant: raw.assistant } : {}),
       };
+    }
+    case "action": {
+      // assistant mode (src/server/agent/assistantTurn.ts): open the dashboard, switch the person, show the assistant
+      const a = raw.action;
+      if (!isRecord(a)) return null;
+      if (a.kind === "dashboard") {
+        const checkInId = str(a.checkInId);
+        return checkInId === null ? null : { type, action: { kind: "dashboard", checkInId } };
+      }
+      if (a.kind === "identity") {
+        if (a.crewId !== null && typeof a.crewId !== "string") return null;
+        return { type, action: { kind: "identity", crewId: a.crewId } };
+      }
+      if (a.kind === "assistant") return { type, action: { kind: "assistant" } };
+      return null;
     }
     case "measurement": {
       if (!isOneOf(KPI_KEYS, raw.key)) return null;

@@ -16,6 +16,7 @@
 import { useCallback, useEffect, useReducer, useRef } from "react";
 import {
   ApiClientError,
+  createAssistant as apiCreateAssistant,
   createCheckIn as apiCreateCheckIn,
   fetchSnapshot,
   postLanguage as apiPostLanguage,
@@ -31,7 +32,7 @@ import {
   type SpeechStatus,
 } from "@/components/checkin/state";
 import type { CosmoEmotion } from "@/components/cosmo/types";
-import type { CheckInCreated, ConversationState, Lang, SummaryPayload } from "@/lib/types";
+import type { AssistantAction, CheckInCreated, ConversationState, Lang, SummaryPayload } from "@/lib/types";
 import type { ExplainEvent } from "@/lib/explain";
 import { noteSosFromTurn } from "@/components/sos/store";
 import { notePainFromTurn } from "@/components/pain/store";
@@ -70,12 +71,20 @@ export interface UseCheckInOptions {
   onResumedFinished?: (checkInId: string) => void;
   /** a request came back 401: the session is gone, send the person to the crew screen */
   onNoSession?: () => void;
+  /**
+   * The "/" screen: open the conversation in assistant mode (POST /api/checkins { mode: "assistant" }) instead of the
+   * daily check-up. `language` is the one heard in the first utterance; `welcome` as in api.createAssistant.
+   */
+  assistant?: { language?: Lang; welcome?: "quiet" | "back" };
+  /** assistant mode asks the screen to open the dashboard or to switch the person */
+  onAction?: (action: AssistantAction, checkInId: string) => void;
 }
 
 export interface UseCheckIn {
   state: CheckInState;
   createCheckIn: () => Promise<void>;
-  sendText: (text: string) => Promise<boolean>;
+  /** `greet`: assistant mode, the first words after the speaker was recognised (the reply greets them by name) */
+  sendText: (text: string, opts?: { greet?: boolean }) => Promise<boolean>;
   sendAudio: (audio: Blob) => Promise<boolean>;
   /** mirror the recorder's state into cosmoState */
   setRecording: (recording: boolean) => void;
@@ -137,9 +146,34 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckIn {
     creating.current = true;
     dispatch({ type: "CREATE_START" });
     try {
-      const created: CheckInCreated = await apiCreateCheckIn(optionsRef.current.language);
+      const assistant = optionsRef.current.assistant;
+      const created: CheckInCreated = assistant
+        ? await apiCreateAssistant({ language: assistant.language, welcome: assistant.welcome })
+        : await apiCreateCheckIn(optionsRef.current.language);
       checkInId.current = created.checkInId;
       dispatch({ type: "CREATED", created });
+
+      if (created.assistant) {
+        // the assistant says what the server chose to say now (a new greeting, a "welcome back"), resumed or not, and a
+        // confirmed check-up does not open the dashboard by itself: the assistant stays the screen
+        if (created.say) {
+          optionsRef.current.onAssistant?.({
+            checkInId: created.checkInId,
+            turnId: created.say.turnId,
+            text: created.say.text,
+            language: created.language,
+            emotion: "happy",
+          });
+        }
+        if (created.resumed) {
+          try {
+            dispatch({ type: "SNAPSHOT", snapshot: await fetchSnapshot(created.checkInId) });
+          } catch {
+            // the greeting is on screen; a missing history does not block the conversation
+          }
+        }
+        return;
+      }
 
       if (created.resumed) {
         try {
@@ -208,6 +242,7 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckIn {
           }
           if (event.type === "summary") summary = event.summary;
           if (event.type === "explain") explain = event;
+          if (event.type === "action") optionsRef.current.onAction?.(event.action, id);
           if (event.type === "transcript") turnLang = event.language;
           // "tell Earth": the server stored the urgent alert; the SOS card takes the photo for it (src/components/sos)
           if (event.type === "sos") noteSosFromTurn(event, turnLang, id);
@@ -241,10 +276,11 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckIn {
   );
 
   const sendText = useCallback(
-    (text: string): Promise<boolean> => {
+    (text: string, opts?: { greet?: boolean }): Promise<boolean> => {
       const trimmed = text.trim();
       if (trimmed === "") return Promise.resolve(false);
-      return runTurn((id, signal) => postTurnText(id, trimmed, signal), trimmed);
+      const extra = opts?.greet ? { greet: true } : undefined;
+      return runTurn((id, signal) => postTurnText(id, trimmed, signal, undefined, extra), trimmed);
     },
     [runTurn],
   );

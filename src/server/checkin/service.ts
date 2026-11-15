@@ -11,13 +11,16 @@ import type {
 import { computeBaselines, evaluateIndicator, type HistoryDay } from "@/lib/health";
 import { normalizeLanguageCode } from "@/lib/language";
 import { greeting } from "@/server/agent/templates";
-import { parseCtx, serializeCtx, type MachineCtx } from "@/server/agent/machine";
+import { initialCtx, parseCtx, serializeCtx, type MachineCtx } from "@/server/agent/machine";
+import { assistantGreeting, enterAssistant, welcomeBack } from "@/server/agent/assistantMode";
 import { now } from "@/server/clock";
 import {
   createCheckIn,
   getCheckIn,
+  getLatestCheckInForDate,
   getOpenCheckInForDate,
   listHistoryDays,
+  setCheckInLanguage,
   setCheckInState,
   type CheckInRecord,
 } from "@/server/db/repos/checkin";
@@ -82,6 +85,69 @@ export async function createOrResumeCheckIn(crewId: string, languageHint?: strin
       language,
       greeting: { turnId: turn.id, text: turn.text },
       resumed: false,
+    };
+  });
+}
+
+/**
+ * The assistant screen ("/"): today's newest check-in row (confirmed or not), or a new one, with assistant mode on
+ * (assistantMode.ts). The daily check-up on the same row waits where it stands and opens only when asked for.
+ *  - `language`: the language heard in the first utterance (a resumed row follows it);
+ *  - `welcome`: "quiet" = a new row's greeting is stored but not said (the reply to the first utterance greets by name
+ *    instead), "back" = a resumed row gets a short "Hi Bat, I'm right here" that is said (a person was switched).
+ * Serialised per crew member like createOrResumeCheckIn.
+ */
+export async function createOrResumeAssistant(
+  crewId: string,
+  opts: { language?: string | null; welcome?: "quiet" | "back" } = {},
+): Promise<CheckInCreated> {
+  const crew = await getCrewPublic(crewId); // NotFoundError for an unknown crew member
+  const at = now();
+  const db = await getDb();
+  const hint = normalizeLanguageCode(opts.language);
+  return db.transaction(async () => {
+    await lockKeyForTransaction(db, LOCK_SCOPE.checkInStart, crewId);
+    const existing = await getLatestCheckInForDate(crewId, localDateISO(at));
+
+    if (existing) {
+      const row = hint && existing.language !== hint ? await setCheckInLanguage(crewId, existing.id, hint) : existing;
+      const ctx = await loadMachineCtx(row);
+      if (!ctx.assistant) await saveMachineCtx(crewId, row.id, enterAssistant(ctx));
+      const turns = await listTurns(crewId, row.id);
+      const first = turns.find((t) => t.speaker === "cosmo");
+      const greetingTurn =
+        first ??
+        (await appendTurn(crewId, row.id, { speaker: "cosmo", text: assistantGreeting(crew, row.language), language: row.language, createdAt: at }));
+      let say: CheckInCreated["say"] = null;
+      if (opts.welcome === "back") {
+        const text = welcomeBack(crew, row.language);
+        const turn = await appendTurn(crewId, row.id, { speaker: "cosmo", text, language: row.language, createdAt: at });
+        say = { turnId: turn.id, text };
+      }
+      return {
+        checkInId: row.id,
+        state: row.confirmedAt !== null ? "DONE" : row.state,
+        language: row.language,
+        greeting: { turnId: greetingTurn.id, text: greetingTurn.text },
+        resumed: true,
+        assistant: true,
+        say,
+      };
+    }
+
+    const language: Lang = hint ?? crew.preferredLanguage;
+    const created = await createCheckIn(crewId, { language, startedAt: at });
+    await saveMachineCtx(crewId, created.id, enterAssistant(initialCtx()));
+    const text = assistantGreeting(crew, language);
+    const turn = await appendTurn(crewId, created.id, { speaker: "cosmo", text, language, createdAt: at });
+    return {
+      checkInId: created.id,
+      state: created.state,
+      language,
+      greeting: { turnId: turn.id, text },
+      resumed: false,
+      assistant: true,
+      say: opts.welcome === "quiet" ? null : { turnId: turn.id, text },
     };
   });
 }

@@ -3,7 +3,14 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { KpiKey, Lang, SummaryFindings, TurnRow } from "@/lib/types";
 import { KPI_DEFS, getQuestion } from "@/lib/kpi/registry";
 import { getEnv } from "@/server/env";
-import { LlmUnavailable, type Agent, type AgentArgs, type AgentDecision, type CompanionReplyArgs } from "./agent";
+import {
+  LlmUnavailable,
+  type Agent,
+  type AgentArgs,
+  type AgentDecision,
+  type AssistantReplyArgs,
+  type CompanionReplyArgs,
+} from "./agent";
 import { buildCompanionDirective, buildDirective } from "./directive";
 import { interpretYesNo, type InterpretedRecord } from "./interpret";
 import { SYSTEM_PROMPT } from "./prompt";
@@ -432,6 +439,17 @@ export class ClaudeAgent implements Agent {
     });
     try {
       const message = await this.call(this.withDirective(buildMessages(args.history, args.text), directive));
+      const out = textOf(message).trim();
+      return out.length > 0 ? out : null;
+    } catch (err) {
+      return this.noText(err);
+    }
+  }
+
+  /** Assistant mode: the conversation so far plus the assistant directive (same cached prefix); text only, checked by the pipeline. */
+  async assistantReply(args: AssistantReplyArgs): Promise<string | null> {
+    try {
+      const message = await this.call(this.withDirective(buildMessages(args.history, args.text), args.directive));
       const out = textOf(message).trim();
       return out.length > 0 ? out : null;
     } catch (err) {

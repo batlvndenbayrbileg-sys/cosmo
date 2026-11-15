@@ -334,7 +334,20 @@ export interface CheckInCreated {
   language: Lang;
   greeting: { turnId: string; text: string };
   resumed: boolean;
+  /** assistant mode is on (the "/" screen's default conversation, not the daily check-up); absent = off */
+  assistant?: boolean;
+  /** a line Cosmo says now (assistant mode: the greeting of a new conversation, or "welcome back" after a switch) */
+  say?: { turnId: string; text: string } | null;
 }
+
+/** what assistant mode asks the screen to do (src/server/agent/assistantTurn.ts) */
+export type AssistantAction =
+  /** open the dashboard of this confirmed check-in */
+  | { kind: "dashboard"; checkInId: string }
+  /** the speaker is someone else: sign in as `crewId` (null: forget who is speaking and listen again) */
+  | { kind: "identity"; crewId: string | null }
+  /** "back to assistant": show the assistant screen (also from the dashboard) */
+  | { kind: "assistant" };
 
 export interface CheckInSnapshot {
   checkIn: { id: string; state: ConversationState; language: Lang; confirmedAt: string | null };
@@ -351,7 +364,11 @@ export type TurnEvent =
       expectedQuestion: QuestionId | null;
       /** friend mode is on (a conversation on the side; the client offers a way back to the check-in) */
       companion?: boolean;
+      /** assistant mode on / off; absent = unchanged (only the assistant switches send it) */
+      assistant?: boolean;
     }
+  /** assistant mode asks the screen to open the dashboard or to switch the person */
+  | { type: "action"; action: AssistantAction }
   | {
       type: "measurement";
       key: KpiKey;

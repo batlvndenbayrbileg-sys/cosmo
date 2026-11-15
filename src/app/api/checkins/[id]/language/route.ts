@@ -48,7 +48,8 @@ export function POST(request: Request, context: { params: Promise<{ id: string }
     const ctx = await loadMachineCtx(checkIn);
 
     let text: string;
-    switch (ctx.state) {
+    // assistant mode: the check-up is paused, so only the switch is said (its question waits for "continue")
+    switch (ctx.assistant ? "ASSISTANT" : ctx.state) {
       case "GREETING":
       case "SMALL_TALK":
         text = greeting(await getCrewPublic(crewId), lang);

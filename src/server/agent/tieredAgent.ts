@@ -1,5 +1,12 @@
 import type { CrewPublic, Lang, SummaryFindings, TurnRow } from "@/lib/types";
-import { LlmUnavailable, type Agent, type AgentArgs, type AgentDecision, type CompanionReplyArgs } from "./agent";
+import {
+  LlmUnavailable,
+  type Agent,
+  type AgentArgs,
+  type AgentDecision,
+  type AssistantReplyArgs,
+  type CompanionReplyArgs,
+} from "./agent";
 import type { ResultsFacts } from "./resultsFacts";
 
 /**
@@ -114,5 +121,9 @@ export class TieredAgent implements Agent {
 
   companionReply(args: CompanionReplyArgs): Promise<string | null> {
     return this.firstText("companion reply", (a) => (a.companionReply ? a.companionReply(args) : null));
+  }
+
+  assistantReply(args: AssistantReplyArgs): Promise<string | null> {
+    return this.firstText("assistant reply", (a) => (a.assistantReply ? a.assistantReply(args) : null));
   }
 }

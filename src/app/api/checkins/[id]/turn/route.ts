@@ -17,6 +17,8 @@ const jsonSchema = z
   .object({
     text: z.string().trim().min(1).max(MAX_UTTERANCE_CHARS),
     language: z.string().min(2).max(20).optional(),
+    /** assistant mode: the first words after the speaker was recognised (the reply greets them by name) */
+    greet: z.boolean().optional(),
   })
   .strict();
 
@@ -67,7 +69,7 @@ async function readInput(request: Request, fallbackHint: Lang | null, expected: 
   }
   const parsed = jsonSchema.safeParse(json);
   if (!parsed.success) throw new HttpError(400, "BAD_INPUT", 'Expected { "text": string, "language"?: string }');
-  return { kind: "typed", text: parsed.data.text, languageHint: parsed.data.language ?? null };
+  return { kind: "typed", text: parsed.data.text, languageHint: parsed.data.language ?? null, greet: parsed.data.greet === true };
 }
 
 /**

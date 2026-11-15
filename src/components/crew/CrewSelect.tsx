@@ -20,9 +20,10 @@ type LoadState = { status: "loading" } | { status: "ready"; crew: CrewPublic[] }
 const GRID = "grid grid-cols-1 gap-4 min-[480px]:grid-cols-2 lg:grid-cols-4 lg:gap-5";
 
 /**
- * Start screen: the crew roster (name, role, avatar) and nothing else. No health data is requested
- * or shown here. Tapping a card opens the signed session (POST /api/session { crewId }) and goes to
- * /checkin. The quiet "Earth console" link leads to /earth, which starts its own ground session.
+ * The crew picker (/crew, kept for demos: the "/" screen recognises the speaker by itself): the roster (name, role,
+ * avatar) and nothing else. No health data is requested or shown here. Tapping a card opens the signed session
+ * (POST /api/session { crewId }) and goes to the assistant screen "/". The quiet "Earth console" link leads to /earth,
+ * which starts its own ground session.
  */
 export function CrewSelect() {
   const router = useRouter();
@@ -61,7 +62,8 @@ export function CrewSelect() {
     saveSelectedCrew(crew);
     // the greeting is spoken in the crew member's preferred language, so the screen follows it
     setLang(crew.preferredLanguage);
-    router.push("/checkin");
+    // the assistant screen, already signed in as this person (the daily check-up opens from its button there)
+    router.push("/");
   };
 
   return (

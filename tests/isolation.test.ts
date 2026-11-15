@@ -105,8 +105,8 @@ const notFound = (fn: () => Promise<unknown>) => expect(fn()).rejects.toThrow(No
 const REGISTRY: Record<string, readonly string[]> = {
   crew: ["listCrewPublic", "getCrewPublic"],
   checkin: [
-    "createCheckIn", "getCheckIn", "getOpenCheckInForDate", "setCheckInState", "setCheckInLanguage", "confirmCheckIn",
-    "latestConfirmedCheckIn", "listHistoryDays",
+    "createCheckIn", "getCheckIn", "getOpenCheckInForDate", "getLatestCheckInForDate", "setCheckInState",
+    "setCheckInLanguage", "confirmCheckIn", "latestConfirmedCheckIn", "listHistoryDays",
   ],
   measurement: ["upsertMeasurement", "listMeasurements"],
   turn: ["appendTurn", "listTurns"],
@@ -154,6 +154,14 @@ const cases: Record<string, () => Promise<void>> = {
     // A has no open check-in that day, and must never be handed B's
     expect(await checkinRepo.getOpenCheckInForDate(A, dateOf(12))).toBeNull();
     expect(await checkinRepo.getOpenCheckInForDate(B, dateOf(11))).toBeNull(); // confirmed: not open
+  },
+  "checkin.getLatestCheckInForDate": async () => {
+    // the assistant screen's row: today's newest, confirmed or not, and only ever the caller's own
+    expect((await checkinRepo.getLatestCheckInForDate(B, dateOf(12)))?.id).toBe(w.bOpen);
+    expect((await checkinRepo.getLatestCheckInForDate(B, dateOf(11)))?.id).toBe(w.bCheckIn);
+    expect(await checkinRepo.getLatestCheckInForDate(A, dateOf(12))).toBeNull();
+    expect(await checkinRepo.getLatestCheckInForDate(A, dateOf(11))).toBeNull();
+    expect((await checkinRepo.getLatestCheckInForDate(A, dateOf(10)))?.id).toBe(w.aCheckIn);
   },
   "checkin.setCheckInState": async () => {
     await notFound(() => checkinRepo.setCheckInState(A, w.bCheckIn, "DONE", "{}"));

@@ -74,6 +74,8 @@ import { buildResultsFacts, numeralsAreGrounded, type ResultsFacts } from "./res
 import { answerSignatureQuestion, insertBeforeDisclaimer, panelClockDay, signatureFollowUp } from "./signature";
 import { showEvent } from "./show";
 import { explainQuestionTurn, explainSummaryEvent } from "./explain";
+import { assistantTurn } from "./assistantTurn";
+import { assistantCrisis } from "./assistantMode";
 
 /** without the model: today's headline, the first suggestion, and an invitation to ask about any part */
 export function offlineResultsAnswer(facts: ResultsFacts, lang: Lang): string {
@@ -112,6 +114,8 @@ export interface TurnInput {
   languageHint?: string | null;
   /** speech-to-text time, reported back in the timing event */
   sttMs?: number;
+  /** assistant mode: the first words after the speaker was recognised; the reply greets them by name */
+  greet?: boolean;
 }
 
 export interface RunTurnArgs {
@@ -637,6 +641,34 @@ async function* runTurnInner(args: RunTurnArgs, started: number): AsyncGenerator
     return;
   }
 
+  /* ── assistant mode, "back to assistant" and "I'm Bat" (assistantTurn.ts): answered there, the check-up waits ── */
+  // the first words (who is speaking), crisis words and a pending "shall I add it?" go there before anything else;
+  // otherwise the pain check and the walkthrough come first, so "it hurts" and "how am I today?" work there too
+  const runAssistant = () =>
+    assistantTurn({
+      crewId,
+      checkIn,
+      crew,
+      ctx0,
+      text,
+      lang,
+      history,
+      source: input.kind === "voice" ? "voice" : getEnv().demoMode === "scripted" ? "simulated" : "typed",
+      greet: input.greet === true,
+      agent: args.agent ?? defaultAgent(),
+    });
+  const assistantFirst =
+    input.greet === true || (ctx0.assistant && (assistantCrisis(text) !== null || ctx0.assistantOffer !== null));
+  if (assistantFirst) {
+    const first = await runAssistant();
+    if (first) {
+      yield* first.events;
+      yield { type: "timing", sttMs: Math.max(0, Math.round(input.sttMs ?? 0)), llmMs: first.llmMs, totalMs: Math.round(performance.now() - started) };
+      yield { type: "done" };
+      return;
+    }
+  }
+
   /* ── "it hurts": the body map, the related data, the guide and a report to Earth (src/server/pain.ts) ── */
   // checked before the walkthrough: pain is a safety path and must never be answered with charts
   const pain = await painTurn({ crewId, checkInId, localDate: checkIn.localDate, text, lang, ctx: ctx0, history });
@@ -652,6 +684,14 @@ async function* runTurnInner(args: RunTurnArgs, started: number): AsyncGenerator
   if (explained) {
     yield* explained;
     yield { type: "timing", sttMs: Math.max(0, Math.round(input.sttMs ?? 0)), llmMs: 0, totalMs: Math.round(performance.now() - started) };
+    yield { type: "done" };
+    return;
+  }
+
+  const assistant = assistantFirst ? null : await runAssistant();
+  if (assistant) {
+    yield* assistant.events;
+    yield { type: "timing", sttMs: Math.max(0, Math.round(input.sttMs ?? 0)), llmMs: assistant.llmMs, totalMs: Math.round(performance.now() - started) };
     yield { type: "done" };
     return;
   }

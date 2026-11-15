@@ -11,6 +11,7 @@ import { painStrings } from "./strings/pain";
 import { signatureStrings } from "./strings/signature";
 import { labsStrings } from "./strings/labs";
 import { listenStrings } from "./strings/listen";
+import { assistantStrings } from "./strings/assistant";
 import { showArea } from "./strings/show";
 import { explainStrings } from "./strings/explain";
 
@@ -25,9 +26,9 @@ export const areaDictionaries = {
   // the listening pill's keys ("checkin.listen.*") and the panels Cosmo shows on screen ("checkin.show.*") live in the
   // check-in area
   checkin: {
-    // Cosmo's step-by-step walkthrough ("checkin.explain.*") too
-    en: { ...checkinStrings.en, ...listenStrings.en, ...showCheckin.en, ...explainStrings.en },
-    mn: { ...checkinStrings.mn, ...listenStrings.mn, ...showCheckin.mn, ...explainStrings.mn },
+    // Cosmo's step-by-step walkthrough ("checkin.explain.*") and the assistant too
+    en: { ...checkinStrings.en, ...listenStrings.en, ...showCheckin.en, ...explainStrings.en, ...assistantStrings.en },
+    mn: { ...checkinStrings.mn, ...listenStrings.mn, ...showCheckin.mn, ...explainStrings.mn, ...assistantStrings.mn },
   },
   crew: crewStrings,
   // Signature Triage keys ("dashboard.signature.*") and the Labs tab keys ("dashboard.labs.*") live in the dashboard area

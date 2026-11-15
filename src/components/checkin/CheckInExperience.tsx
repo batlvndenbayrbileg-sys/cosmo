@@ -50,7 +50,7 @@ import { PainStage } from "@/components/pain/PainStage";
 import { detectPain } from "@/lib/pain/detect";
 import { ShieldAlert } from "lucide-react";
 import { bubbleItems, computeStageLayout } from "./bubbles";
-import type { CheckInError } from "./state";
+import { freshCrewLines, type CheckInError } from "./state";
 import { useDemoRunner } from "./useDemoRunner";
 import { faceFollowPref } from "./face-follow-pref";
 import type { FaceTrackFailure } from "./face-tracker";
@@ -62,7 +62,8 @@ import { useRecorder } from "@/hooks/useRecorder";
 import { useSpeechPlayer, type SpeakTurn, type SpeechPlayer } from "@/hooks/useSpeechPlayer";
 import { useI18n } from "@/i18n/I18nProvider";
 import { cn } from "@/lib/utils";
-import type { DashboardPayload, HealthResponse, SummaryPayload } from "@/lib/types";
+import type { CrewPublic, DashboardPayload, HealthResponse, Lang, SummaryPayload } from "@/lib/types";
+import { IdentityChip, ModeControl } from "@/components/assistant/AssistantControls";
 
 /** Let Cosmo's glide into the dashboard settle before she starts reading the summary. */
 const SUMMARY_SPEECH_DELAY_MS = 700;
@@ -129,10 +130,28 @@ function spaceBelongsToControl(target: EventTarget | null): boolean {
   return target.closest("input, textarea, select, button, a, [contenteditable='true']") !== null;
 }
 
-export function CheckInExperience() {
+/** the "/" screen (src/components/assistant/AssistantHome): who is speaking and how the conversation opens */
+export interface AssistantEntry {
+  crew: CrewPublic;
+  roster: CrewPublic[];
+  /** the person's first words (heard while they were recognised): answered first, greeting them by name */
+  firstText: string | null;
+  language?: Lang;
+  welcome?: "quiet" | "back";
+  /** the words named someone else (or "switch person": null) */
+  onIdentity: (crewId: string | null) => void;
+  /** the name chip: another crew member was tapped */
+  onChoose: (crew: CrewPublic) => void;
+  onNoSession: () => void;
+  /** every utterance first: true = handled (another person), a string = send it as text, null = send the audio */
+  routeUtterance: (blob: Blob) => Promise<true | string | null>;
+}
+
+export function CheckInExperience({ entry, assistant: entryProps }: { entry?: "assistant"; assistant?: AssistantEntry } = {}) {
   const router = useRouter();
   const { lang, t } = useI18n();
   const viewport = useViewport();
+  const assistantEntry = entry === "assistant" ? (entryProps ?? null) : null;
 
   const rawCrew = useSyncExternalStore(subscribeNever, readSelectedCrewRaw, () => null);
   const crew = useMemo(() => parseStoredCrew(rawCrew), [rawCrew]);
@@ -176,6 +195,8 @@ export function CheckInExperience() {
   // The speech player and the recorder are created after useCheckIn (they report into it), so the
   // check-in callbacks reach them through refs that are filled in an effect below.
   const speakRef = useRef<SpeechPlayer["speak"] | null>(null);
+  /** assistant mode: leave the dashboard for the conversation stage (set below, once the tour controls exist) */
+  const backToStageRef = useRef<() => void>(() => {});
   const cancelRecordingRef = useRef<(() => void) | null>(null);
   /** the last thing Cosmo said, replayed by "Tap to start" when autoplay was blocked */
   const lastTurn = useRef<SpeakTurn | null>(null);
@@ -276,7 +297,14 @@ export function CheckInExperience() {
       setConversationMode(false);
       void openDashboard(checkInId, null);
     },
-    onNoSession: () => router.replace("/"),
+    onNoSession: () => (assistantEntry ? assistantEntry.onNoSession() : router.replace("/")),
+    // the "/" screen: the assistant conversation, with the daily check-up behind its button (assistantTurn.ts)
+    assistant: assistantEntry ? { language: assistantEntry.language, welcome: assistantEntry.welcome } : undefined,
+    onAction: (action) => {
+      if (action.kind === "dashboard") void openDashboard(action.checkInId, null);
+      else if (action.kind === "identity") assistantEntry?.onIdentity(action.crewId);
+      else backToStageRef.current();
+    },
   });
   const { state } = checkIn;
   useEffect(() => {
@@ -303,7 +331,16 @@ export function CheckInExperience() {
       bargeIn.current = { active: false, heard: false };
       if (blob.size < MIN_AUDIO_BYTES) return;
       playHeardEarcon(); // "got it", the moment the words are sent
-      void sendAudio(blob);
+      if (!assistantEntry) {
+        void sendAudio(blob);
+        return;
+      }
+      // the "/" screen: a clearly different voice is recognised first (src/components/assistant/AssistantHome)
+      void assistantEntry.routeUtterance(blob).then((routed) => {
+        if (routed === true) return;
+        if (typeof routed === "string") void sendText(routed);
+        else void sendAudio(blob);
+      });
     },
     // the person talks over Cosmo: she stops at once and listens (team feedback 2026-11-15)
     onSpeechStart: ({ bargeIn: overCosmo }) => {
@@ -486,8 +523,9 @@ export function CheckInExperience() {
       !canTalk ||
       keyboardOpen ||
       player.blocked ||
-      // during the check-in a finished conversation stops listening; on the dashboard it is the Q&A
-      (talking && state.conversation === "DONE") ||
+      // during the check-in a finished conversation stops listening; on the dashboard it is the Q&A (the assistant
+      // keeps listening after a finished check-up)
+      (talking && state.conversation === "DONE" && !state.assistant) ||
       state.busy ||
       (state.speech !== "idle" && !speaking) ||
       recorder.recording ||
@@ -512,6 +550,7 @@ export function CheckInExperience() {
     keyboardOpen,
     player.blocked,
     state.conversation,
+    state.assistant,
     state.busy,
     state.speech,
     recorder.recording,
@@ -531,7 +570,7 @@ export function CheckInExperience() {
     canTalk,
     keyboardOpen,
     blocked: player.blocked,
-    finished: talking && state.conversation === "DONE",
+    finished: talking && state.conversation === "DONE" && !state.assistant,
     busy: state.busy,
     demoRunning: demo.running,
   });
@@ -551,6 +590,15 @@ export function CheckInExperience() {
     },
     [cancelRecorder, stopSpeech, sendText],
   );
+
+  // the "/" screen: the person's first words (heard while they were recognised) are answered first, by name
+  const firstSent = useRef(false);
+  const firstText = assistantEntry?.firstText ?? null;
+  useEffect(() => {
+    if (!firstText || firstSent.current || !ready || state.busy) return;
+    firstSent.current = true;
+    void sendText(firstText, { greet: true });
+  }, [firstText, ready, state.busy, sendText]);
 
   const retryDashboard = useCallback(() => {
     if (dashboardFailed) void openDashboard(dashboardFailed.checkInId, dashboardFailed.summary);
@@ -620,9 +668,8 @@ export function CheckInExperience() {
   const checkedLines = useRef(0);
   useEffect(() => {
     const lines = state.transcript;
-    for (let i = checkedLines.current; i < lines.length; i++) {
-      const line = lines[i];
-      if (line.speaker !== "crew") continue;
+    // only what was said in this visit: a resumed conversation's history does not reopen a guide (or alert again)
+    for (const line of freshCrewLines(lines, checkedLines.current)) {
       const hit = matchEmergency(line.text, emergencyLib);
       // "my chest hurts": the pain check (src/components/pain) shows the body and the data first and opens the guide
       // after Cosmo's line; while talking (friend mode) the guide still opens at once
@@ -683,6 +730,16 @@ export function CheckInExperience() {
     tourCancelled.current = true;
     stopSpeech();
   }, [stopSpeech]);
+
+  // assistant mode: "back to assistant" from the dashboard returns to the conversation stage (Cosmo glides back)
+  const backToStage = useCallback(() => {
+    if (touring) skipTour();
+    setPhase("conversation");
+    setConversationMode(true);
+  }, [touring, skipTour]);
+  useEffect(() => {
+    backToStageRef.current = backToStage;
+  }, [backToStage]);
 
   const handleDashboardMic = useCallback(() => {
     if (recorder.recording) {
@@ -763,7 +820,30 @@ export function CheckInExperience() {
 
   /* ───────────── render ───────────── */
 
-  const variant = crew?.mascotVariant ?? dashboard?.crew.mascotVariant ?? 0;
+  const variant = assistantEntry?.crew.mascotVariant ?? crew?.mascotVariant ?? dashboard?.crew.mascotVariant ?? 0;
+  /** the "/" screen's own controls: the daily check-up / back button and who is speaking */
+  const modeControl = (placement: "stage" | "dashboard") =>
+    assistantEntry ? (
+      <div
+        className={cn(
+          "fixed z-[60]",
+          placement === "dashboard"
+            ? // phones: on the left, which stays on screen even when the dashboard is wider than the phone
+              "left-4 bottom-[5.5rem] sm:top-20 sm:right-6 sm:bottom-auto sm:left-auto"
+            : // phones: above the typing field while it is open (it would cover the field)
+              cn("right-4 sm:right-6 sm:bottom-44", keyboardOpen ? "bottom-[10.5rem]" : "bottom-[7.5rem]"),
+        )}
+      >
+        <ModeControl
+          assistant={state.assistant}
+          conversation={state.conversation}
+          placement={placement}
+          disabled={!ready || state.busy || demo.running}
+          onSay={handleSendText}
+          onBackLocal={backToStage}
+        />
+      </div>
+    ) : null;
   const cosmoState = phase === "preparing" ? "thinking" : state.cosmoState;
 
   const cosmo = (
@@ -841,12 +921,14 @@ export function CheckInExperience() {
           ) : null}
           {emergencyUi("dashboard")}
           {explainerUi}
+          {modeControl("dashboard")}
         </LayoutGroup>
       </MotionConfig>
     );
   }
 
-  const items = bubbleItems(state.cards);
+  // assistant mode shows no capture bubbles: the check-up's values come back with the check-up
+  const items = bubbleItems(state.assistant ? [] : state.cards);
   const layout = computeStageLayout(viewport.width, viewport.height, items.length);
   const { mascot } = layout;
   const preparing = phase === "preparing";
@@ -893,7 +975,7 @@ export function CheckInExperience() {
           data-phase={phase}
           className="aegis-bg fixed inset-0 z-50 overflow-x-hidden overflow-y-auto"
         >
-          <h1 className="sr-only">{t("checkin.page.label")}</h1>
+          <h1 className="sr-only">{t(assistantEntry && state.assistant ? "checkin.assistant.stage.label" : "checkin.page.label")}</h1>
           <p role="status" className="sr-only">
             {preparing ? t("checkin.preparing") : t(`checkin.status.${statusKey}`)}
           </p>
@@ -1124,23 +1206,38 @@ export function CheckInExperience() {
             onDone={stopRecorder}
           />
 
-          <Corner className="fixed top-4 left-4">
-            <BackControl />
-          </Corner>
+          {assistantEntry ? (
+            <div className="fixed top-4 left-4 z-[55] sm:top-auto sm:bottom-[5.5rem]">
+              <IdentityChip
+                crew={assistantEntry.crew}
+                roster={assistantEntry.roster}
+                onChoose={assistantEntry.onChoose}
+                onDetect={() => assistantEntry.onIdentity(null)}
+              />
+            </div>
+          ) : (
+            <Corner className="fixed top-4 left-4">
+              <BackControl />
+            </Corner>
+          )}
+          {!preparing ? modeControl("stage") : null}
           <Corner className="fixed top-4 right-4">
             <FaceFollowControl on={faceFollow} status={face.status} onToggle={toggleFaceFollow} />
             <LanguageCaptionControls captions={captions} onCaptions={setCaptions} />
           </Corner>
           {!preparing ? (
             <>
-              <Corner className="fixed bottom-16 left-4 sm:bottom-9">
-                <DemoControl
-                  running={demo.running}
-                  disabled={!ready || state.busy}
-                  onRun={() => void demo.run()}
-                  onStop={demo.stop}
-                />
-              </Corner>
+              {/* the scripted demo is a check-up: it is offered once the check-up runs */}
+              {!state.assistant ? (
+                <Corner className="fixed bottom-16 left-4 sm:bottom-9">
+                  <DemoControl
+                    running={demo.running}
+                    disabled={!ready || state.busy}
+                    onRun={() => void demo.run()}
+                    onStop={demo.stop}
+                  />
+                </Corner>
+              ) : null}
               <Corner className="fixed right-4 bottom-16 items-end sm:bottom-9">
                 <KeyboardControl
                   open={keyboardOpen}
