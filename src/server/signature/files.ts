@@ -5,6 +5,8 @@ import "server-only";
  * section 4.5). Files are found by name fragment (spec section 3), read once and parsed + QC'd by the pure loader in
  * src/lib/signature/load.ts. The result is memoised per process: the files never change at run time.
  * next.config.ts `outputFileTracingIncludes` puts the CSVs into the server trace of the routes that use this.
+ * Every fs call is marked `turbopackIgnore`: the paths are built while walking the folder, which Turbopack cannot
+ * scope, so without the mark it traced the whole project (build warning; T10 fix, tests/signature/tracing.test.ts).
  */
 
 import fs from "node:fs";
@@ -23,7 +25,7 @@ export function labDataDir(): string {
 export function findLabFile(kind: LabFileKind, dir: string = labDataDir()): string {
   const hint = FILE_HINTS[kind].toLowerCase();
   const walk = (d: string): string | null => {
-    const entries = fs.readdirSync(d, { withFileTypes: true });
+    const entries = fs.readdirSync(/*turbopackIgnore: true*/ d, { withFileTypes: true });
     const files = entries.filter((e) => e.isFile()).map((e) => e.name).sort();
     for (const f of files) {
       const lower = f.toLowerCase();
@@ -42,7 +44,7 @@ export function findLabFile(kind: LabFileKind, dir: string = labDataDir()): stri
 
 /** the four lab files as UTF-8 text */
 export function readLabFiles(dir: string = labDataDir()): LabFiles {
-  const read = (kind: LabFileKind) => fs.readFileSync(findLabFile(kind, dir), "utf8");
+  const read = (kind: LabFileKind) => fs.readFileSync(/*turbopackIgnore: true*/ findLabFile(kind, dir), "utf8");
   return { cbc: read("cbc"), cmp: read("cmp"), cardio: read("cardio"), immune: read("immune") };
 }
 
@@ -60,7 +62,7 @@ export function getLabData(): LabData {
 export function findSecondAssayFile(dir: string = labDataDir()): string {
   const hint = SECOND_ASSAY_FILE_HINT.toLowerCase();
   const walk = (d: string): string | null => {
-    const entries = fs.readdirSync(d, { withFileTypes: true });
+    const entries = fs.readdirSync(/*turbopackIgnore: true*/ d, { withFileTypes: true });
     const files = entries.filter((e) => e.isFile()).map((e) => e.name).sort();
     for (const f of files) {
       const lower = f.toLowerCase();
@@ -84,7 +86,7 @@ let cachedSecond: SecondAssayTable | null = null;
  * Callers must not mutate it. The main loader (getLabData) is independent of it.
  */
 export function loadSecondAssay(): SecondAssayTable {
-  cachedSecond ??= parseSecondAssay(fs.readFileSync(findSecondAssayFile(), "utf8"));
+  cachedSecond ??= parseSecondAssay(fs.readFileSync(/*turbopackIgnore: true*/ findSecondAssayFile(), "utf8"));
   return cachedSecond;
 }
 
