@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { BUILTIN_CALL_FOR_HELP, isReviewed, matchEmergency, scenarioSchema } from "@/lib/emergency";
+import { BUILTIN_CALL_FOR_HELP, BUILTIN_GUIDES, isReviewed, matchEmergency, scenarioSchema } from "@/lib/emergency";
 import { emergencyImagePath, loadEmergencyLibrary } from "@/server/emergency/load";
 
 const valid = {
@@ -49,20 +49,23 @@ describe("scenario format", () => {
 });
 
 describe("loadEmergencyLibrary", () => {
-  it("loads valid folders, skips broken ones with a reason, ignores _drafts, always ends with the built-in card", () => {
+  it("loads valid folders, skips broken ones with a reason, ignores _drafts, then the built-in guides", () => {
     const lib = loadEmergencyLibrary(dir);
-    expect(lib.scenarios.map((s) => s.id)).toEqual(["fainting-unconscious", BUILTIN_CALL_FOR_HELP.id]);
+    expect(lib.scenarios.map((s) => s.id)).toEqual(["fainting-unconscious", ...BUILTIN_GUIDES.map((g) => g.id)]);
+    expect(lib.scenarios.at(-1)?.id).toBe(BUILTIN_CALL_FOR_HELP.id);
     expect(lib.problems.some((p) => p.startsWith("broken:"))).toBe(true);
     expect(lib.problems.some((p) => p.startsWith("wrong-id:"))).toBe(true);
+    // the team folder "fainting-unconscious" is an extra; a folder named "fainting" would replace the built-in one
+    expect(lib.scenarios.filter((s) => s.id === "fainting")).toHaveLength(1);
     const s = lib.scenarios[0];
     expect(s.steps[0].imageUrl).toBe("/api/emergency/fainting-unconscious/image/step-1.png");
     expect(s.steps[1].imageUrl).toBeNull();
   });
 
-  it("works with no folder at all (built-in card only)", () => {
+  it("works with no folder at all (the built-in guides only, as on Vercel)", () => {
     const lib = loadEmergencyLibrary(path.join(dir, "does-not-exist"));
-    expect(lib.scenarios).toHaveLength(1);
-    expect(lib.scenarios[0].builtIn).toBe(true);
+    expect(lib.scenarios).toHaveLength(BUILTIN_GUIDES.length);
+    expect(lib.scenarios.every((s) => s.builtIn)).toBe(true);
   });
 });
 
@@ -85,8 +88,9 @@ describe("matchEmergency", () => {
     expect(matchEmergency("Бат ухаан алдсан байна", lib())?.scenarioId).toBe("fainting-unconscious");
   });
 
-  it("falls back to the built-in card for the app's serious-symptom words", () => {
-    expect(matchEmergency("I have chest pain", lib())?.scenarioId).toBe(BUILTIN_CALL_FOR_HELP.id);
+  it("routes to the built-in guides, and falls back to the get-help card for other serious-symptom words", () => {
+    expect(matchEmergency("I have chest pain", lib())?.scenarioId).toBe("chest-pain");
+    expect(matchEmergency("I am in severe pain", lib())?.scenarioId).toBe(BUILTIN_CALL_FOR_HELP.id);
   });
 
   it("stays closed for ordinary answers", () => {
