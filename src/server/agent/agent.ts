@@ -117,6 +117,21 @@ export interface Agent {
    * signature.acceptSignatureAnswer (numbers grounded, disclaimer last); null (or a throw) means "use the template".
    */
   answerAboutSignature?(args: SignatureAnswerArgs): Promise<string | null>;
+  /**
+   * Optional: assistant mode (assistantMode.ts), the default conversation outside the daily check-up. Word the answer to
+   * anything the astronaut asks from `directive` (which carries the code-computed facts). The pipeline accepts the text
+   * only when it passes assistantMode.isSaneAssistantReply; null (or a throw) means "use the code-written reply".
+   */
+  assistantReply?(args: AssistantReplyArgs): Promise<string | null>;
+}
+
+export interface AssistantReplyArgs {
+  /** assistantMode.buildAssistantDirective: mode, language, name, check-up progress and the facts */
+  directive: string;
+  text: string;
+  lang: Lang;
+  /** earlier turns of this conversation, oldest first, WITHOUT the current utterance */
+  history: TurnRow[];
 }
 
 export interface CompanionReplyArgs {

@@ -1,7 +1,7 @@
 import type { CrewPublic, KpiKey, Lang, SummaryFindings, TurnRow } from "@/lib/types";
 import type { ResultsFacts } from "./resultsFacts";
 import { getQuestion } from "@/lib/kpi/registry";
-import type { Agent, AgentArgs, AgentDecision, CompanionReplyArgs } from "./agent";
+import type { Agent, AgentArgs, AgentDecision, AssistantReplyArgs, CompanionReplyArgs } from "./agent";
 import { ScriptedAgent } from "./scriptedAgent";
 import type { SignatureAnswerArgs } from "./signature";
 
@@ -109,5 +109,10 @@ export class HybridAgent implements Agent {
   /** friend mode: always the live model (warmth is its job); the pipeline falls back to the templates */
   async companionReply(args: CompanionReplyArgs): Promise<string | null> {
     return this.live.companionReply ? this.live.companionReply(args) : null;
+  }
+
+  /** assistant mode: always the live model; the pipeline checks the wording and falls back to the code-written reply */
+  async assistantReply(args: AssistantReplyArgs): Promise<string | null> {
+    return this.live.assistantReply ? this.live.assistantReply(args) : null;
   }
 }

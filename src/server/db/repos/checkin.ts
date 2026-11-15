@@ -80,6 +80,23 @@ export async function getOpenCheckInForDate(crewId: string, dateISO: string): Pr
   return row ? mapCheckIn(row) : null;
 }
 
+/**
+ * The newest check-in of the given server-local date, confirmed or not, or null. The assistant screen continues on it,
+ * so a check-up done this morning is "done" for the rest of the day instead of starting a second one.
+ */
+export async function getLatestCheckInForDate(crewId: string, dateISO: string): Promise<CheckInRecord | null> {
+  assertDateISO(dateISO);
+  const db = await getDb();
+  const row = await db.get<CheckInDbRow>(
+    `SELECT ${CHECK_IN_COLUMNS} FROM check_in
+      WHERE crew_id = ? AND local_date = ?
+      ORDER BY started_at DESC, rowid DESC LIMIT 1`,
+    crewId,
+    dateISO,
+  );
+  return row ? mapCheckIn(row) : null;
+}
+
 /** Persists the state machine position. `stateJson` is left untouched when omitted. */
 export async function setCheckInState(
   crewId: string,

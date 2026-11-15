@@ -72,6 +72,7 @@ import type { Baseline } from "@/lib/health/baseline";
 import { buildResultsFacts, numeralsAreGrounded, type ResultsFacts } from "./resultsFacts";
 import { answerSignatureQuestion, insertBeforeDisclaimer, panelClockDay, signatureFollowUp } from "./signature";
 import { showEvent } from "./show";
+import { assistantTurn } from "./assistantTurn";
 
 /** without the model: today's headline, the first suggestion, and an invitation to ask about any part */
 export function offlineResultsAnswer(facts: ResultsFacts, lang: Lang): string {
@@ -110,6 +111,8 @@ export interface TurnInput {
   languageHint?: string | null;
   /** speech-to-text time, reported back in the timing event */
   sttMs?: number;
+  /** assistant mode: the first words after the speaker was recognised; the reply greets them by name */
+  greet?: boolean;
 }
 
 export interface RunTurnArgs {
@@ -631,6 +634,26 @@ async function* runTurnInner(args: RunTurnArgs, started: number): AsyncGenerator
   if (sos) {
     yield* sos;
     yield { type: "timing", sttMs: Math.max(0, Math.round(input.sttMs ?? 0)), llmMs: 0, totalMs: Math.round(performance.now() - started) };
+    yield { type: "done" };
+    return;
+  }
+
+  /* ── assistant mode, "back to assistant" and "I'm Bat" (assistantTurn.ts): answered there, the check-up waits ── */
+  const assistant = await assistantTurn({
+    crewId,
+    checkIn,
+    crew,
+    ctx0,
+    text,
+    lang,
+    history,
+    source: input.kind === "voice" ? "voice" : getEnv().demoMode === "scripted" ? "simulated" : "typed",
+    greet: input.greet === true,
+    agent: args.agent ?? defaultAgent(),
+  });
+  if (assistant) {
+    yield* assistant.events;
+    yield { type: "timing", sttMs: Math.max(0, Math.round(input.sttMs ?? 0)), llmMs: assistant.llmMs, totalMs: Math.round(performance.now() - started) };
     yield { type: "done" };
     return;
   }

@@ -189,13 +189,84 @@ export async function postTurnText(
   text: string,
   signal?: AbortSignal,
   fetchImpl?: FetchLike,
+  /** assistant mode: `greet` = the first words after the speaker was recognised (the reply greets them by name) */
+  extra?: { greet?: boolean },
 ): Promise<Response> {
   return send(fetchImpl, turnUrl(checkInId), {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
-    body: JSON.stringify({ text }),
+    body: JSON.stringify(extra?.greet ? { text, greet: true } : { text }),
     signal,
   });
+}
+
+/**
+ * POST /api/checkins { mode: "assistant" } - the "/" screen's conversation: today's newest row (confirmed or not) with
+ * assistant mode on. `welcome`: "quiet" = do not say the greeting (the first reply greets by name), "back" = say a
+ * short welcome on a resumed row (the person was switched).
+ */
+export async function createAssistant(
+  opts: { language?: Lang; welcome?: "quiet" | "back" },
+  fetchImpl?: FetchLike,
+): Promise<CheckInCreated> {
+  const res = await send(fetchImpl, "/api/checkins", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ mode: "assistant", ...(opts.language ? { language: opts.language } : {}), ...(opts.welcome ? { welcome: opts.welcome } : {}) }),
+  });
+  return readJson<CheckInCreated>(res);
+}
+
+export interface IdentifyResult {
+  transcript: string;
+  language: Lang;
+  /** the person recognised (the session cookie is now set), or null: Cosmo asks */
+  crew: CrewPublic | null;
+  reason: "claim" | "voice" | "previous" | "ask";
+  candidates: CrewPublic[];
+}
+
+/**
+ * POST /api/identify - who is speaking (src/lib/identity.ts). `voice` is the on-device guess; the recording's pitch
+ * itself is never sent. With `audio` the server transcribes it; with `text` the script decides the language.
+ */
+export async function postIdentify(
+  input: { audio?: Blob; text?: string; voice: "female" | "male" | "unknown"; previous?: string | null; asked?: boolean },
+  fetchImpl?: FetchLike,
+): Promise<IdentifyResult> {
+  let init: RequestInit;
+  if (input.audio) {
+    const form = new FormData();
+    form.append("audio", input.audio, audioFileName(input.audio.type));
+    form.append("voice", input.voice);
+    if (input.previous) form.append("previous", input.previous);
+    if (input.asked) form.append("asked", "true");
+    init = { method: "POST", body: form };
+  } else {
+    init = {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text: input.text ?? "",
+        voice: input.voice,
+        ...(input.previous ? { previous: input.previous } : {}),
+        ...(input.asked ? { asked: true } : {}),
+      }),
+    };
+  }
+  const res = await send(fetchImpl, "/api/identify", init);
+  return readJson<IdentifyResult>(res);
+}
+
+/** GET /api/session: the crew member signed in on this browser, or null */
+export async function fetchSessionCrewId(fetchImpl?: FetchLike): Promise<string | null> {
+  try {
+    const res = await send(fetchImpl, "/api/session");
+    const body = await readJson<{ session: { role: string; crewId?: string } | null }>(res);
+    return body.session?.role === "crew" && typeof body.session.crewId === "string" ? body.session.crewId : null;
+  } catch {
+    return null;
+  }
 }
 
 /** Opens the SSE stream for a recorded utterance (multipart field `audio`). */

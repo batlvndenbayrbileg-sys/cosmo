@@ -60,6 +60,8 @@ describe.each<Lang>(["en", "mn"])("scripted demo flow (%s)", (lang) => {
       state: 3,
       // an SOS turn ("tell Earth") sends `sos` before Cosmo's line
       sos: 3,
+      // assistant mode asks the screen to open the dashboard or switch the person before Cosmo's line
+      action: 3,
       assistant: 4,
       summary: 5,
       // the panels Cosmo shows on screen (show.ts) come after her words

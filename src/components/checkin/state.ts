@@ -68,6 +68,8 @@ export interface CheckInState {
   expectedQuestion: QuestionId | null;
   /** friend mode is on: a conversation on the side, with a way back to the check-in */
   companion: boolean;
+  /** assistant mode is on: the "/" screen's default conversation; the daily check-up waits (with a button to it) */
+  assistant: boolean;
   transcript: TranscriptLine[];
   pendingCrew: PendingCrewLine | null;
   /** newest first */
@@ -125,6 +127,7 @@ export function initialCheckInState(): CheckInState {
     conversation: null,
     expectedQuestion: null,
     companion: false,
+    assistant: false,
     transcript: [],
     pendingCrew: null,
     cards: [],
@@ -199,7 +202,17 @@ function applyEvent(state: CheckInState, event: TurnEvent): CheckInState {
       });
     }
     case "state":
-      return { ...state, conversation: event.state, expectedQuestion: event.expectedQuestion, companion: event.companion === true };
+      return {
+        ...state,
+        conversation: event.state,
+        expectedQuestion: event.expectedQuestion,
+        companion: event.companion === true,
+        // only the assistant switches send it: absent = unchanged
+        assistant: event.assistant ?? state.assistant,
+      };
+    case "action":
+      // the screen acts on it (useCheckIn's onAction): the dashboard, or another person
+      return state;
     case "measurement": {
       const clarification = state.clarification?.key === event.key ? null : state.clarification;
       return { ...state, cards: upsertCard(state.cards, event), clarification };
@@ -247,6 +260,7 @@ export function checkInReducer(state: CheckInState, action: CheckInAction): Chec
         checkInId: created.checkInId,
         language: created.language,
         conversation: created.state,
+        assistant: created.assistant === true,
         error: null,
       };
       return withDerived(

@@ -58,7 +58,24 @@ export interface MachineCtx {
   companionTurns: number;
   /** crisis words were heard in this check-in and a red alert was raised (kept for the rest of the check-in) */
   companionCrisis: boolean;
+  /**
+   * Assistant mode (assistantMode.ts): the default conversation on the "/" screen, NOT the daily check-up. While it is
+   * on, the check-up waits exactly where it was (`state`, the cursor and clarifyCount untouched): the reducer below
+   * produces no check-up reply at all, and nothing is recorded unless the astronaut volunteers a value and confirms it.
+   */
+  assistant: boolean;
+  /** a value the astronaut volunteered in assistant mode, waiting for their yes before it is recorded */
+  assistantOffer: AssistantOffer | null;
+  /** turns of friend talk inside assistant mode (varies the offline replies) */
+  assistantTalkTurns: number;
 }
+
+/** what assistant mode asked the astronaut to confirm */
+export type AssistantOffer =
+  /** "Heart rate 72 bpm: shall I add it to today's check-up?" (the utterance the values were heard in, for the validator) */
+  | { kind: "record"; utterance: string; records: Array<{ key: KpiKey; value: number | string; unit: string | null; sourceText: string; confidence: number }> }
+  /** "Shall we start your daily check-up?" */
+  | { kind: "checkup" };
 
 /** what was heard in a crisis turn: self-harm / harming others, or a possible medical emergency */
 export type CrisisKind = "self" | "medical";
@@ -153,7 +170,33 @@ export function initialCtx(): MachineCtx {
     companion: false,
     companionTurns: 0,
     companionCrisis: false,
+    assistant: false,
+    assistantOffer: null,
+    assistantTalkTurns: 0,
   };
+}
+
+function parseOffer(v: unknown): AssistantOffer | null {
+  if (typeof v !== "object" || v === null) return null;
+  const o = v as Record<string, unknown>;
+  if (o.kind === "checkup") return { kind: "checkup" };
+  if (o.kind !== "record" || typeof o.utterance !== "string" || !Array.isArray(o.records)) return null;
+  const records: Extract<AssistantOffer, { kind: "record" }>["records"] = [];
+  for (const r of o.records as unknown[]) {
+    if (typeof r !== "object" || r === null) continue;
+    const x = r as Record<string, unknown>;
+    if (typeof x.key !== "string" || !KEY_SET.has(x.key)) continue;
+    if (typeof x.value !== "number" && typeof x.value !== "string") continue;
+    if (typeof x.sourceText !== "string") continue;
+    records.push({
+      key: x.key as KpiKey,
+      value: x.value,
+      unit: typeof x.unit === "string" ? x.unit : null,
+      sourceText: x.sourceText,
+      confidence: typeof x.confidence === "number" && Number.isFinite(x.confidence) ? x.confidence : 0.9,
+    });
+  }
+  return records.length > 0 ? { kind: "record", utterance: o.utterance, records } : null;
 }
 
 const QUESTION_IDS = new Set<string>(QUESTIONS.map((q) => q.id));
@@ -202,6 +245,12 @@ export function parseCtx(state: ConversationState, json: string | null | undefin
     ctx.companionTurns = Math.trunc(o.companionTurns);
   }
   if (typeof o.companionCrisis === "boolean") ctx.companionCrisis = o.companionCrisis;
+  // assistant mode (absent in contexts written before it existed: off, i.e. the plain check-up)
+  if (typeof o.assistant === "boolean") ctx.assistant = o.assistant;
+  ctx.assistantOffer = parseOffer(o.assistantOffer);
+  if (typeof o.assistantTalkTurns === "number" && Number.isFinite(o.assistantTalkTurns) && o.assistantTalkTurns >= 0) {
+    ctx.assistantTalkTurns = Math.trunc(o.assistantTalkTurns);
+  }
   return ctx;
 }
 
@@ -293,6 +342,9 @@ function failedAnswer(ctx: MachineCtx, question: QuestionId, reason: ClarifyReas
  * no effects (or a `refused` effect for writes in DONE / SUMMARY).
  */
 export function transition(ctx: MachineCtx, event: MachineEvent): TransitionResult {
+  // assistant mode: the check-up is paused, so no check-up event moves it and no check-up question is asked
+  // (assistantMode.ts switches the mode on and off; writes are refused here)
+  if (ctx.assistant) return { ctx, effects: isWrite(event) ? [{ type: "refused", reason: "illegal_state" }] : [] };
   const companion = fromCompanion(ctx, event);
   if (companion) return companion;
   switch (ctx.state) {
