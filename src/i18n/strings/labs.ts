@@ -9,7 +9,7 @@ export const labsStrings: AreaDicts = {
   en: {
     "dashboard.labs.titleLight": "Urine",
     "dashboard.labs.titleStrong": "panel",
-    "dashboard.labs.caption": "Changes versus the person's own pre-flight urine. Not a clinical test or a diagnosis.",
+    "dashboard.labs.caption": "vs. the person's own pre-flight urine · not a diagnosis",
     "dashboard.labs.dilution": "Urine is easily diluted, so Borderline means: confirm before acting.",
     "dashboard.labs.source":
       "Data: NASA OSDR OSD-656, Inspiration4 urine, Alamar NULISA panel (NPQ, log2). Linked Inspiration4 reference crew member {person}, shown for demonstration.",
@@ -19,7 +19,7 @@ export const labsStrings: AreaDicts = {
     "dashboard.labs.unlinked": "No reference urine panel is linked to this crew member.",
 
     "dashboard.labs.tp.label": "Post-flight time point",
-    "dashboard.labs.tp.day": "Day {n} after landing",
+    "dashboard.labs.tp.day": "Day {n}",
     "dashboard.labs.tp.noSample": "No sample",
     "dashboard.labs.tp.aria": "{tp}: {normal} Normal, {borderline} Borderline, {abnormal} Abnormal, {insufficient} Insufficient",
     "dashboard.labs.tp.ariaNoSample": "{tp}: no urine sample",
@@ -57,9 +57,9 @@ export const labsStrings: AreaDicts = {
     "dashboard.labs.chart.title": "{analyte} over time",
     "dashboard.labs.chart.empty": "Choose an analyte in the list to see its course.",
     "dashboard.labs.chart.band": "Personal range",
-    "dashboard.labs.chart.baseline": "Pre-flight baseline (mean)",
-    "dashboard.labs.chart.pre": "Pre-flight sample (baseline)",
-    "dashboard.labs.chart.post": "Post-flight sample",
+    "dashboard.labs.chart.baseline": "Baseline",
+    "dashboard.labs.chart.pre": "Pre-flight",
+    "dashboard.labs.chart.post": "Post-flight",
     "dashboard.labs.chart.axisX": "Days from launch (L-) and from landing (R+)",
     "dashboard.labs.chart.axisY": "NPQ (log2)",
     "dashboard.labs.chart.range": "Personal range {low} to {high}, baseline {baseline}.",
@@ -72,7 +72,7 @@ export const labsStrings: AreaDicts = {
   mn: {
     "dashboard.labs.titleLight": "Шээсний",
     "dashboard.labs.titleStrong": "шинжилгээ",
-    "dashboard.labs.caption": "Тухайн хүний нислэгийн өмнөх шээстэй харьцуулсан өөрчлөлт. Эмнэлгийн шинжилгээ эсвэл онош биш.",
+    "dashboard.labs.caption": "Тухайн хүний нислэгийн өмнөх шээстэй харьцуулсан · онош биш",
     "dashboard.labs.dilution": "Шээс амархан шингэрдэг тул «Хязгаарт ойр» гэдэг нь: арга хэмжээ авахаасаа өмнө дахин шалгана уу.",
     "dashboard.labs.source":
       "Өгөгдөл: NASA OSDR OSD-656, Inspiration4-ийн шээс, Alamar NULISA (NPQ, log2). Холбосон Inspiration4-ийн жишиг багийн гишүүн {person}, үзүүлэх зорилгоор.",
@@ -82,7 +82,7 @@ export const labsStrings: AreaDicts = {
     "dashboard.labs.unlinked": "Энэ багийн гишүүнд холбосон жишиг шээсний шинжилгээ алга.",
 
     "dashboard.labs.tp.label": "Нислэгийн дараах хугацаа",
-    "dashboard.labs.tp.day": "Газардсанаас хойш {n} дэх өдөр",
+    "dashboard.labs.tp.day": "{n} дэх өдөр",
     "dashboard.labs.tp.noSample": "Дээж алга",
     "dashboard.labs.tp.aria": "{tp}: {normal} хэвийн, {borderline} хязгаарт ойр, {abnormal} хэвийн бус, {insufficient} хангалтгүй",
     "dashboard.labs.tp.ariaNoSample": "{tp}: шээсний дээж алга",
@@ -120,9 +120,9 @@ export const labsStrings: AreaDicts = {
     "dashboard.labs.chart.title": "{analyte}-ийн явц",
     "dashboard.labs.chart.empty": "Явцыг харахын тулд жагсаалтаас үзүүлэлт сонгоно уу.",
     "dashboard.labs.chart.band": "Хувийн хүрээ",
-    "dashboard.labs.chart.baseline": "Нислэгийн өмнөх суурь (дундаж)",
-    "dashboard.labs.chart.pre": "Нислэгийн өмнөх дээж (суурь)",
-    "dashboard.labs.chart.post": "Нислэгийн дараах дээж",
+    "dashboard.labs.chart.baseline": "Суурь",
+    "dashboard.labs.chart.pre": "Нислэгийн өмнө",
+    "dashboard.labs.chart.post": "Нислэгийн дараа",
     "dashboard.labs.chart.axisX": "Хөөрөхөөс өмнөх (L-) ба газардсанаас хойших (R+) өдөр",
     "dashboard.labs.chart.axisY": "NPQ (log2)",
     "dashboard.labs.chart.range": "Хувийн хүрээ {low}-{high}, суурь {baseline}.",

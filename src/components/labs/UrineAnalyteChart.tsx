@@ -189,8 +189,9 @@ export function UrineAnalyteChart({
           {t("dashboard.labs.chart.post")}
         </li>
       </ul>
-      <p className="text-[11.5px] leading-snug text-[var(--aegis-label)]">
-        {rangeText} <span className="text-[var(--aegis-label)]/90">{t("dashboard.labs.chart.axisX")}.</span>
+      {/* the numbers behind the band, for screen readers; the chart shows them */}
+      <p className="sr-only">
+        {rangeText} {t("dashboard.labs.chart.axisX")}.
       </p>
     </div>
   );

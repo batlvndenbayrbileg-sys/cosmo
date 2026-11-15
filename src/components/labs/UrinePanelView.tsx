@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { ArrowDown, ArrowUp, FlaskConical } from "lucide-react";
+import { ArrowDown, ArrowUp, FlaskConical, Info } from "lucide-react";
 import type { Status } from "@/lib/types";
 import { StatusPill } from "@/components/status";
 import { TwoToneTitle } from "@/components/dashboard/parts";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { usePrefersReducedMotion } from "@/components/cosmo/usePrefersReducedMotion";
 import { useI18n } from "@/i18n/I18nProvider";
 import {
@@ -38,11 +39,41 @@ const BAR_CLASS: Record<UrineGroup, string> = {
 
 export const LABS_CHART_ID = "labs-urine-chart";
 
-/** title, honest caption and the dataset line; shared by the loaded view and its loading / error states */
+/** the method, dilution note and dataset, behind one info button instead of three lines of text */
+function LabsInfo({ person }: { person: string | null }) {
+  const { t } = useI18n();
+  const lines = [t("dashboard.labs.dilution"), t("dashboard.labs.chart.method"), person ? t("dashboard.labs.source", { person }) : null].filter(
+    (l): l is string => Boolean(l),
+  );
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <span
+            tabIndex={0}
+            role="note"
+            data-slot="labs-info"
+            aria-label={lines.join(" ")}
+            className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-white/70 text-[var(--aegis-label)] ring-1 ring-[var(--aegis-hairline)] outline-none hover:text-[var(--aegis-ink)] focus-visible:ring-3 focus-visible:ring-ring/60"
+          />
+        }
+      >
+        <Info aria-hidden="true" className="size-4" strokeWidth={1.8} />
+      </TooltipTrigger>
+      <TooltipContent className="max-w-[22rem] flex-col items-start gap-1.5 text-left">
+        {lines.map((l) => (
+          <span key={l}>{l}</span>
+        ))}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+/** title, one short honest caption and the info button; shared by the loaded view and its loading / error states */
 export function LabsHeader({ person }: { person: string | null }) {
   const { t } = useI18n();
   return (
-    <header className="flex flex-col gap-0.5 lg:flex-row lg:flex-wrap lg:items-baseline lg:gap-x-4">
+    <header className="flex flex-wrap items-center gap-x-3 gap-y-1">
       <TwoToneTitle
         id="labs-title"
         icon={FlaskConical}
@@ -50,13 +81,10 @@ export function LabsHeader({ person }: { person: string | null }) {
         strong={t("dashboard.labs.titleStrong")}
         className="lg:[&_.icon-chip]:size-[clamp(28px,3.8vh,38px)]! lg:[&_h2]:text-[clamp(20px,2.8vh,26px)]"
       />
-      <p className="text-[13px] font-medium text-[var(--aegis-ink)] lg:text-[12px]">{t("dashboard.labs.caption")}</p>
-      <p className="text-[13px] font-medium text-status-watch-ink lg:text-[12px]">{t("dashboard.labs.dilution")}</p>
-      {person ? (
-        <p className="w-full text-[12px] leading-snug text-[var(--aegis-label)] lg:text-[11.5px]">
-          {t("dashboard.labs.source", { person })}
-        </p>
-      ) : null}
+      <span className="rounded-full bg-white/70 px-3 py-1 text-[12px] font-medium text-[var(--aegis-label)] ring-1 ring-[var(--aegis-hairline)]">
+        {t("dashboard.labs.caption")}
+      </span>
+      <LabsInfo person={person} />
     </header>
   );
 }
@@ -121,18 +149,20 @@ function TimepointSelector({
                 <span className="text-[11px] leading-tight text-[var(--aegis-label)]">{t("dashboard.labs.tp.day", { n: p.day })}</span>
               </span>
               <StackedBar summary={p} />
-              <span className="tnum flex flex-wrap gap-x-2 text-[11.5px] leading-tight text-[var(--aegis-label)]">
+              <span aria-hidden="true" className="tnum flex items-center gap-3 text-[15px] leading-none font-semibold">
                 {p.counts ? (
                   <>
-                    <span className="font-medium text-status-alert-ink">
-                      {p.counts.abnormal} {t("dashboard.labs.group.abnormal")}
+                    <span className="flex items-center gap-1.5 text-status-alert-ink">
+                      <span className="size-2.5 rounded-full bg-status-alert" />
+                      {p.counts.abnormal}
                     </span>
-                    <span className="font-medium text-status-watch-ink">
-                      {p.counts.borderline} {t("dashboard.labs.group.borderline")}
+                    <span className="flex items-center gap-1.5 text-status-watch-ink">
+                      <span className="size-2.5 rounded-full bg-status-watch" />
+                      {p.counts.borderline}
                     </span>
                   </>
                 ) : (
-                  t("dashboard.labs.tp.noSample")
+                  <span className="text-[12px] font-normal text-[var(--aegis-label)]">{t("dashboard.labs.tp.noSample")}</span>
                 )}
               </span>
             </button>
@@ -140,11 +170,11 @@ function TimepointSelector({
         })}
       </div>
       {current?.counts ? (
-        <ul aria-hidden="true" className="tnum flex flex-wrap gap-x-3.5 gap-y-1 text-[11.5px] text-[var(--aegis-label)]">
+        <ul aria-hidden="true" className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-[var(--aegis-label)]">
           {URINE_GROUPS.map((g) => (
             <li key={g} className="flex items-center gap-1.5">
-              <span className={cn("size-2.5 rounded-[3px]", BAR_CLASS[g])} />
-              {t(`dashboard.labs.group.${g}`)} <span className="font-medium text-[var(--aegis-ink)]">{current.counts![g]}</span>
+              <span className={cn("size-2 rounded-full", BAR_CLASS[g])} />
+              {t(`dashboard.labs.group.${g}`)}
             </li>
           ))}
         </ul>
@@ -182,6 +212,7 @@ export function UrinePanelView({
     (picked && initialAnalyte === picked ? view.analytes.find((a) => a.analyte === picked) : undefined) ??
     flagged[0]?.analyte ??
     null;
+  const activePoint = active?.points.find((p) => p.timepoint === tp) ?? null;
 
   const choose = (name: string) => {
     setPicked(name);
@@ -232,60 +263,63 @@ export function UrinePanelView({
                 {t("dashboard.labs.list.none")}
               </p>
             ) : (
-              <ul className="-mx-1 flex flex-col gap-1 px-1 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overscroll-contain lg:pb-1">
-                {flagged.map(({ analyte, point }) => {
-                  const on = active?.analyte === analyte.analyte;
-                  const Arrow = point.direction === "down" ? ArrowDown : ArrowUp;
-                  const fold = formatFold(point.fold, point.change);
+              <div className="-mx-1 flex flex-col gap-2 px-1 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overscroll-contain lg:pb-1">
+                {(["abnormal", "borderline"] as const).map((kind) => {
+                  const rows = flagged.filter((f) => f.point.kind === kind);
+                  if (rows.length === 0) return null;
                   return (
-                    <li key={analyte.analyte}>
-                      <button
-                        type="button"
-                        aria-pressed={on}
-                        aria-controls={LABS_CHART_ID}
-                        data-analyte={analyte.analyte}
-                        onClick={() => choose(analyte.analyte)}
-                        className={cn(
-                          // phones: the pill gets its own row under the name, so the name keeps the full width and wraps
-                          // instead of being cut; lg: name, fold and pill on one line, the name truncated with a title
-                          "grid w-full grid-cols-[18px_minmax(0,1fr)] items-center gap-x-2.5 gap-y-1 rounded-2xl lg:grid-cols-[18px_minmax(0,1fr)_auto] lg:gap-y-0.5 px-2.5 py-2 text-left outline-none transition-colors duration-150 focus-visible:ring-3 focus-visible:ring-ring/60 motion-reduce:transition-none",
-                          on ? "bg-[var(--aegis-pastel-blue)]/70 ring-1 ring-[var(--aegis-accent)]/40" : "hover:bg-white/80",
-                        )}
-                      >
-                        {point.direction ? (
-                          <Arrow
-                            aria-label={t(`dashboard.labs.dir.${point.direction}`)}
-                            className={cn("size-4", point.kind === "abnormal" ? "text-status-alert" : "text-status-watch")}
-                            strokeWidth={2.2}
-                          />
-                        ) : (
-                          <span />
-                        )}
-                        <span className="col-start-2 row-start-1 flex min-w-0 items-baseline gap-2">
-                          <span
-                            title={analyte.analyte}
-                            data-slot="labs-analyte-name"
-                            className="min-w-0 text-[14.5px] font-medium wrap-anywhere text-[var(--aegis-ink)] lg:truncate"
-                          >
-                            {analyte.analyte}
-                          </span>
-                          <span className="tnum shrink-0 text-[14px] text-[var(--aegis-ink)]" aria-label={t("dashboard.labs.foldAria", { fold })}>
-                            {fold}
-                          </span>
-                        </span>
-                        <span className="col-start-2 row-start-2 flex min-w-0 lg:col-start-3 lg:row-start-1 lg:justify-end">
-                          <StatusPill status={PILL_STATUS[point.kind]} label={statusText(point.status)} size="sm" />
-                        </span>
-                        {point.note ? (
-                          <span className="col-start-2 row-start-3 text-[11.5px] leading-snug text-[var(--aegis-label)] lg:col-end-4 lg:row-start-2">
-                            {noteText(point.note)}
-                          </span>
-                        ) : null}
-                      </button>
-                    </li>
+                    <div key={kind} data-group={kind} className="flex flex-col gap-1">
+                      <h4 className="flex items-center gap-2 px-1 text-[11px] font-semibold tracking-wide text-[var(--aegis-label)] uppercase">
+                        <span className={cn("size-2 rounded-full", BAR_CLASS[kind])} />
+                        {t(`dashboard.labs.group.${kind}`)}
+                        <span className="tnum font-medium">{rows.length}</span>
+                      </h4>
+                      <ul className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+                        {rows.map(({ analyte, point }) => {
+                          const on = active?.analyte === analyte.analyte;
+                          const Arrow = point.direction === "down" ? ArrowDown : ArrowUp;
+                          const fold = formatFold(point.fold, point.change);
+                          return (
+                            <li key={analyte.analyte}>
+                              <button
+                                type="button"
+                                aria-pressed={on}
+                                aria-controls={LABS_CHART_ID}
+                                aria-label={`${analyte.analyte} ${fold}, ${statusText(point.status)}`}
+                                data-analyte={analyte.analyte}
+                                data-kind={point.kind}
+                                onClick={() => choose(analyte.analyte)}
+                                className={cn(
+                                  "flex w-full items-center gap-2 rounded-xl px-2.5 py-1.5 text-left outline-none transition-colors duration-150 focus-visible:ring-3 focus-visible:ring-ring/60 motion-reduce:transition-none",
+                                  on ? "bg-[var(--aegis-pastel-blue)]/70 ring-1 ring-[var(--aegis-accent)]/40" : "bg-white/50 hover:bg-white/90",
+                                )}
+                              >
+                                {point.direction ? (
+                                  <Arrow
+                                    aria-hidden="true"
+                                    className={cn("size-4 shrink-0", kind === "abnormal" ? "text-status-alert" : "text-status-watch")}
+                                    strokeWidth={2.4}
+                                  />
+                                ) : (
+                                  <span className="size-4 shrink-0" />
+                                )}
+                                <span
+                                  title={analyte.analyte}
+                                  data-slot="labs-analyte-name"
+                                  className="min-w-0 flex-1 truncate text-[14px] font-medium text-[var(--aegis-ink)]"
+                                >
+                                  {analyte.analyte}
+                                </span>
+                                <span className="tnum shrink-0 text-[13.5px] text-[var(--aegis-label)]">{fold}</span>
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
                   );
                 })}
-              </ul>
+              </div>
             )}
           </section>
         </div>
@@ -299,11 +333,24 @@ export function UrinePanelView({
         >
           {active ? (
             <>
-              <h3 id="labs-chart-title" className="text-[15px] leading-tight font-medium text-[var(--aegis-ink)]">
-                {t("dashboard.labs.chart.title", { analyte: active.analyte })}
-              </h3>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                <h3 id="labs-chart-title" className="text-[20px] leading-tight font-semibold text-[var(--aegis-ink)]">
+                  <span className="sr-only">{t("dashboard.labs.chart.title", { analyte: active.analyte })}</span>
+                  <span aria-hidden="true">{active.analyte}</span>
+                </h3>
+                {activePoint && activePoint.fold !== null ? (
+                  <span data-slot="labs-active-fold" className="tnum text-[20px] leading-tight font-light text-[var(--aegis-label)]">
+                    {formatFold(activePoint.fold, activePoint.change)}
+                  </span>
+                ) : null}
+                {activePoint ? (
+                  <span className="ml-auto">
+                    <StatusPill status={PILL_STATUS[activePoint.kind]} label={statusText(activePoint.status)} size="sm" />
+                  </span>
+                ) : null}
+              </div>
+              {activePoint?.note ? <p className="text-[12.5px] leading-snug text-[var(--aegis-label)]">{noteText(activePoint.note)}</p> : null}
               <UrineAnalyteChart key={active.analyte} analyte={active} selected={tp} fill />
-              <p className="text-[11px] leading-snug text-[var(--aegis-label)]">{t("dashboard.labs.chart.method")}</p>
             </>
           ) : (
             <>

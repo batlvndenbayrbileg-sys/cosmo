@@ -212,22 +212,28 @@ describe("Labs tab view (server render)", () => {
   it("C002 R+1: three Abnormal, CXCL8 x15.1 Abnormal high, honest caption and the dataset", () => {
     const out = html(createElement(UrinePanelView, { view: view("C002"), initialTimepoint: "R+1" }));
     const text = textOf(out);
-    expect(text).toContain("3 Abnormal");
-    expect(text).toContain("12 Borderline");
-    expect(out.match(/data-slot="status-pill" data-status="red"/g)).toHaveLength(3);
-    expect(out).toMatch(/data-analyte="CXCL8"[\s\S]*?x15\.1[\s\S]*?Abnormal high/);
-    expect(out).toMatch(/data-analyte="S100A12"[\s\S]*?x15\.9/);
-    expect(out).toMatch(/data-analyte="BMP10"[\s\S]*?x0\.14[\s\S]*?Abnormal low/);
+    // the list is grouped: three Abnormal rows, then twelve Borderline rows
+    expect(out.match(/data-kind="abnormal"/g)).toHaveLength(3);
+    expect(out.match(/data-kind="borderline"/g)).toHaveLength(12);
+    expect(out).toContain('aria-label="CXCL8 x15.1, Abnormal high"');
+    expect(out).toContain('aria-label="S100A12 x15.9, Abnormal high"');
+    expect(out).toContain('aria-label="BMP10 x0.14, Abnormal low"');
     // the list order: the three Abnormal first
     const order = [...out.matchAll(/data-analyte="([^"]+)"/g)].map((m) => m[1]);
     expect(order.slice(0, 3)).toEqual(["BMP10", "S100A12", "CXCL8"]);
+    // the open analyte (top of the list): big fold, status and its note
+    expect(out).toMatch(/data-slot="labs-active-fold"[^>]*>x0\.14</);
+    expect(out).toMatch(/data-slot="status-pill" data-status="red"/);
     expect(text).toContain("Outside personal range, also after sample-level adjustment");
-    expect(text).toContain("Changes versus the person's own pre-flight urine. Not a clinical test or a diagnosis.");
+    // one short honest caption; dilution, method and dataset sit behind the info button
+    expect(text).toContain("vs. the person's own pre-flight urine · not a diagnosis");
     expect(text).not.toMatch(/\byour own\b/i);
-    expect(text).toContain("Borderline means: confirm before acting");
-    expect(text).toContain("NASA OSDR OSD-656");
-    expect(text).toContain("Alamar NULISA");
-    expect(text).toContain("reference crew member C002");
+    const info = /data-slot="labs-info"[^>]*aria-label="([^"]*)"|aria-label="([^"]*)"[^>]*data-slot="labs-info"/.exec(out);
+    const infoText = (info?.[1] ?? info?.[2] ?? "").replace(/&#x27;/g, "'");
+    expect(infoText).toContain("Borderline means: confirm before acting");
+    expect(infoText).toContain("NASA OSDR OSD-656");
+    expect(infoText).toContain("Alamar NULISA");
+    expect(infoText).toContain("reference crew member C002");
     // the top analyte's chart is open, with the personal range in text
     expect(text).toContain("BMP10 over time");
     expect(text).toContain("Personal range 2.7 to 7.8, baseline 5.3.");
@@ -240,20 +246,14 @@ describe("Labs tab view (server render)", () => {
     expect(out).toContain("Personal range 8.6 to 15.4, baseline 12.0.");
   });
 
-  it("phones: the analyte name is never cut (wraps, pill on its own row); lg truncates with a title", () => {
+  it("every flagged analyte is listed once, its full name in the title and the row's accessible name", () => {
     const out = html(createElement(UrinePanelView, { view: view("C003"), initialTimepoint: "R+1" }));
     const names = [...out.matchAll(/<span([^>]*data-slot="labs-analyte-name"[^>]*)>([^<]*)<\/span>/g)];
     expect(names.length).toBe(flaggedAt(view("C003"), "R+1").length);
     for (const [, attrs, name] of names) {
       expect(attrs).toContain(`title="${name}"`);
-      const cls = /class="([^"]*)"/.exec(attrs)![1].split(/\s+/);
-      expect(cls).not.toContain("truncate");
-      expect(cls).toContain("lg:truncate");
-      expect(cls).toContain("wrap-anywhere");
+      expect(out).toContain(`aria-label="${name} x`);
     }
-    // the row is two columns below lg (pill under the name), three at lg
-    expect(out).toMatch(/data-analyte="[^"]+"[^>]*class="grid w-full grid-cols-\[18px_minmax\(0,1fr\)\] [^"]*lg:grid-cols-\[18px_minmax\(0,1fr\)_auto\]/);
-    expect(out).toContain('class="col-start-2 row-start-2 flex min-w-0 lg:col-start-3 lg:row-start-1 lg:justify-end"');
   });
 
   it("C001 R+1: no urine sample message", () => {
@@ -267,9 +267,10 @@ describe("Labs tab view (server render)", () => {
   });
 
   it("renders in Mongolian", () => {
-    const out = textOf(mn(createElement(UrinePanelView, { view: view("C002"), initialTimepoint: "R+1" })));
+    const raw = mn(createElement(UrinePanelView, { view: view("C002"), initialTimepoint: "R+1" }));
+    const out = textOf(raw);
     expect(out).toContain("Шээсний шинжилгээ");
-    expect(out).toContain("Хэвийн бус, өндөр");
+    expect(raw).toContain('aria-label="CXCL8 x15.1, Хэвийн бус, өндөр"');
     expect(out).toContain("x15.1");
     expect(textOf(mn(createElement(UrinePanelView, { view: view("C001"), initialTimepoint: "R+1" })))).toContain(
       "Энэ хугацаанд шээсний дээж аваагүй.",
