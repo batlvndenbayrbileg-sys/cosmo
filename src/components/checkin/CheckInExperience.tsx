@@ -43,6 +43,7 @@ import { EmergencyOverlay } from "@/components/emergency/EmergencyOverlay";
 import { EMERGENCY_REQUEST_EVENT } from "@/components/emergency/EmergencyGuidePanel";
 import { useEmergencyLibrary } from "@/components/emergency/hooks";
 import { matchEmergency } from "@/lib/emergency";
+import { SosStatus, sendSosToEarth } from "@/components/sos";
 import { ShieldAlert } from "lucide-react";
 import { bubbleItems, computeStageLayout } from "./bubbles";
 import type { CheckInError } from "./state";
@@ -608,7 +609,11 @@ export function CheckInExperience() {
     <>
       <button
         type="button"
-        onClick={() => openEmergency(null)}
+        onClick={() => {
+          // SOS = an urgent alert to Earth (with a face photo), then the guidance (src/components/sos)
+          void sendSosToEarth({ checkInId: checkInIdNow, lang: state.language ?? lang });
+          openEmergency(null);
+        }}
         aria-label={t("checkin.emergency.openLabel")}
         className={cn(
           "fixed z-[60] flex h-10 items-center gap-1.5 rounded-full border border-[#C53030]/25 bg-white/80 px-4 text-[14px] font-semibold tracking-wide text-[#C53030] shadow-sm backdrop-blur transition-opacity hover:opacity-100 focus-visible:opacity-100",
@@ -628,9 +633,11 @@ export function CheckInExperience() {
             onSelect={(id) => openEmergency(id)}
             onCallHelp={() => openEmergency("call-for-help")}
             onClose={() => setEmergency((prev) => ({ ...prev, open: false }))}
+            banner={<SosStatus variant="inline" checkInId={checkInIdNow} lang={state.language ?? lang} />}
           />
         ) : null}
       </AnimatePresence>
+      {emergency.open ? null : <SosStatus variant="floating" checkInId={checkInIdNow} lang={state.language ?? lang} />}
     </>
   );
 

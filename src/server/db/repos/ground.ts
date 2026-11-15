@@ -17,6 +17,8 @@ import {
   type MeasurementDbRow,
 } from "../rows";
 import { isTextKey, queryHistoryDays, toIso, type HistoryDayRow } from "../shared";
+import type { GroundSosAlert } from "@/lib/sos";
+import { SOS_COLUMNS, mapSos, type SosDbRow } from "./sos";
 
 /**
  * Read-only reads for the Earth console (ground role). This file is the ONLY place that reads
@@ -141,4 +143,39 @@ export async function groundListAlerts(asOf: string): Promise<AlertRow[]> {
     toIso(asOf, "asOf"),
   );
   return rows.map(mapAlert);
+}
+
+/**
+ * SOS alerts (sos_alert) that have arrived by asOf, newest first, with the crew member's name; optionally one crew
+ * member's only. They are not tied to a confirmed check-in: an SOS is visible as soon as it was raised (minus the
+ * simulated delay). No photo bytes here (groundGetSosPhoto).
+ */
+export async function groundListSosAlerts(asOf: string, opts: { crewId?: string; limit?: number } = {}): Promise<GroundSosAlert[]> {
+  const db = await getDb();
+  const limit = Math.max(1, Math.min(100, Math.floor(opts.limit ?? 50)));
+  const cols = SOS_COLUMNS.split(", ")
+    .map((c) => `s.${c}`)
+    .join(", ");
+  const rows = await db.all<SosDbRow & { crew_name: string }>(
+    `SELECT ${cols}, m.name AS crew_name
+       FROM sos_alert s
+       JOIN crew_member m ON m.id = s.crew_id
+      WHERE s.created_at <= ? ${opts.crewId ? "AND s.crew_id = ?" : ""}
+      ORDER BY s.created_at DESC, s.rowid DESC
+      LIMIT ${limit}`,
+    ...[toIso(asOf, "asOf"), ...(opts.crewId ? [opts.crewId] : [])],
+  );
+  return rows.map((r) => ({ ...mapSos(r), crewName: r.crew_name }));
+}
+
+/** the face still of an SOS alert that has arrived by asOf, or null (no such alert, not arrived, no photo) */
+export async function groundGetSosPhoto(id: string, asOf: string): Promise<Uint8Array | null> {
+  const db = await getDb();
+  const row = await db.get<{ photo_jpeg: string | null }>(
+    "SELECT photo_jpeg FROM sos_alert WHERE id = ? AND created_at <= ? AND photo_status = 'attached'",
+    id,
+    toIso(asOf, "asOf"),
+  );
+  if (!row?.photo_jpeg) return null;
+  return new Uint8Array(Buffer.from(row.photo_jpeg, "base64"));
 }

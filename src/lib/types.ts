@@ -374,4 +374,14 @@ export type TurnEvent =
   | { type: "show"; panels: ShowPanel[] }
   | { type: "timing"; sttMs: number; llmMs: number; totalMs: number }
   | { type: "error"; code: ApiErrorCode; message: string; recoverable: boolean }
+  /** the crew member asked Cosmo to alert Earth (src/lib/sos): ok = the urgent alert is stored (or already was) */
+  | {
+      type: "sos";
+      ok: boolean;
+      alertId: string | null;
+      createdAt: string | null;
+      duplicate: boolean;
+      /** SosPhotoStatus (src/lib/sos) */
+      photoStatus: "pending" | "attached" | "denied" | "unavailable" | null;
+    }
   | { type: "done" };

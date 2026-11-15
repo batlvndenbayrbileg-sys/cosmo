@@ -228,6 +228,9 @@ function applyEvent(state: CheckInState, event: TurnEvent): CheckInState {
       };
     case "done":
       return { ...commitPending(state), busy: false };
+    case "sos":
+      // the SOS status card (src/components/sos) follows it; the conversation itself is unchanged
+      return state;
   }
 }
 

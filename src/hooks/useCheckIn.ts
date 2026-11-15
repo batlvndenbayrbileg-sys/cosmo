@@ -32,6 +32,7 @@ import {
 } from "@/components/checkin/state";
 import type { CosmoEmotion } from "@/components/cosmo/types";
 import type { CheckInCreated, ConversationState, Lang, SummaryPayload } from "@/lib/types";
+import { noteSosFromTurn } from "@/components/sos/store";
 
 export interface AssistantTurn {
   checkInId: string;
@@ -170,6 +171,7 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckIn {
 
       // the SUMMARY turn's text is spoken from the `summary` event, not from its `assistant` event
       let turnState: ConversationState | null = null;
+      let turnLang: Lang = "en";
       try {
         const response = await open(id, controller.signal);
         if (!response.body) throw new ApiClientError("INTERNAL", "Empty response", response.status);
@@ -187,6 +189,9 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckIn {
             });
           }
           if (event.type === "summary") optionsRef.current.onSummary?.(event.summary, id);
+          if (event.type === "transcript") turnLang = event.language;
+          // "tell Earth": the server stored the urgent alert; the SOS card takes the photo for it (src/components/sos)
+          if (event.type === "sos") noteSosFromTurn(event, turnLang, id);
         }
         dispatch({ type: "TURN_END" });
       } catch (error) {

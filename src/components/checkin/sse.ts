@@ -25,6 +25,7 @@ import {
   type SummaryPayload,
   type TurnEvent,
 } from "@/lib/types";
+import { SOS_PHOTO_STATUSES } from "@/lib/sos";
 
 export interface SseMessage {
   /** value of the `event:` field, "message" when absent */
@@ -245,6 +246,17 @@ function validateTurnEvent(type: string, raw: Rec): TurnEvent | null {
         code: isOneOf(ERROR_CODES, raw.code) ? raw.code : "INTERNAL",
         message: str(raw.message) ?? "",
         recoverable: typeof raw.recoverable === "boolean" ? raw.recoverable : true,
+      };
+    }
+    case "sos": {
+      if (typeof raw.ok !== "boolean") return null;
+      return {
+        type,
+        ok: raw.ok,
+        alertId: str(raw.alertId),
+        createdAt: str(raw.createdAt),
+        duplicate: raw.duplicate === true,
+        photoStatus: isOneOf(SOS_PHOTO_STATUSES, raw.photoStatus) ? raw.photoStatus : null,
       };
     }
     case "done":

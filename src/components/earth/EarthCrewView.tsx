@@ -9,6 +9,7 @@ import { DashboardView } from "@/components/dashboard/DashboardView";
 import { DashboardMotionProvider } from "@/components/dashboard/motion";
 import { useI18n } from "@/i18n/I18nProvider";
 import { DelaySelector } from "./DelaySelector";
+import { SosAlertsPanel } from "./SosAlertsPanel";
 import { EarthTitle } from "./EarthTitle";
 import { ErrorNotice } from "./ErrorNotice";
 import { delayMsFor, parseDelayId, type DelayId } from "./delay";
@@ -77,6 +78,8 @@ export function EarthCrewView({ crewId, initialDelay }: { crewId: string; initia
         <Info className="size-3.5 shrink-0" aria-hidden="true" />
         {t("earth.delay.hint")}
       </p>
+
+      <SosAlertsPanel delayMs={delayMs} delayId={delayId} crewId={crewId} />
 
       {dashboard.status === "loading" ? <DashboardSkeleton /> : null}
 

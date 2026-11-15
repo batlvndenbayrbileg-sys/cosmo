@@ -175,7 +175,7 @@ describe("seed: determinism", () => {
   // on Postgres `SELECT *` includes the `seq` identity column; two fresh databases number their rows alike
   const dump = async (db: Db) => {
     const tables: unknown[][] = [];
-    for (const t of ["crew_member", "check_in", "measurement", "turn", "alert"]) {
+    for (const t of ["crew_member", "check_in", "measurement", "turn", "alert", "sos_alert"]) {
       tables.push(await db.all(`SELECT * FROM ${t} ORDER BY 1`));
     }
     return JSON.stringify(tables);
