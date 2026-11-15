@@ -16,6 +16,7 @@ import { explainLines } from "@/lib/pet/explain";
 import { isPetCrewId } from "@/lib/pet/link";
 import type { CrewPublic } from "@/lib/types";
 import { RunSprite } from "@/components/pet/RunSprite";
+import { nextWanderFrac, wanderRestMs } from "@/lib/pet/stroll";
 
 const MIN_AUDIO_BYTES = 2000;
 const RELISTEN_DELAY_MS = 300;
@@ -145,7 +146,8 @@ export function DesktopPet({ crewId }: { crewId: string | null }) {
   const [hop, setHop] = useState(false);
   /** a one-off idle trick; `wave` shows the waving render, `look` the three-quarter one */
   const [trick, setTrick] = useState<"wave" | "look" | "dance" | "jump" | null>(null);
-  const [sleeping, setSleeping] = useState(crewId === null);
+  // without a profile she is not asleep any more: she wanders the screen edge, and a tap opens the menu to pick one
+  const [sleeping, setSleeping] = useState(false);
   const [moving, setMoving] = useState(false);
   const [dir, setDir] = useState(1);
   const press = useRef<{ x: number; moved: boolean } | null>(null);
@@ -262,7 +264,7 @@ export function DesktopPet({ crewId }: { crewId: string | null }) {
   }, [createCheckIn, crewId]);
 
   const toggle = useCallback(async () => {
-    if (crewId === null) return; // no profile yet: stay asleep until the website sends one
+    if (crewId === null) return; // no profile yet: the tap opens the menu instead (onPointerUp)
     setIssue(null);
     if (activeRef.current && state.status !== "failed") {
       setActive(false);
@@ -323,6 +325,27 @@ export function DesktopPet({ crewId }: { crewId: string | null }) {
       clearTimeout(nap);
     };
   }, [active, hop, moving, sleeping, crewId, reducedMotion]);
+
+  // wandering: while nobody is talking to her, typing or being followed by the camera, she rests a few seconds, then
+  // runs to another spot along the bottom of the screen (the main process moves the window, pet:goto). A run wakes
+  // her from a doze; a long rest now and then lets her doze off again.
+  const wanderAt = useRef(0.92);
+  useEffect(() => {
+    if (active || typing || reducedMotion || (camera && crewId !== null) || !window.cosmoPet) return;
+    let off: ReturnType<typeof setTimeout>;
+    const next = () => {
+      off = setTimeout(() => {
+        const to = nextWanderFrac(wanderAt.current, Math.random);
+        wanderAt.current = to;
+        setSleeping(false);
+        setTrick(null);
+        window.cosmoPet?.goTo(to);
+        next();
+      }, wanderRestMs(Math.random));
+    };
+    next();
+    return () => clearTimeout(off);
+  }, [active, typing, reducedMotion, camera, crewId]);
 
   // running is the main process moving the window; the page plays the sprite facing the way she goes
   useEffect(() => {
@@ -498,7 +521,11 @@ export function DesktopPet({ crewId }: { crewId: string | null }) {
         }}
         onPointerUp={() => {
           // a touch (not a drag) wakes her / puts her to sleep
-          if (press.current && !press.current.moved) void toggle();
+          // without a profile the tap opens the menu, where "Switch profile" lists the crew
+          if (press.current && !press.current.moved) {
+            if (crewId === null) window.cosmoPet?.showMenu(menu());
+            else void toggle();
+          }
           press.current = null;
         }}
         onPointerCancel={() => {

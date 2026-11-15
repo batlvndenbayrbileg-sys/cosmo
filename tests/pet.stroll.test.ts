@@ -4,8 +4,12 @@ import {
   STAND_MAX_MS,
   STAND_MIN_MS,
   STROLL_MARGIN,
+  WANDER_EDGE,
+  WANDER_MIN_STEP,
   clampStroll,
   nextStroll,
+  nextWanderFrac,
+  wanderRestMs,
   runDurationMs,
   strollBounds,
   strollHiddenOn,
@@ -62,6 +66,25 @@ describe("lil cosmo on the web page: stroll planning", () => {
     expect(runDurationMs(100, 400, 150)).toBe(2000);
     expect(runDurationMs(400, 100, 150)).toBe(2000);
     expect(runDurationMs(0, 100, 0)).toBe(0);
+  });
+
+  it("desktop pet: wanders to a spot at least WANDER_MIN_STEP away, inside the screen", () => {
+    for (const r of [0, 0.2, 0.5, 0.8, 0.999]) {
+      const to = nextWanderFrac(0.5, seq(r, 0.95, 0.02));
+      expect(to).toBeGreaterThanOrEqual(WANDER_EDGE);
+      expect(to).toBeLessThanOrEqual(1 - WANDER_EDGE);
+      expect(Math.abs(to - 0.5)).toBeGreaterThanOrEqual(WANDER_MIN_STEP);
+    }
+    // every random spot too close: the farther end
+    expect(nextWanderFrac(0.6, seq(0.6))).toBe(WANDER_EDGE);
+    expect(nextWanderFrac(Number.NaN, seq(0.9))).toBeGreaterThan(0.5);
+  });
+
+  it("desktop pet: rests 4 to 10 s, now and then 25 to 45 s", () => {
+    expect(wanderRestMs(seq(0.5, 0))).toBe(4000);
+    expect(wanderRestMs(seq(0.5, 0.999))).toBeLessThanOrEqual(10_000);
+    expect(wanderRestMs(seq(0.1, 0))).toBe(25_000);
+    expect(wanderRestMs(seq(0.1, 0.999))).toBeLessThanOrEqual(45_000);
   });
 
   it("is not shown on the desktop pet's page, the ground console or developer pages", () => {
