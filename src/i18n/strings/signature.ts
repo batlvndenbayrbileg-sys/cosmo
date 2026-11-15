@@ -150,6 +150,14 @@ export const signatureStrings: AreaDicts = {
     "dashboard.signature.ev.kimRef": "Kim J. et al., Nature Communications 2024, DOI {doi}",
     "dashboard.signature.ev.n": "n = {n}, descriptive only.",
 
+    "dashboard.signature.space.caption": "Scored on ground laboratory panels",
+    "dashboard.signature.space.title": "Can this be measured in space?",
+    "dashboard.signature.ev.twins.title": "Different mission, same direction (n = 1)",
+    "dashboard.signature.ev.twins.study": "NASA Twins Study: one astronaut, one year on the ISS.",
+    "dashboard.signature.ev.twins.limits":
+      "Limits: one person, a one-year mission, and an assay we did not compare with ours. It supports the direction of the core triad, not the thresholds.",
+    "dashboard.signature.ev.twins.ref": "Gertz M. L. et al., Cell Reports 2020, DOI {doi}",
+
     "dashboard.signature.sa.label": "Second assay",
     "dashboard.signature.sa.badge.TWO_ASSAY_CONFIRMED": "Confirmed by two assays",
     "dashboard.signature.sa.badge.SINGLE_ASSAY": "Single assay",
@@ -167,6 +175,46 @@ export const signatureStrings: AreaDicts = {
       "Only {k} of {n} pairs agree at {good} or better. Same direction in all crew at R+1 on both assays: {list}. IL-6 over the {panels} post-flight panels: same sign on both in {same}, rank correlation {spearman}.",
     "dashboard.signature.ev.qc.l44second":
       "Second assay: L-44 is the lowest pre-flight draw in {k} of {n} series ({pct} %), so the L-44 low batch is an artefact of the first platform.",
+
+    "dashboard.signature.demo.title": "Signature Triage: offline demo",
+    "dashboard.signature.demo.subtitle":
+      "Scripted walk-through on Inspiration4 reference data (NASA OSDR). Runs without a network: Cosmo's lines are templates.",
+    "dashboard.signature.demo.controls": "Demo controls",
+    "dashboard.signature.demo.beat": "Beat {n} of {total}",
+    "dashboard.signature.demo.slot": "{from} to {to}",
+    "dashboard.signature.demo.next": "Next",
+    "dashboard.signature.demo.back": "Back",
+    "dashboard.signature.demo.restart": "Start again",
+    "dashboard.signature.demo.autoplay": "Auto-play",
+    "dashboard.signature.demo.keys": "Space or right arrow: next beat",
+    "dashboard.signature.demo.clock": "Mission clock: day {day} after landing",
+    "dashboard.signature.demo.crew": "Inspiration4 crew member",
+    "dashboard.signature.demo.cosmo": "Cosmo",
+    "dashboard.signature.demo.lang.mn": "speaks Mongolian, English captions",
+    "dashboard.signature.demo.lang.en": "speaks English",
+    "dashboard.signature.demo.presenter": "Presenter",
+    "dashboard.signature.demo.captionsOnly": "Captions only: no pre-generated audio for this beat",
+    "dashboard.signature.demo.audio": "Pre-generated audio",
+    "dashboard.signature.demo.simulated": "Simulated check-ins: generated days, not a real person's data",
+    "dashboard.signature.demo.end": "End of the script",
+    "dashboard.signature.demo.beatName.intro": "Crew and mission clock",
+    "dashboard.signature.demo.beatName.a": "A new panel arrives",
+    "dashboard.signature.demo.beatName.recovery": "Recovery and next draw",
+    "dashboard.signature.demo.beatName.c1": "Re-test",
+    "dashboard.signature.demo.beatName.c2": "Off-trajectory",
+    "dashboard.signature.demo.beatName.d": "Single-assay signal",
+    "dashboard.signature.demo.beatName.b": "Daily check-in",
+    "dashboard.signature.demo.beatName.evidence": "Evidence",
+
+    "dashboard.signature.limits.label": "Limitations",
+    "dashboard.signature.limits.triage":
+      "n = 4 after a 3-day low-Earth-orbit flight, and the 20 and 40 zone limits were chosen on the same four people.",
+    "dashboard.signature.limits.fp":
+      "Multiplex research assays, not clinical tests, compared with only three pre-flight draws (one batch-shifted) and an unknown fasting state.",
+    "dashboard.signature.limits.rec":
+      "No sample between day 1 and day 45, so the decay is an upper bound, and the daily check-in rules are not validated.",
+    "dashboard.signature.limits.ev":
+      "Private astronauts with all samples taken on the ground and none in flight, so this is not evidence for long-duration missions.",
   },
   mn: {
     "dashboard.signature.title": "Цусны дохионы ангилал",
@@ -314,6 +362,14 @@ export const signatureStrings: AreaDicts = {
     "dashboard.signature.ev.kimRef": "Kim J. нар, Nature Communications 2024, DOI {doi}",
     "dashboard.signature.ev.n": "n = {n}, зөвхөн тодорхойлох шинжилгээ.",
 
+    "dashboard.signature.space.caption": "Дэлхий дээрх лабораторийн хариугаар оноо өгсөн",
+    "dashboard.signature.space.title": "Үүнийг сансарт хэмжиж болох уу?",
+    "dashboard.signature.ev.twins.title": "Өөр нислэг, ижил чиглэл (n = 1)",
+    "dashboard.signature.ev.twins.study": "NASA-гийн Ихрүүдийн судалгаа: нэг сансрын нисгэгч, Олон улсын сансрын станц дээр нэг жил.",
+    "dashboard.signature.ev.twins.limits":
+      "Хязгаарлалт: нэг хүн, нэг жилийн нислэг, мөн бидний шинжилгээтэй харьцуулаагүй арга. Энэ нь үндсэн гурван үзүүлэлтийн чиглэлийг дэмждэг, босго утгыг биш.",
+    "dashboard.signature.ev.twins.ref": "Gertz M. L. нар, Cell Reports 2020, DOI {doi}",
+
     "dashboard.signature.sa.label": "Хоёр дахь шинжилгээ",
     "dashboard.signature.sa.badge.TWO_ASSAY_CONFIRMED": "Хоёр шинжилгээгээр батлагдсан",
     "dashboard.signature.sa.badge.SINGLE_ASSAY": "Ганц шинжилгээ",
@@ -331,5 +387,45 @@ export const signatureStrings: AreaDicts = {
       "{n} хосоос зөвхөн {k} нь {good} ба түүнээс дээш тохирсон. R+1 үед хоёр шинжилгээнд бүх гишүүнд ижил чиглэлтэй: {list}. Нислэгийн дараах {panels} шинжилгээнд IL-6 хоёр шинжилгээнд {same} удаа ижил тэмдэгтэй, зэрэглэлийн корреляц {spearman}.",
     "dashboard.signature.ev.qc.l44second":
       "Хоёр дахь шинжилгээнд L-44 нь {n} цувралаас {k}-д ({pct} %) нислэгийн өмнөх хамгийн бага утга байсан тул L-44 бага багц нь эхний платформын алдаа.",
+
+    "dashboard.signature.demo.title": "Цусны дохионы ангилал: офлайн үзүүлэн",
+    "dashboard.signature.demo.subtitle":
+      "Inspiration4-ийн жишиг өгөгдөл (NASA OSDR) дээрх бэлтгэсэн үзүүлэн. Сүлжээгүй ажиллана: Cosmo-гийн хэлэх үгс загвараас гардаг.",
+    "dashboard.signature.demo.controls": "Үзүүлэнгийн удирдлага",
+    "dashboard.signature.demo.beat": "{total}-с {n} дахь хэсэг",
+    "dashboard.signature.demo.slot": "{from}-с {to}",
+    "dashboard.signature.demo.next": "Дараах",
+    "dashboard.signature.demo.back": "Өмнөх",
+    "dashboard.signature.demo.restart": "Дахин эхлэх",
+    "dashboard.signature.demo.autoplay": "Автоматаар тоглуулах",
+    "dashboard.signature.demo.keys": "Space эсвэл баруун сум: дараагийн хэсэг",
+    "dashboard.signature.demo.clock": "Нислэгийн цаг: газардсанаас хойш {day} дахь өдөр",
+    "dashboard.signature.demo.crew": "Inspiration4-ийн багийн гишүүн",
+    "dashboard.signature.demo.cosmo": "Cosmo",
+    "dashboard.signature.demo.lang.mn": "монголоор ярина, англи хадмал",
+    "dashboard.signature.demo.lang.en": "англиар ярина",
+    "dashboard.signature.demo.presenter": "Илтгэгч",
+    "dashboard.signature.demo.captionsOnly": "Зөвхөн хадмал: энэ хэсэгт урьдчилан бэлтгэсэн дуу алга",
+    "dashboard.signature.demo.audio": "Урьдчилан бэлтгэсэн дуу",
+    "dashboard.signature.demo.simulated": "Симуляци хийсэн асуулга: үүсгэсэн өдрүүд, бодит хүний өгөгдөл биш",
+    "dashboard.signature.demo.end": "Үзүүлэнгийн төгсгөл",
+    "dashboard.signature.demo.beatName.intro": "Багийн гишүүн ба нислэгийн цаг",
+    "dashboard.signature.demo.beatName.a": "Шинэ шинжилгээ ирлээ",
+    "dashboard.signature.demo.beatName.recovery": "Сэргэлт ба дараагийн шинжилгээ",
+    "dashboard.signature.demo.beatName.c1": "Давтан шинжилгээ",
+    "dashboard.signature.demo.beatName.c2": "Хүлээгдээгүй чиглэл",
+    "dashboard.signature.demo.beatName.d": "Ганц шинжилгээний дохио",
+    "dashboard.signature.demo.beatName.b": "Өдөр тутмын асуулга",
+    "dashboard.signature.demo.beatName.evidence": "Нотолгоо",
+
+    "dashboard.signature.limits.label": "Хязгаарлалт",
+    "dashboard.signature.limits.triage":
+      "n = 4, 3 хоногийн нам тойрог замын нислэгийн дараах өгөгдөл бөгөөд 20 ба 40-ийн бүсийн хязгаарыг мөн энэ дөрвөн хүн дээр сонгосон.",
+    "dashboard.signature.limits.fp":
+      "Эмнэлзүйн шинжилгээ биш, судалгааны мультиплекс шинжилгээ бөгөөд нислэгийн өмнөх зөвхөн гурван дээжтэй (нэг нь багцын шилжилттэй) харьцуулсан, өлөн байсан эсэх нь тодорхойгүй.",
+    "dashboard.signature.limits.rec":
+      "Газардсанаас хойш 1 ба 45 дахь өдрийн хооронд дээж байхгүй тул бууралт нь дээд хязгаарын тооцоо бөгөөд өдөр тутмын асуулгын дүрмийг баталгаажуулаагүй.",
+    "dashboard.signature.limits.ev":
+      "Хувийн сансрын нисгэгчид, бүх дээжийг дэлхий дээр авсан, нислэгийн үеэр нэг ч дээж аваагүй тул урт хугацааны нислэгийн нотолгоо биш.",
   },
 };

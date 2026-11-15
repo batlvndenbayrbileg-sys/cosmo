@@ -337,9 +337,18 @@ export interface DrawView {
   dss: (number | null)[];
 }
 
-/** the draw advisor on the selected panel's day: panels up to that day, DSS from linked check-ins (if any) */
-export function drawView(view: SignatureViewData, crew: string, tp: Timepoint, dss: readonly (number | null)[] = []): DrawView {
-  const advice = drawAdvice(drawStateFromPanels(view.panels[crew] ?? [], TIMEPOINT_DAY[tp], dss));
+/**
+ * the draw advisor on the selected panel's day: panels up to that day, DSS from linked check-ins (if any); `today`
+ * overrides the clock (the demo's check-in beat sits between two panels)
+ */
+export function drawView(
+  view: SignatureViewData,
+  crew: string,
+  tp: Timepoint,
+  dss: readonly (number | null)[] = [],
+  today: number = TIMEPOINT_DAY[tp],
+): DrawView {
+  const advice = drawAdvice(drawStateFromPanels(view.panels[crew] ?? [], today, dss));
   return {
     advice,
     nextRetestDay: advice.state.retestDay,

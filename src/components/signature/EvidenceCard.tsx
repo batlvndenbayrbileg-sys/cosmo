@@ -8,10 +8,12 @@ import {
   AGREEMENT_RHO_GOOD,
   KIM_2024_DOI,
   SIGNATURE_DATASETS,
+  TWINS_STUDY_DOI,
   buildEvidence,
   buildSecondAssayEvidence,
   type SecondAssayEvidenceRow,
 } from "@/lib/signature/evidence";
+import { CardLimits } from "./CardLimits";
 import { formatFri, markerName, numberList } from "./logic";
 
 const SUMMARY =
@@ -52,6 +54,7 @@ export function EvidenceCard() {
         <h2 id="sig-ev-title" className="text-[17px] leading-tight font-medium text-[var(--aegis-ink)]">
           {t("dashboard.signature.ev.title")}
         </h2>
+        <CardLimits card="ev" />
       </header>
 
       <div className="-mx-1 overflow-x-auto px-1">
@@ -117,6 +120,12 @@ export function EvidenceCard() {
           text={t("dashboard.signature.ev.h.noiseText", { n: ev.noise.n, median: ev.noise.median, low: T_LOW, high: T_HIGH })}
         />
       </ul>
+      <p className="-mt-1 text-[12px] leading-snug text-[var(--aegis-label)]">
+        {t("dashboard.signature.ev.h.heldout", {
+          heldout: ev.loco.heldoutR1.map(formatFri).join(", "),
+          insample: ev.loco.inSampleR1.map(formatFri).join(", "),
+        })}
+      </p>
       <div data-slot="signature-second-assay-evidence" className="flex flex-col gap-1 rounded-2xl bg-white/60 p-3 ring-1 ring-[var(--aegis-hairline)]">
         <p className="text-[14px] font-medium leading-snug text-[var(--aegis-ink)] tnum">
           {t("dashboard.signature.ev.sa.headline", { n: sa.matchedPairs, rho: String(sa.medianRho) })}
@@ -133,12 +142,21 @@ export function EvidenceCard() {
           })}
         </p>
       </div>
-      <p className="-mt-1 text-[12px] leading-snug text-[var(--aegis-label)]">
-        {t("dashboard.signature.ev.h.heldout", {
-          heldout: ev.loco.heldoutR1.map(formatFri).join(", "),
-          insample: ev.loco.inSampleR1.map(formatFri).join(", "),
-        })}
-      </p>
+      {/* T14 (spec section 8 item 4b): static text, Cosmo does not speak the numbers of that paper */}
+      <div data-slot="signature-twins" className="flex flex-col gap-1 rounded-2xl bg-white/60 p-3 ring-1 ring-[var(--aegis-hairline)]">
+        <p className="text-[13px] font-medium leading-snug text-[var(--aegis-ink)]">{t("dashboard.signature.ev.twins.title")}</p>
+        <p className="text-[12px] leading-snug text-[var(--aegis-label)]">
+          {t("dashboard.signature.ev.twins.study")} {t("dashboard.signature.ev.twins.limits")}
+        </p>
+        <a
+          href={`https://doi.org/${TWINS_STUDY_DOI}`}
+          target="_blank"
+          rel="noreferrer"
+          className="text-[11px] leading-snug text-[var(--aegis-label)] underline-offset-2 hover:underline"
+        >
+          {t("dashboard.signature.ev.twins.ref", { doi: TWINS_STUDY_DOI })}
+        </a>
+      </div>
 
       <details className="group rounded-2xl bg-white/50 px-2 py-1 ring-1 ring-[var(--aegis-hairline)]">
         <summary className={SUMMARY}>

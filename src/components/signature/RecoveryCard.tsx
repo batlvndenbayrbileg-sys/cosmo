@@ -10,6 +10,7 @@ import { spokenInt } from "@/lib/signature/facts";
 import { SIGNATURE_REFERENCE } from "@/lib/signature/reference";
 import type { SignatureViewData } from "@/lib/signature/view";
 import type { Timepoint } from "@/lib/signature/types";
+import { CardLimits } from "./CardLimits";
 import { FRI_MAX, drawView, formatFri, recoveryTimeline } from "./logic";
 
 const POINT = "var(--aegis-ink)";
@@ -59,6 +60,7 @@ export function RecoveryCard({
   timepoint,
   dss = [],
   simulated = false,
+  today,
 }: {
   view: SignatureViewData;
   crew: string;
@@ -66,10 +68,12 @@ export function RecoveryCard({
   /** daily strain scores of linked check-ins, oldest first (the demo passes simulated ones) */
   dss?: readonly (number | null)[];
   simulated?: boolean;
+  /** draw-advisor clock (day after landing) when it is not the panel's day (the demo's check-in beat) */
+  today?: number;
 }) {
   const { t } = useI18n();
   const tl = recoveryTimeline(view, crew, timepoint);
-  const draw = drawView(view, crew, timepoint, dss);
+  const draw = drawView(view, crew, timepoint, dss, today);
   const a = draw.advice;
   const rec = SIGNATURE_REFERENCE.recovery;
   const caption = t("dashboard.signature.rec.caption", {
@@ -95,6 +99,7 @@ export function RecoveryCard({
         <h2 id="sig-rec-title" className="text-[17px] leading-tight font-medium text-[var(--aegis-ink)]">
           {t("dashboard.signature.rec.title")}
         </h2>
+        <CardLimits card="rec" />
       </header>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_200px]">
