@@ -19,6 +19,8 @@ import {
 import { isTextKey, queryHistoryDays, toIso, type HistoryDayRow } from "../shared";
 import type { GroundSosAlert } from "@/lib/sos";
 import { SOS_COLUMNS, mapSos, type SosDbRow } from "./sos";
+import type { GroundPainReport } from "@/lib/pain";
+import { PAIN_COLUMNS, mapPain, type PainDbRow } from "./pain";
 
 /**
  * Read-only reads for the Earth console (ground role). This file is the ONLY place that reads
@@ -166,6 +168,37 @@ export async function groundListSosAlerts(asOf: string, opts: { crewId?: string;
     ...[toIso(asOf, "asOf"), ...(opts.crewId ? [opts.crewId] : [])],
   );
   return rows.map((r) => ({ ...mapSos(r), crewName: r.crew_name }));
+}
+
+/**
+ * Pain reports (pain_report) that are on the Earth console by asOf (sent_at <= asOf), newest first, with the crew
+ * member's name; optionally one crew member's only. Structured fields only (place, 0-10, since when, the related data
+ * items built by code); never what Cosmo asked or the words that were said.
+ */
+export async function groundListPainReports(
+  asOf: string,
+  opts: { crewId?: string; limit?: number } = {},
+): Promise<GroundPainReport[]> {
+  const db = await getDb();
+  const limit = Math.max(1, Math.min(100, Math.floor(opts.limit ?? 30)));
+  const cols = PAIN_COLUMNS.split(", ")
+    .map((c) => `p.${c}`)
+    .join(", ");
+  const rows = await db.all<PainDbRow & { crew_name: string }>(
+    `SELECT ${cols}, m.name AS crew_name
+       FROM pain_report p
+       JOIN crew_member m ON m.id = p.crew_id
+      WHERE p.sent_at IS NOT NULL AND p.sent_at <= ? ${opts.crewId ? "AND p.crew_id = ?" : ""}
+      ORDER BY p.sent_at DESC, p.rowid DESC
+      LIMIT ${limit}`,
+    ...[toIso(asOf, "asOf"), ...(opts.crewId ? [opts.crewId] : [])],
+  );
+  return rows.map((r) => {
+    const { awaiting: _a, askedTurnId: _t, ...rest } = mapPain(r);
+    void _a;
+    void _t;
+    return { ...rest, crewName: r.crew_name };
+  });
 }
 
 /** the face still of an SOS alert that has arrived by asOf, or null (no such alert, not arrived, no photo) */

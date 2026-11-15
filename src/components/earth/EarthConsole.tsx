@@ -12,6 +12,7 @@ import { AlertsFeed } from "./AlertsFeed";
 import { CrewCard } from "./CrewCard";
 import { DelaySelector } from "./DelaySelector";
 import { SosAlertsPanel } from "./SosAlertsPanel";
+import { PainReportsPanel } from "./PainReportsPanel";
 import { EarthTitle } from "./EarthTitle";
 import { ErrorNotice } from "./ErrorNotice";
 import { delayMsFor, parseDelayId, type DelayId } from "./delay";
@@ -56,6 +57,8 @@ export function EarthConsole({ initialDelay }: { initialDelay?: string }) {
 
         {/* SOS from the crew: always first, live (polled), with photo, alarm and "seen" */}
         <SosAlertsPanel delayMs={delayMs} delayId={delayId} />
+        {/* what the crew told Cosmo hurts (the pain check), with the related values */}
+        <PainReportsPanel delayMs={delayMs} delayId={delayId} />
 
         {/* heading + delay */}
         <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">

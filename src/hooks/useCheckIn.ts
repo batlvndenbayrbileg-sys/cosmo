@@ -34,6 +34,7 @@ import type { CosmoEmotion } from "@/components/cosmo/types";
 import type { CheckInCreated, ConversationState, Lang, SummaryPayload } from "@/lib/types";
 import type { ExplainEvent } from "@/lib/explain";
 import { noteSosFromTurn } from "@/components/sos/store";
+import { notePainFromTurn } from "@/components/pain/store";
 
 export interface AssistantTurn {
   checkInId: string;
@@ -210,6 +211,8 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckIn {
           if (event.type === "transcript") turnLang = event.language;
           // "tell Earth": the server stored the urgent alert; the SOS card takes the photo for it (src/components/sos)
           if (event.type === "sos") noteSosFromTurn(event, turnLang, id);
+          // "it hurts": the body map, the related data and the guide (src/components/pain)
+          if (event.type === "pain") notePainFromTurn(event, turnLang);
           if (event.type === "done") deliver();
         }
         deliver();

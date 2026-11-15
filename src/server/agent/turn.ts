@@ -27,6 +27,7 @@ import { ALERT_SPOKEN_NOTICE, createAlertsForCheckIn, raiseCrisisAlert } from "@
 import { loadHistory, loadMachineCtx, loadTodayValues, saveMachineCtx } from "@/server/checkin/service";
 import { composeTemplateSummary } from "@/server/dashboard/template";
 import { sosTurn } from "@/server/sos";
+import { painTurn } from "@/server/pain";
 import { LlmUnavailable, type Agent, type AgentDecision, type Emotion } from "./agent";
 import { ClaudeAgent, HISTORY_TURNS } from "./claudeAgent";
 import { interpretAnswer, interpretCorrection, interpretStart, interpretYesNo, type InterpretedRecord } from "./interpret";
@@ -631,6 +632,16 @@ async function* runTurnInner(args: RunTurnArgs, started: number): AsyncGenerator
   const sos = await sosTurn({ crewId, checkInId, text, lang, talking: ctx0.companion, ctx: ctx0 });
   if (sos) {
     yield* sos;
+    yield { type: "timing", sttMs: Math.max(0, Math.round(input.sttMs ?? 0)), llmMs: 0, totalMs: Math.round(performance.now() - started) };
+    yield { type: "done" };
+    return;
+  }
+
+  /* ── "it hurts": the body map, the related data, the guide and a report to Earth (src/server/pain.ts) ── */
+  // checked before the walkthrough: pain is a safety path and must never be answered with charts
+  const pain = await painTurn({ crewId, checkInId, localDate: checkIn.localDate, text, lang, ctx: ctx0, history });
+  if (pain) {
+    yield* pain;
     yield { type: "timing", sttMs: Math.max(0, Math.round(input.sttMs ?? 0)), llmMs: 0, totalMs: Math.round(performance.now() - started) };
     yield { type: "done" };
     return;

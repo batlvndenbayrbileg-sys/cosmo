@@ -477,7 +477,7 @@ export async function seedDatabase(db: Db, opts: SeedOptions = {}): Promise<Seed
 
   await db.transaction(async (tx) => {
     if (opts.wipe) {
-      for (const table of ["sos_alert", "alert", "turn", "measurement", "check_in", "crew_member"]) {
+      for (const table of ["pain_report", "sos_alert", "alert", "turn", "measurement", "check_in", "crew_member"]) {
         await tx.run(`DELETE FROM ${table}`);
       }
     }

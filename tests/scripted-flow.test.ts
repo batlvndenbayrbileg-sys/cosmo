@@ -60,6 +60,8 @@ describe.each<Lang>(["en", "mn"])("scripted demo flow (%s)", (lang) => {
       state: 3,
       // an SOS turn ("tell Earth") sends `sos` before Cosmo's line
       sos: 3,
+      // a pain turn ("my head hurts") sends `pain` before Cosmo's line
+      pain: 3,
       assistant: 4,
       summary: 5,
       // the panels Cosmo shows on screen (show.ts) come after her words

@@ -17,6 +17,11 @@ import "server-only";
  * so its `check_in_id` is nullable (the composite foreign key applies only when it is set) and `crew_id` references the
  * crew member directly. The face still is a base64 JPEG (at most SOS_PHOTO_MAX_BYTES) in `photo_jpeg`, read only by
  * the ground photo route.
+ *
+ * `pain_report` (the pain check, src/server/pain.ts) is additive too: one row per pain told to Cosmo, tied to the
+ * check-in it was told in. Only structured fields are stored (place, 0-10, since when, the related data items built by
+ * code, red flags), never the words. `sent_at` is set once it is on the Earth console; `awaiting` / `asked_turn_id`
+ * say what Cosmo asked and in which turn, so only the very next answer is read as the reply.
  */
 export const SCHEMA_VERSION = 1;
 
@@ -109,6 +114,30 @@ CREATE TABLE IF NOT EXISTS sos_alert (
 );
 CREATE INDEX IF NOT EXISTS idx_sos_crew_time ON sos_alert (crew_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_sos_time ON sos_alert (created_at);
+
+CREATE TABLE IF NOT EXISTS pain_report (
+  id             TEXT PRIMARY KEY,
+  crew_id        TEXT NOT NULL,
+  check_in_id    TEXT NOT NULL,
+  created_at     TEXT NOT NULL,
+  updated_at     TEXT NOT NULL,
+  location       TEXT CHECK (location IN ('head','eye','ear','tooth','throat','chest','abdomen','side','back','arm','leg','joint','whole_body')),
+  severity       INTEGER CHECK (severity BETWEEN 0 AND 10),
+  severity_word  TEXT CHECK (severity_word IN ('mild','moderate','severe')),
+  onset_kind     TEXT CHECK (onset_kind IN ('just_now','minutes','hours','this_morning','last_night','today','yesterday','days','weeks')),
+  onset_amount   REAL,
+  items_json     TEXT NOT NULL DEFAULT '[]',
+  red_flags_json TEXT NOT NULL DEFAULT '[]',
+  urgent         INTEGER NOT NULL DEFAULT 0 CHECK (urgent IN (0,1)),
+  guide_id       TEXT,
+  sos_alert_id   TEXT,
+  sent_at        TEXT,
+  awaiting       TEXT CHECK (awaiting IN ('location','details')),
+  asked_turn_id  TEXT,
+  FOREIGN KEY (check_in_id, crew_id) REFERENCES check_in (id, crew_id)
+);
+CREATE INDEX IF NOT EXISTS idx_pain_crew_time ON pain_report (crew_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_pain_sent ON pain_report (sent_at);
 `;
 
 /**
@@ -215,12 +244,38 @@ CREATE TABLE IF NOT EXISTS sos_alert (
 CREATE INDEX IF NOT EXISTS idx_sos_crew_time ON sos_alert (crew_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_sos_time ON sos_alert (created_at);
 
+CREATE TABLE IF NOT EXISTS pain_report (
+  id             TEXT PRIMARY KEY,
+  seq            BIGINT GENERATED ALWAYS AS IDENTITY,
+  crew_id        TEXT NOT NULL,
+  check_in_id    TEXT NOT NULL,
+  created_at     TEXT NOT NULL,
+  updated_at     TEXT NOT NULL,
+  location       TEXT CHECK (location IN ('head','eye','ear','tooth','throat','chest','abdomen','side','back','arm','leg','joint','whole_body')),
+  severity       INTEGER CHECK (severity BETWEEN 0 AND 10),
+  severity_word  TEXT CHECK (severity_word IN ('mild','moderate','severe')),
+  onset_kind     TEXT CHECK (onset_kind IN ('just_now','minutes','hours','this_morning','last_night','today','yesterday','days','weeks')),
+  onset_amount   DOUBLE PRECISION,
+  items_json     TEXT NOT NULL DEFAULT '[]',
+  red_flags_json TEXT NOT NULL DEFAULT '[]',
+  urgent         INTEGER NOT NULL DEFAULT 0 CHECK (urgent IN (0,1)),
+  guide_id       TEXT,
+  sos_alert_id   TEXT,
+  sent_at        TEXT,
+  awaiting       TEXT CHECK (awaiting IN ('location','details')),
+  asked_turn_id  TEXT,
+  FOREIGN KEY (check_in_id, crew_id) REFERENCES check_in (id, crew_id)
+);
+CREATE INDEX IF NOT EXISTS idx_pain_crew_time ON pain_report (crew_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_pain_sent ON pain_report (sent_at);
+
 ALTER TABLE crew_member ENABLE ROW LEVEL SECURITY;
 ALTER TABLE check_in ENABLE ROW LEVEL SECURITY;
 ALTER TABLE measurement ENABLE ROW LEVEL SECURITY;
 ALTER TABLE turn ENABLE ROW LEVEL SECURITY;
 ALTER TABLE alert ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sos_alert ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pain_report ENABLE ROW LEVEL SECURITY;
 `;
 
 /** the tables and indexes PG_SCHEMA_SQL creates (read from it, so the two cannot drift apart); see pgSchemaReady */
