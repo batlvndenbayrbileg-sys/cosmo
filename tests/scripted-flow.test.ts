@@ -404,7 +404,8 @@ describe("conversation edge cases (scripted agent)", () => {
       expect(eventsOf(events, "clarification"), say).toEqual([{ type: "clarification", key: "sleep_hours", reason: "out_of_range" }]);
       expect(eventsOf(events, "measurement"), say).toEqual([]);
       expect(eventsOf(events, "summary"), say).toEqual([]);
-      expect(assistantText(events), say).toMatch(/outside the expected range/i);
+      // changed 2026-11-15: the range re-ask names what was heard (valueChecks.rangeReply)
+      expect(assistantText(events), say).toMatch(/I heard 30 hours, which is too high for sleep/i);
       expect(assistantText(events), say).toMatch(/between 0 and 14 hours/i);
       expect(assistantText(events), say).not.toMatch(/what would you like to change|here is what i have/i);
       expect(eventsOf(events, "assistant")[0].emotion).toBe("concerned");

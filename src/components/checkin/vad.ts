@@ -71,6 +71,10 @@ export interface VadConfig {
   unvoicedEndMs: number;
   /** speech starts only after this much CONTINUOUS loud voiced sound (a lone voiced-looking noise frame does not) */
   onsetMs: number;
+  /** a room whose noise floor is at or above this RMS is noisy: speech must then last noisyOnsetMs before it counts */
+  noisyFloorRms: number;
+  /** the onset in a noisy room (chatter, machinery): a 250 ms "yes" still passes, a burst of noise does not */
+  noisyOnsetMs: number;
   /** an utterance is kept only if at least this share of its loud time was voiced (else it was mostly noise) */
   minVoicedShare: number;
   /** hard cap on one utterance, measured from the first loud frame */
@@ -127,6 +131,8 @@ export const DEFAULT_VAD_CONFIG: VadConfig = {
   minSpeechMs: 200,
   unvoicedEndMs: 2500,
   onsetMs: 150,
+  noisyFloorRms: 0.01,
+  noisyOnsetMs: 250,
   minVoicedShare: 0.35,
   maxUtteranceMs: 30_000,
   noSpeechTimeoutMs: 30_000,
@@ -380,7 +386,10 @@ export function stepVad(
     if (loud && voiced) {
       // without spectrum data (voiced unknown) the first loud frame starts speech, as before
       const onsetMs = state.onsetMs + dt;
-      if (frame.voiced === undefined || onsetMs >= config.onsetMs) {
+      // in a noisy room a voice-like burst must last longer before it counts as the person speaking
+      const needOnsetMs =
+        state.noiseFloor >= config.noisyFloorRms ? Math.max(config.onsetMs, config.noisyOnsetMs) : config.onsetMs;
+      if (frame.voiced === undefined || onsetMs >= needOnsetMs) {
         return {
           state: {
             ...state,
@@ -450,15 +459,18 @@ export function stepVad(
     noiseFloor,
   };
 
-  if (utteranceMs >= config.maxUtteranceMs) {
-    return { state: { ...next, phase: "ended" }, signal: "max_length" };
-  }
+  // enough voice, and not mostly noise with a few voice-like moments in it (noise after the last word does not count)
+  const realSpeech = speechMs >= config.minSpeechMs && speechMs >= config.minVoicedShare * loudAtVoicedMs;
   // a pause (shorter once a long answer was heard), or no real voice for a while (only soft or distant voices)
   const needQuietMs = endSilenceMs(speechMs, config);
   const needNoVoiceMs = config.unvoicedEndMs - (config.silenceMs - needQuietMs);
-  if (utteranceMs >= config.minUtteranceMs && (silenceMs >= needQuietMs || sinceVoicedMs >= needNoVoiceMs)) {
-    // enough voice, and not mostly noise with a few voice-like moments in it (noise after the last word does not count)
-    if (speechMs >= config.minSpeechMs && speechMs >= config.minVoicedShare * loudAtVoicedMs) {
+  const capped = utteranceMs >= config.maxUtteranceMs;
+  // 30 s of real speech is sent; 30 s of mostly noise is dropped like a blip
+  if (capped && realSpeech) {
+    return { state: { ...next, phase: "ended" }, signal: "max_length" };
+  }
+  if (capped || (utteranceMs >= config.minUtteranceMs && (silenceMs >= needQuietMs || sinceVoicedMs >= needNoVoiceMs))) {
+    if (realSpeech) {
       return { state: { ...next, phase: "ended" }, signal: "utterance_end" };
     }
     // a blip: forget it and keep listening; its duration still counts towards the no-speech timeout

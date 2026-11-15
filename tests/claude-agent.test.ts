@@ -521,7 +521,8 @@ describe("turn pipeline with a live agent", () => {
   it("a model reply cannot replace the clarification of an unusable answer (it could ask for another value)", async () => {
     await toCapture(checkInId);
     const events = await playTurn("bat", checkInId, "I slept 20 hours", { agent: withReply("Great, what is your mood?") });
-    expect(assistantText(events)).toMatch(/outside the expected range/i);
+    // changed 2026-11-15: the range re-ask names what was heard (valueChecks.rangeReply)
+    expect(assistantText(events)).toMatch(/I heard 20 hours, which is too high for sleep/i);
     expect(assistantText(events)).not.toMatch(/mood/i);
   });
 

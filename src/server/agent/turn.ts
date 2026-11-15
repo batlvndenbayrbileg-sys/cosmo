@@ -57,6 +57,17 @@ import { TieredAgent, logTier, type Tier } from "./tieredAgent";
 import { answerAskedQuestion, detectAskedQuestion, isHealthTopic, questionFacts, questionTopicOf, type AskedKind } from "./questions";
 import { answerReferenceQuestion, withReferenceCaveat } from "./questions";
 import { readBackReferenceReply } from "./readBackQuestion";
+import { dangerNotice, rangeReply, rulesRangeKeys } from "./valueChecks";
+
+/** the rules found these keys out of range: their failures say so (replacing an "unclear" from the model) */
+function markOutOfRange(failures: Array<{ key: KpiKey; reason: "range" | "type" | "unclear"; text: string }>, keys: KpiKey[]): void {
+  for (const key of keys) {
+    const at = failures.findIndex((f) => f.key === key);
+    const entry = { key, reason: "range" as const, text: "out_of_range" };
+    if (at >= 0) failures[at] = entry;
+    else failures.unshift(entry);
+  }
+}
 import type { Baseline } from "@/lib/health/baseline";
 import { buildResultsFacts, numeralsAreGrounded, type ResultsFacts } from "./resultsFacts";
 import { answerSignatureQuestion, insertBeforeDisclaimer, panelClockDay, signatureFollowUp } from "./signature";
@@ -853,6 +864,8 @@ async function* runTurnInner(args: RunTurnArgs, started: number): AsyncGenerator
           send({ type: "ALREADY_RECORDED" });
         } else {
           const q = getQuestion(expected);
+          // an impossible value ("50" for temperature) is "out of range" whatever the model asked (valueChecks.ts)
+          markOutOfRange(failures, rulesRangeKeys(expected, text, lang));
           const own = failures.find((f) => q.keys.includes(f.key));
           const asked = decision.rejected?.find((r) => q.keys.includes(r.key)) ?? decision.clarifications?.find((c) => q.keys.includes(c.key));
           send({ type: "MEASUREMENT_REJECTED", question: expected, reason: own?.reason ?? asked?.reason ?? failures[0]?.reason ?? "unclear" });
@@ -878,6 +891,8 @@ async function* runTurnInner(args: RunTurnArgs, started: number): AsyncGenerator
       for (const r of decision.rejected ?? []) {
         if (!failures.some((f) => f.key === r.key)) failures.push({ key: r.key, reason: r.reason, text: clarifyReasonText(r.reason) });
       }
+      // a correction out of range is said to be out of range, also when the model only answered "no"
+      markOutOfRange(failures, rulesRangeKeys(null, text, lang).filter((k) => !correctedNow.has(k)));
       // a correction that could not be used (out of range, not a number, not in the astronaut's words)
       const unusable = failures.filter((f) => !correctedNow.has(f.key));
       if (corrected.length > 0) send({ type: "CORRECTION_ACCEPTED", keys: corrected });
@@ -980,7 +995,13 @@ async function* runTurnInner(args: RunTurnArgs, started: number): AsyncGenerator
     out.push({ type: "summary", summary: summaryPayload });
   } else {
     const effect: ReplyEffect = replyEffect ?? { type: "reply", kind: "closing" };
-    let template = askedReply ?? renderTemplate(effect, lang, ctx, text, valuesNow, acknowledged);
+    let template =
+      askedReply ??
+      // "I heard 50 °C, which is too high for body temperature ..." instead of the general range message
+      (effect.kind === "clarify" && effect.reason === "range" && effect.question && (effect.attempt ?? 0) < 2
+        ? rangeReply(getQuestion(effect.question), text, lang, effect.attempt ?? 0)
+        : null) ??
+      renderTemplate(effect, lang, ctx, text, valuesNow, acknowledged);
     // a read-back correction was taken and another one was not: say both
     if (ctx0.state === "CONFIRM" && effect.kind === "clarify" && correctedNow.size > 0) {
       template = join(TEMPLATES_EXTRA.updated[lang], template);
@@ -1034,7 +1055,10 @@ async function* runTurnInner(args: RunTurnArgs, started: number): AsyncGenerator
     }
     // the model's wording replaces the template only where the machine leaves room for it: never when a question was
     // just skipped (the template carries the "add it at the confirmation" notice), never at the read-back
+    // a value past a general danger threshold: the code's wording says so, never a bland model acknowledgement
+    const danger = dangerNotice(acknowledged, lang);
     const modelMayWord =
+      danger.length === 0 &&
       !afterCheckIn &&
       askedReply === null &&
       decision.replyText !== undefined &&
@@ -1065,8 +1089,9 @@ async function* runTurnInner(args: RunTurnArgs, started: number): AsyncGenerator
         assistantText = join(assistantText.slice(0, assistantText.length - prompt.length).trim(), reference.brief, prompt);
       }
     }
+    if (danger && !assistantText.includes(danger)) assistantText = join(danger, assistantText);
     emotion =
-      effect.kind === "clarify" && effect.reason === "range"
+      danger || (effect.kind === "clarify" && effect.reason === "range")
         ? "concerned"
         : effect.kind === "smallTalkPropose"
           ? "happy"

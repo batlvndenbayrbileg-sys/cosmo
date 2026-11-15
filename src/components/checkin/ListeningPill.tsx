@@ -7,7 +7,7 @@
  * by a silent, unexplained wait. See listening.ts for when each mode shows.
  */
 import { useSyncExternalStore } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Check } from "lucide-react";
 import type { LevelStore } from "@/hooks/useRecorder";
 import { useI18n } from "@/i18n/I18nProvider";
@@ -33,16 +33,22 @@ function LevelBars({ level }: { level: LevelStore }) {
 }
 
 function ThinkingDots() {
+  // reduced motion: three still dots (MotionConfig "user" stops movement but not an endless opacity pulse)
+  const reduced = useReducedMotion();
   return (
     <span aria-hidden="true" className="flex items-center gap-1">
-      {[0, 1, 2].map((i) => (
-        <motion.span
-          key={i}
-          className="size-1.5 rounded-full bg-[var(--aegis-accent)]"
-          animate={{ opacity: [0.25, 1, 0.25], y: [0, -2, 0] }}
-          transition={{ duration: 1, repeat: Infinity, delay: i * 0.15, ease: "easeInOut" }}
-        />
-      ))}
+      {[0, 1, 2].map((i) =>
+        reduced ? (
+          <span key={i} className="size-1.5 rounded-full bg-[var(--aegis-accent)] opacity-70" />
+        ) : (
+          <motion.span
+            key={i}
+            className="size-1.5 rounded-full bg-[var(--aegis-accent)]"
+            animate={{ opacity: [0.25, 1, 0.25], y: [0, -2, 0] }}
+            transition={{ duration: 1, repeat: Infinity, delay: i * 0.15, ease: "easeInOut" }}
+          />
+        ),
+      )}
     </span>
   );
 }

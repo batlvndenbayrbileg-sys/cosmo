@@ -280,8 +280,16 @@ describe("stepVad: background noise is not speech (voicing)", () => {
       s = stepVad(s, { rms: 0.3, dtMs: FRAME_MS, voiced: i % 2 === 0 }).state;
     }
     expect(s.phase).toBe("waiting");
-    const start = runV(s, 0.3, true, 150);
+    // that burst left a noisy room (floor >= noisyFloorRms), so speech now needs the longer noisy-room onset (250 ms)
+    expect(runV(s, 0.3, true, 150).signals).toEqual([]);
+    const start = runV(s, 0.3, true, 250);
     expect(start.signals).toEqual(["speech_start"]);
+  });
+
+  it("in a quiet room 150 ms of voice starts speech; in a noisy room it takes 250 ms", () => {
+    expect(runV(calibrated(0.005), 0.3, true, 150).signals).toEqual(["speech_start"]);
+    expect(runV(calibrated(0.05), 0.3, true, 150).signals).toEqual([]);
+    expect(runV(calibrated(0.05), 0.3, true, 250).signals).toEqual(["speech_start"]);
   });
 
   it("speech followed by steady noise ends after 2.5 s without voice, instead of running to the 30 s cap", () => {
@@ -315,7 +323,28 @@ describe("stepVad: background noise is not speech (voicing)", () => {
   it("soft speech in a noisy room still gets through: a voice only has to clear the room by 1.4x", () => {
     const noisy = calibrated(0.05); // a fan
     expect(runV(noisy, 0.08, false, 1000).signals).toEqual([]); // the same level as noise: ignored
-    expect(runV(noisy, 0.08, true, 200).signals).toEqual(["speech_start"]);
+    // a noisy room needs the longer onset (250 ms) before the voice counts
+    expect(runV(noisy, 0.08, true, 250).signals).toEqual(["speech_start"]);
+  });
+
+  it("30 s of mostly noise is dropped at the cap and listening goes on; 30 s of real speech is sent", () => {
+    const cfg = { ...DEFAULT_VAD_CONFIG, maxUtteranceMs: 3000 };
+    let s = calibrated(0.005);
+    const signals: VadSignal[] = [];
+    // a voice burst to start, then loud unvoiced noise with a voiced flicker now and then (never a long enough pause)
+    for (let t = 0; t < 300; t += FRAME_MS) {
+      const r = stepVad(s, { rms: 0.3, dtMs: FRAME_MS, voiced: true }, cfg);
+      signals.push(r.signal);
+      s = r.state;
+    }
+    expect(signals).toContain("speech_start");
+    for (let i = 0; i < 400 && s.phase === "speaking"; i++) {
+      const r = stepVad(s, { rms: 0.3, dtMs: FRAME_MS, voiced: i % 20 === 0 }, cfg);
+      signals.push(r.signal);
+      s = r.state;
+    }
+    expect(signals).toContain("too_short");
+    expect(signals).not.toContain("max_length");
   });
 
   it("soft voiced sound does not count as room noise (the threshold must not climb over the speaker)", () => {

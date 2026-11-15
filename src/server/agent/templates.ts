@@ -13,6 +13,7 @@ import { KPI_DEFS, QUESTIONS, asNumber, formatValue } from "@/lib/kpi/registry";
 import { formatNumber } from "@/lib/health/format";
 import type { InterpretedRecord } from "./interpret";
 import { ASSUMPTION_CHECK, answerExample, assumptionNote } from "./assumptions";
+import { dangerNotice } from "./valueChecks";
 
 export type ClarifyReason = "range" | "type" | "unclear";
 
@@ -218,7 +219,8 @@ function acknowledgement(ack: InterpretedRecord[], lang: Lang): string {
     parts.push(note?.text ?? spoken);
   }
   if (parts.length === 0) return lang === "mn" ? "Тэмдэглэлээ." : "Noted.";
-  return join([`${opener}, ${parts.join(", ")}.`, assumed ? ASSUMPTION_CHECK[lang] : ""]);
+  // a value past a general danger threshold is never acknowledged blandly (valueChecks.ts)
+  return join([`${opener}, ${parts.join(", ")}.`, assumed ? ASSUMPTION_CHECK[lang] : "", dangerNotice(ack, lang)]);
 }
 
 /** the registry prompt for q, preceded by a short acknowledgement of what was just recorded */
@@ -319,9 +321,10 @@ export function readBack(values: Partial<Record<KpiKey, MeasurementValue>>, lang
 /** confirms a single corrected value, then asks again */
 export function correctionAck(key: KpiKey, value: MeasurementValue, lang: Lang): string {
   const text = KPI_DEFS[key].type === "text" ? shortNote(String(value)) : formatValue(key, value, lang);
+  const danger = dangerNotice([{ key, value }], lang);
   return lang === "mn"
-    ? `Заслаа: ${lowerLabel(key, lang)} ${text}. Одоо бүгд зөв үү?`
-    : `Updated: ${lowerLabel(key, lang)} ${text}. Is everything correct now?`;
+    ? join([`Заслаа: ${lowerLabel(key, lang)} ${text}.`, danger, "Одоо бүгд зөв үү?"])
+    : join([`Updated: ${lowerLabel(key, lang)} ${text}.`, danger, "Is everything correct now?"]);
 }
 
 export function askWhatToChange(lang: Lang): string {
