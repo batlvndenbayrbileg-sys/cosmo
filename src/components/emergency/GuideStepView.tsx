@@ -159,6 +159,8 @@ export function GuideStepView({
         </div>
 
         <div className="flex min-h-0 flex-col gap-3">
+          {/* text and metronome may scroll on short screens; the controls below never leave the frame */}
+          <div className="flex min-h-0 flex-col gap-3 lg:flex-1 lg:overflow-y-auto">
           <AnimatePresence mode="wait" initial={false}>
             <motion.p
               key={`${scenario.id}-${index}`}
@@ -166,7 +168,7 @@ export function GuideStepView({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
               transition={{ duration: reduced ? 0.1 : 0.22 }}
-              className="text-[24px] leading-snug text-[var(--aegis-ink)] lg:min-h-0 lg:overflow-y-auto lg:text-[clamp(19px,2.9vh,30px)]"
+              className="shrink-0 text-[24px] leading-snug text-[var(--aegis-ink)] lg:text-[clamp(18px,2.7vh,30px)]"
             >
               {current.text[lang]}
             </motion.p>
@@ -191,8 +193,9 @@ export function GuideStepView({
               onResetTimer={() => setStartedAt(Date.now())}
             />
           ) : null}
+          </div>
 
-          <div className="mt-auto flex flex-wrap items-center gap-2 pt-1">
+          <div className="mt-auto flex shrink-0 flex-wrap items-center gap-2 pt-1">
             <button type="button" onClick={() => go(index - 1)} disabled={index === 0} className={cn(BTN, "bg-white ring-1 ring-[var(--aegis-hairline)]")}>
               <ChevronLeft className="size-5" aria-hidden />
               {t("emergency.step.prev")}

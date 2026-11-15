@@ -77,12 +77,12 @@ export function Metronome({
       <div className="flex min-w-0 flex-col leading-tight">
         <span className="unit-label">{t("emergency.metro.title")}</span>
         <span className="tnum text-[17px] font-medium text-[var(--aegis-ink)]">{t("emergency.metro.rate", { rate })}</span>
-        <span className="tnum text-[13px] text-[var(--aegis-label)]">{t("emergency.metro.count", { n: pos })}</span>
-      </div>
-      <div className="flex min-w-0 flex-col leading-tight">
-        <span className="unit-label">{t("emergency.metro.elapsed")}</span>
-        <span className="tnum text-[22px] font-medium text-[var(--aegis-ink)]" role="timer" aria-live="off">
-          {formatElapsed(now - startedAt)}
+        <span className="tnum text-[13px] text-[var(--aegis-label)]">
+          {t("emergency.metro.count", { n: pos })} ·{" "}
+          <span className="sr-only">{t("emergency.metro.elapsed")} </span>
+          <span className="font-medium text-[var(--aegis-ink)]" role="timer" aria-live="off">
+            {formatElapsed(now - startedAt)}
+          </span>
         </span>
       </div>
       <div className="ml-auto flex items-center gap-1.5">
