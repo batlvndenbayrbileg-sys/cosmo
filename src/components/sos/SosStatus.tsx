@@ -50,7 +50,7 @@ function PhotoLine({ s }: { s: Extract<SosUiState, { phase: "sent" }> }) {
   }
   if (s.photo === "taking" || s.photo === "waiting") {
     return (
-      <span className="flex items-center gap-2 text-[14px] text-[var(--aegis-label)]">
+      <span className="flex items-center gap-2 text-[14px] text-[var(--cosmo-label)]">
         <Camera className="size-4 shrink-0 motion-safe:animate-pulse" aria-hidden />
         {t("emergency.sos.photo.taking")}
       </span>

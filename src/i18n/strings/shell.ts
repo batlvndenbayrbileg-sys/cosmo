@@ -2,10 +2,10 @@ import type { AreaDicts } from "../types";
 
 export const shellStrings: AreaDicts = {
   en: {
-    "shell.title": "AEGIS",
-    "shell.subtitle": "Cosmo health companion",
+    "shell.title": "Cosmo",
+    "shell.subtitle": "Health companion",
     "shell.skipToContent": "Skip to main content",
-    "shell.header.home": "AEGIS home",
+    "shell.header.home": "Cosmo home",
     "shell.header.crew": "Crew member",
     "shell.header.missionDay": "Mission day {day}",
 
@@ -42,10 +42,10 @@ export const shellStrings: AreaDicts = {
     "shell.constellation.empty": "No indicators",
   },
   mn: {
-    "shell.title": "AEGIS",
-    "shell.subtitle": "Cosmo эрүүл мэндийн хамтрагч",
+    "shell.title": "Cosmo",
+    "shell.subtitle": "Эрүүл мэндийн хамтрагч",
     "shell.skipToContent": "Үндсэн агуулга руу очих",
-    "shell.header.home": "AEGIS нүүр хуудас",
+    "shell.header.home": "Cosmo нүүр хуудас",
     "shell.header.crew": "Багийн гишүүн",
     "shell.header.missionDay": "Нислэгийн {day}-р өдөр",
 

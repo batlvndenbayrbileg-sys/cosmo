@@ -17,7 +17,7 @@ const schema = z.object({
   ELEVENLABS_STT_MODEL: optional,
   ELEVENLABS_TTS_MODEL_MN: optional,
   ELEVENLABS_TTS_MODEL_EN: optional,
-  AEGIS_DB_PATH: optional,
+  COSMO_DB_PATH: optional,
   DATABASE_URL: optional,
   POSTGRES_URL: optional,
   SESSION_SECRET: optional,
@@ -79,7 +79,7 @@ export function parseEnv(source: Record<string, string | undefined>): Env {
     // account; eleven_v3 does not. v4_turbo is the low-latency one.
     ttsModelMn: e.ELEVENLABS_TTS_MODEL_MN ?? "eleven_v4_turbo",
     ttsModelEn: e.ELEVENLABS_TTS_MODEL_EN,
-    dbPath: e.AEGIS_DB_PATH ?? "data/aegis.db",
+    dbPath: e.COSMO_DB_PATH ?? "data/cosmo.db",
     databaseUrl: e.DATABASE_URL ?? e.POSTGRES_URL,
     sessionSecret: e.SESSION_SECRET,
     missionStartDate: e.MISSION_START_DATE ?? "2026-10-01",

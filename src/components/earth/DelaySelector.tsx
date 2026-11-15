@@ -46,14 +46,14 @@ export function DelaySelector({
               className={cn(
                 "tnum inline-flex h-9 min-w-16 items-center justify-center gap-1.5 rounded-full px-3.5 text-[14px] font-medium outline-none",
                 "transition-[background-color,color,box-shadow] duration-200",
-                "focus-visible:ring-3 focus-visible:ring-[color:var(--aegis-accent)]/45",
+                "focus-visible:ring-3 focus-visible:ring-[color:var(--cosmo-accent)]/45",
                 active
-                  ? "bg-white text-[color:var(--aegis-ink)] shadow-[0_4px_12px_-6px_rgba(40,80,160,0.45)]"
-                  : "text-[color:var(--aegis-label)] hover:bg-white/60 hover:text-[color:var(--aegis-ink)]",
+                  ? "bg-white text-[color:var(--cosmo-ink)] shadow-[0_4px_12px_-6px_rgba(40,80,160,0.45)]"
+                  : "text-[color:var(--cosmo-label)] hover:bg-white/60 hover:text-[color:var(--cosmo-ink)]",
               )}
             >
               {active ? (
-                <span aria-hidden="true" className="size-1.5 rounded-full bg-[color:var(--aegis-accent)]" />
+                <span aria-hidden="true" className="size-1.5 rounded-full bg-[color:var(--cosmo-accent)]" />
               ) : null}
               {t(option.labelKey)}
             </button>

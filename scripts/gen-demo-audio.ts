@@ -2,7 +2,7 @@
  * Pre-generates Cosmo's voice for the OFFLINE scripted demo (DEMO_MODE=scripted).
  *
  * It runs the real scripted conversation (same server code, same templates) for the chosen crew members on a
- * throw-away in-memory database seeded exactly like data/aegis.db, collects every sentence Cosmo says (greeting,
+ * throw-away in-memory database seeded exactly like data/cosmo.db, collects every sentence Cosmo says (greeting,
  * replies, read-back, summary, dashboard tour) and voices each unique sentence once with ElevenLabs. Files are written
  * to public/demo/audio/<lang>-<sha1(text) first 12 hex>.mp3, the name the audio route looks up (demoAudioFileName).
  *
@@ -38,7 +38,7 @@ const crewIds = (crewArg ?? "bat,alex").split(/[,\s]+/).map((s) => s.trim()).fil
 const fileEnv = loadDotEnv(path.join(process.cwd(), ".env.local"));
 // the conversation must be the scripted one (templates), on a private in-memory database
 process.env.DEMO_MODE = "scripted";
-process.env.AEGIS_DB_PATH = ":memory:";
+process.env.COSMO_DB_PATH = ":memory:";
 // (a DATABASE_URL / POSTGRES_URL in the shell would point getDb() at Postgres, and the seed below wipes it)
 delete process.env.DATABASE_URL;
 delete process.env.POSTGRES_URL;

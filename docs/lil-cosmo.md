@@ -5,7 +5,7 @@ in the same assistant conversation as the "/" screen (the daily check-up starts 
 edge to where the camera sees you (off unless turned on), and opens the dashboard in its own window.
 
 It is an Electron shell around one page of the website: the app opens `<site>/pet?crew=<id>`. Everything else
-(conversation, voice, data) is the normal AEGIS server.
+(conversation, voice, data) is the normal Cosmo server.
 
 | Part | Where |
 | --- | --- |

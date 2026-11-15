@@ -131,10 +131,10 @@ export function BodyMap({
           {/* a slow scanning light over the figure (off with reduced motion) */}
           <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-[40%]">
             <div
-              className="aegis-sweep absolute inset-0"
+              className="cosmo-sweep absolute inset-0"
               style={{
                 background: "linear-gradient(180deg, rgba(79,134,247,0) 40%, rgba(79,134,247,0.16) 50%, rgba(79,134,247,0) 60%)",
-                animation: animate ? "aegis-sweep 5.5s ease-in-out 1.2s infinite" : "none",
+                animation: animate ? "cosmo-sweep 5.5s ease-in-out 1.2s infinite" : "none",
                 opacity: animate ? undefined : 0,
               }}
             />
@@ -194,7 +194,7 @@ export function BodyMap({
                   className="absolute inset-0 rounded-full"
                   style={{
                     background: statusColorVar(status),
-                    animation: animate ? `aegis-pulse ${status === "red" ? 1.8 : 2.6}s cubic-bezier(0.2,0.6,0.3,1) infinite` : "none",
+                    animation: animate ? `cosmo-pulse ${status === "red" ? 1.8 : 2.6}s cubic-bezier(0.2,0.6,0.3,1) infinite` : "none",
                   }}
                 />
               ) : null}
@@ -231,18 +231,18 @@ export function BodyMap({
             >
               <span
                 className={cn(
-                  "font-semibold tracking-[0.08em] whitespace-nowrap text-[var(--aegis-label)] uppercase",
+                  "font-semibold tracking-[0.08em] whitespace-nowrap text-[var(--cosmo-label)] uppercase",
                   small ? "text-[8.5px] leading-[1.1]" : "text-[clamp(8px,2.8cqw,10px)] leading-tight",
                 )}
               >
                 {t(`dashboard.bodyMap.site.${c.site}`)}
               </span>
               {c.keys.length === 0 ? (
-                <span className={cn("leading-tight text-[var(--aegis-label)]", small ? "text-[10px]" : "text-[clamp(10px,3.4cqw,12px)]")}>
+                <span className={cn("leading-tight text-[var(--cosmo-label)]", small ? "text-[10px]" : "text-[clamp(10px,3.4cqw,12px)]")}>
                   {t("dashboard.bodyMap.spo2")}
                 </span>
               ) : empty ? (
-                <span className={cn("leading-tight text-[var(--aegis-label)]", small ? "text-[10px]" : "text-[clamp(10px,3.4cqw,12px)]")}>
+                <span className={cn("leading-tight text-[var(--cosmo-label)]", small ? "text-[10px]" : "text-[clamp(10px,3.4cqw,12px)]")}>
                   {t("dashboard.bodyMap.none")}
                 </span>
               ) : (
@@ -250,7 +250,7 @@ export function BodyMap({
                   <span
                     key={l.key}
                     className={cn(
-                      "tnum flex items-center gap-1 leading-tight font-medium whitespace-nowrap text-[var(--aegis-ink)]",
+                      "tnum flex items-center gap-1 leading-tight font-medium whitespace-nowrap text-[var(--cosmo-ink)]",
                       small ? "text-[10.5px]" : "text-[clamp(10px,3.6cqw,12.5px)]",
                       left && "flex-row-reverse",
                     )}

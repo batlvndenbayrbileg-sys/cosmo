@@ -22,7 +22,7 @@ import {
   type FingerprintRow,
 } from "./logic";
 
-const CORE_FILL = "var(--aegis-accent-deep)";
+const CORE_FILL = "var(--cosmo-accent-deep)";
 const SUPP_FILL = "#9dbcf6";
 const ENVELOPE_FILL = "rgba(15, 27, 45, 0.12)";
 
@@ -39,7 +39,7 @@ function FpTooltip({ active, payload }: { active?: boolean; payload?: ReadonlyAr
   const r = payload?.[0]?.payload;
   if (!active || !r) return null;
   return (
-    <div className="max-w-[16rem] rounded-xl bg-white px-3 py-2 text-[12px] leading-snug text-[var(--aegis-ink)] shadow-lg ring-1 ring-[var(--aegis-hairline)]">
+    <div className="max-w-[16rem] rounded-xl bg-white px-3 py-2 text-[12px] leading-snug text-[var(--cosmo-ink)] shadow-lg ring-1 ring-[var(--cosmo-hairline)]">
       <p className="font-medium">{r.label}</p>
       <p>{markerTooltip(r.row, lang)}</p>
     </div>
@@ -60,7 +60,7 @@ function AnalyteDrawer({
 }) {
   const { t } = useI18n();
   const series = row ? drawerSeries(view, row.name, crew) : null;
-  const config = { value: { label: row?.label ?? "", color: "var(--aegis-accent-deep)" } } satisfies ChartConfig;
+  const config = { value: { label: row?.label ?? "", color: "var(--cosmo-accent-deep)" } } satisfies ChartConfig;
   return (
     <Dialog open={row !== null} onOpenChange={(open) => (!open ? onClose() : undefined)}>
       <DialogContent className="sm:max-w-lg">
@@ -148,12 +148,12 @@ export function FingerprintCard({ view, panel }: { view: SignatureViewData; pane
     <section aria-labelledby="sig-fp-title" data-slot="signature-fingerprint" className="glass-card flex min-w-0 flex-col gap-3 p-4 sm:p-5">
       <header className="flex items-center gap-2.5">
         <IconChip icon={Fingerprint} size={32} />
-        <h2 id="sig-fp-title" className="text-[17px] leading-tight font-medium text-[var(--aegis-ink)]">
+        <h2 id="sig-fp-title" className="text-[17px] leading-tight font-medium text-[var(--cosmo-ink)]">
           {t("dashboard.signature.fp.title")}
         </h2>
         <CardLimits card="fp" />
       </header>
-      <p className="text-[12px] leading-snug text-[var(--aegis-label)]">{t("dashboard.signature.fp.hint", { cap: Z_CAP })}</p>
+      <p className="text-[12px] leading-snug text-[var(--cosmo-label)]">{t("dashboard.signature.fp.hint", { cap: Z_CAP })}</p>
 
       <div aria-hidden="true">
         <ChartContainer config={config} className="aspect-[1.7] w-full">
@@ -173,7 +173,7 @@ export function FingerprintCard({ view, panel }: { view: SignatureViewData; pane
         </ChartContainer>
       </div>
 
-      <ul className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-[var(--aegis-label)]" aria-hidden="true">
+      <ul className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-[var(--cosmo-label)]" aria-hidden="true">
         <li className="flex items-center gap-1.5">
           <span className="inline-block h-2.5 w-4 rounded-sm" style={{ background: CORE_FILL }} />
           {t("dashboard.signature.fp.core")}
@@ -201,7 +201,7 @@ export function FingerprintCard({ view, panel }: { view: SignatureViewData; pane
               </li>
             ))}
           </ul>
-          <p className="text-[11px] leading-snug text-[var(--aegis-label)]">
+          <p className="text-[11px] leading-snug text-[var(--cosmo-label)]">
             {t("dashboard.signature.fp.singleAssayNote", { list: singleAssay.map((r) => r.label).join(", ") })}
           </p>
         </div>
@@ -243,13 +243,13 @@ export function FingerprintCard({ view, panel }: { view: SignatureViewData; pane
         </table>
       </div>
 
-      <div className="flex flex-col gap-1.5 rounded-2xl bg-white/60 p-3 ring-1 ring-[var(--aegis-hairline)]">
-        <p className="flex items-baseline gap-2 text-[13px] font-medium text-[var(--aegis-ink)]">
+      <div className="flex flex-col gap-1.5 rounded-2xl bg-white/60 p-3 ring-1 ring-[var(--cosmo-hairline)]">
+        <p className="flex items-baseline gap-2 text-[13px] font-medium text-[var(--cosmo-ink)]">
           {t("dashboard.signature.fp.other.title")}
-          <span className="text-[11px] font-normal text-[var(--aegis-label)]">{t("dashboard.signature.fp.other.info")}</span>
+          <span className="text-[11px] font-normal text-[var(--cosmo-label)]">{t("dashboard.signature.fp.other.info")}</span>
         </p>
         {others.length === 0 ? (
-          <p className="text-[12px] text-[var(--aegis-label)]">{t("dashboard.signature.fp.other.none", { fold: OTHER_LARGE_FOLD })}</p>
+          <p className="text-[12px] text-[var(--cosmo-label)]">{t("dashboard.signature.fp.other.none", { fold: OTHER_LARGE_FOLD })}</p>
         ) : (
           <ul className="flex flex-wrap gap-1.5">
             {others.map((o) => (
@@ -257,7 +257,7 @@ export function FingerprintCard({ view, panel }: { view: SignatureViewData; pane
                 key={o.label}
                 className={cn(
                   "rounded-full px-2.5 py-0.5 text-[12px] ring-1",
-                  "bg-[var(--status-nodata-soft)] text-[var(--aegis-ink)] ring-[var(--aegis-hairline)]",
+                  "bg-[var(--status-nodata-soft)] text-[var(--cosmo-ink)] ring-[var(--cosmo-hairline)]",
                 )}
               >
                 {t("dashboard.signature.fp.other.item", { marker: o.label, fold: o.fold })}

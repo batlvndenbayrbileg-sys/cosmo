@@ -45,13 +45,13 @@ export function PetPreview() {
   return (
     <div className="flex min-h-dvh w-full items-center justify-center px-4 py-10" data-slot="pet-preview">
       <div className={cn(GLASS, "w-full max-w-md rounded-[28px] p-6 sm:p-8")}>
-        <p className="text-[13px] font-semibold tracking-wide text-[var(--aegis-label)]">{t("crew.pet.launch")}</p>
-        <h1 className="mt-1 text-[22px] leading-tight font-semibold text-[var(--aegis-ink)] sm:text-[26px]">{t("crew.pet.preview.title")}</h1>
-        <p className="mt-2 text-[14px] leading-relaxed text-[var(--aegis-label)]">{t("crew.pet.lead")}</p>
+        <p className="text-[13px] font-semibold tracking-wide text-[var(--cosmo-label)]">{t("crew.pet.launch")}</p>
+        <h1 className="mt-1 text-[22px] leading-tight font-semibold text-[var(--cosmo-ink)] sm:text-[26px]">{t("crew.pet.preview.title")}</h1>
+        <p className="mt-2 text-[14px] leading-relaxed text-[var(--cosmo-label)]">{t("crew.pet.lead")}</p>
 
         {/* a strip of "screen" with her on its bottom edge */}
         <div className="relative mt-6 h-40 overflow-hidden rounded-2xl border border-white/80 bg-[linear-gradient(180deg,#e6efff_0%,#f7faff_70%,#dfe8f8_100%)]">
-          <div className="absolute inset-x-0 bottom-0 h-2.5 bg-[var(--aegis-ink)]/10" aria-hidden="true" />
+          <div className="absolute inset-x-0 bottom-0 h-2.5 bg-[var(--cosmo-ink)]/10" aria-hidden="true" />
           <div
             className="absolute bottom-2.5 h-[112px] w-[112px] transition-[left] ease-in-out motion-reduce:transition-none"
             style={{ left: dir > 0 ? "calc(100% - 124px)" : "12px", transitionDuration: `${RUN_MS}ms` }}
@@ -63,10 +63,10 @@ export function PetPreview() {
           </div>
         </div>
 
-        <p className="mt-5 text-[13.5px] leading-relaxed text-[var(--aegis-ink)]">{t("crew.pet.preview.body")}</p>
+        <p className="mt-5 text-[13.5px] leading-relaxed text-[var(--cosmo-ink)]">{t("crew.pet.preview.body")}</p>
         <Link
           href="/"
-          className="mt-5 inline-flex h-11 items-center gap-2 rounded-full bg-[var(--aegis-ink)] px-5 text-[14px] font-semibold text-white outline-none transition-transform hover:-translate-y-px focus-visible:ring-3 focus-visible:ring-[var(--aegis-accent)]/45"
+          className="mt-5 inline-flex h-11 items-center gap-2 rounded-full bg-[var(--cosmo-ink)] px-5 text-[14px] font-semibold text-white outline-none transition-transform hover:-translate-y-px focus-visible:ring-3 focus-visible:ring-[var(--cosmo-accent)]/45"
         >
           <ArrowLeft className="size-4" aria-hidden="true" />
           {t("crew.pet.preview.back")}

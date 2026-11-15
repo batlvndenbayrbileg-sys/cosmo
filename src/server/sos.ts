@@ -46,7 +46,7 @@ export async function raiseSosFromButton(
     try {
       turnId = (await appendTurn(crewId, checkIn.id, { speaker: "cosmo", text, language, createdAt: now() })).id;
     } catch (err) {
-      console.error("[aegis] SOS: storing Cosmo's line failed (the alert itself is stored):", err);
+      console.error("[cosmo] SOS: storing Cosmo's line failed (the alert itself is stored):", err);
     }
   }
   return { alert, duplicate, spoken: { text, language, turnId } };
@@ -76,7 +76,7 @@ export async function sosTurn(p: {
     const { alert, duplicate } = await raiseSosAlert(p.crewId, { reason: "voice", phrase: hit.phrase, checkInId: p.checkInId });
     event = { type: "sos", ok: true, alertId: alert.id, createdAt: alert.createdAt, duplicate, photoStatus: alert.photoStatus };
   } catch (err) {
-    console.error("[aegis] SOS alert could not be stored:", err);
+    console.error("[cosmo] SOS alert could not be stored:", err);
     event = { type: "sos", ok: false, alertId: null, createdAt: null, duplicate: false, photoStatus: null };
   }
 
@@ -87,7 +87,7 @@ export async function sosTurn(p: {
     try {
       await raiseCrisisAlert(p.crewId, p.checkInId, crisis);
     } catch (err) {
-      console.error("[aegis] crisis alert next to the SOS failed:", err);
+      console.error("[cosmo] crisis alert next to the SOS failed:", err);
     }
     // as the CRISIS transition does (machine.ts): Cosmo stays in a crisis-aware talk for the next turns
     const c = p.ctx;
@@ -95,7 +95,7 @@ export async function sosTurn(p: {
       try {
         await saveMachineCtx(p.crewId, p.checkInId, { ...c, companion: true, companionTurns: c.companionTurns + 1, companionCrisis: true });
       } catch (err) {
-        console.error("[aegis] marking the crisis next to the SOS failed:", err);
+        console.error("[cosmo] marking the crisis next to the SOS failed:", err);
       }
     }
   }

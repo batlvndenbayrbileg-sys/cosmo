@@ -3,7 +3,7 @@
 /**
  * CheckInExperience: the Siri-style check-in (docs/DESIGN_V2.md section 3).
  *
- *  - phase "conversation": nothing but the big Cosmo on the .aegis-bg gradient. She greets as soon
+ *  - phase "conversation": nothing but the big Cosmo on the .cosmo-bg gradient. She greets as soon
  *    as the page opens; after every sentence the microphone opens by itself (VAD ends the utterance
  *    after 900 ms of silence). Each captured value flies out of her chest as a glass bubble and is
  *    "written" into it. Ghost controls in the corners: back, language + captions, keyboard, demo.
@@ -915,7 +915,7 @@ export function CheckInExperience({ entry, assistant: entryProps }: { entry?: "a
           {veil ? (
             <motion.div
               aria-hidden="true"
-              className="aegis-bg pointer-events-none fixed inset-0 z-30"
+              className="cosmo-bg pointer-events-none fixed inset-0 z-30"
               initial={{ opacity: 1, scale: 1 }}
               animate={{ opacity: 0, scale: 1.04 }}
               transition={{ duration: 0.75, ease: [0.4, 0, 0.2, 1] }}
@@ -976,7 +976,7 @@ export function CheckInExperience({ entry, assistant: entryProps }: { entry?: "a
         <div
           data-slot="checkin-stage"
           data-phase={phase}
-          className="aegis-bg fixed inset-0 z-50 overflow-x-hidden overflow-y-auto"
+          className="cosmo-bg fixed inset-0 z-50 overflow-x-hidden overflow-y-auto"
         >
           <h1 className="sr-only">{t(assistantEntry && state.assistant ? "checkin.assistant.stage.label" : "checkin.page.label")}</h1>
           <p role="status" className="sr-only">
@@ -1038,7 +1038,7 @@ export function CheckInExperience({ entry, assistant: entryProps }: { entry?: "a
                 aria-describedby="checkin-space-hint"
                 aria-pressed={micUsable ? recorder.recording : undefined}
                 disabled={preparing}
-                className="size-full cursor-pointer rounded-[38%] outline-none focus-visible:ring-4 focus-visible:ring-[var(--aegis-accent)]/30 disabled:cursor-default"
+                className="size-full cursor-pointer rounded-[38%] outline-none focus-visible:ring-4 focus-visible:ring-[var(--cosmo-accent)]/30 disabled:cursor-default"
               >
                 {explainer ? null : cosmo}
               </button>
@@ -1100,7 +1100,7 @@ export function CheckInExperience({ entry, assistant: entryProps }: { entry?: "a
                   <motion.p
                     key="preparing"
                     role="status"
-                    className="flex items-center gap-2.5 text-[17px] font-normal text-[var(--aegis-ink)]"
+                    className="flex items-center gap-2.5 text-[17px] font-normal text-[var(--cosmo-ink)]"
                     initial={{ opacity: 0, y: 6 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0 }}
@@ -1117,9 +1117,9 @@ export function CheckInExperience({ entry, assistant: entryProps }: { entry?: "a
                       "line-clamp-2 max-w-[min(46rem,92vw)] text-center text-[15.5px] leading-snug",
                       // the open text field sits bottom-right: keep the caption clear of it on wide screens
                       keyboardOpen && layout.mode === "wide" && "max-w-[max(16rem,calc(100vw-58rem))]",
-                      caption.who === "crew" && "font-medium text-[var(--aegis-ink)]",
-                      caption.who === "cosmo" && "text-[var(--aegis-ink)]/80",
-                      caption.who === "hint" && "text-[var(--aegis-label)] italic",
+                      caption.who === "crew" && "font-medium text-[var(--cosmo-ink)]",
+                      caption.who === "cosmo" && "text-[var(--cosmo-ink)]/80",
+                      caption.who === "hint" && "text-[var(--cosmo-label)] italic",
                     )}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
@@ -1149,10 +1149,10 @@ export function CheckInExperience({ entry, assistant: entryProps }: { entry?: "a
                     autoFocus
                     className={cn(
                       GLASS,
-                      "flex h-14 items-center gap-3 rounded-full px-7 text-[17px] font-medium text-[var(--aegis-ink)] outline-none focus-visible:ring-4 focus-visible:ring-[var(--aegis-accent)]/40",
+                      "flex h-14 items-center gap-3 rounded-full px-7 text-[17px] font-medium text-[var(--cosmo-ink)] outline-none focus-visible:ring-4 focus-visible:ring-[var(--cosmo-accent)]/40",
                     )}
                   >
-                    <span className="inline-flex size-8 items-center justify-center rounded-full bg-[var(--aegis-ink)] text-white">
+                    <span className="inline-flex size-8 items-center justify-center rounded-full bg-[var(--cosmo-ink)] text-white">
                       <Play className="size-3.5 translate-x-px fill-current" aria-hidden="true" />
                     </span>
                     {t("checkin.tapToStart")}
@@ -1179,7 +1179,7 @@ export function CheckInExperience({ entry, assistant: entryProps }: { entry?: "a
                     disabled={!ready || state.busy || demo.running}
                     className={cn(
                       GLASS,
-                      "flex h-11 items-center rounded-full px-5 text-[15px] font-medium text-[var(--aegis-ink)] outline-none focus-visible:ring-4 focus-visible:ring-[var(--aegis-accent)]/40 disabled:opacity-60",
+                      "flex h-11 items-center rounded-full px-5 text-[15px] font-medium text-[var(--cosmo-ink)] outline-none focus-visible:ring-4 focus-visible:ring-[var(--cosmo-accent)]/40 disabled:opacity-60",
                     )}
                   >
                     {t("checkin.companion.back")}
@@ -1255,7 +1255,7 @@ export function CheckInExperience({ entry, assistant: entryProps }: { entry?: "a
 
           <p
             data-slot="prototype-ribbon"
-            className="fixed inset-x-0 bottom-0 z-10 px-4 py-1.5 text-center text-[11px] leading-tight text-[var(--aegis-label)]"
+            className="fixed inset-x-0 bottom-0 z-10 px-4 py-1.5 text-center text-[11px] leading-tight text-[var(--cosmo-label)]"
           >
             {t("shell.ribbon.text")}
           </p>

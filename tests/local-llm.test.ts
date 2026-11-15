@@ -310,7 +310,7 @@ describe("Claude -> local -> rules", () => {
     expect(fn).not.toHaveBeenCalled();
     expect(await agent.companionReply({ crew, ctx: initialCtx(), turn: 1, text: "rough day", lang: "en", history: [] })).toBe("Glad to hear it.");
     expect(fn).not.toHaveBeenCalled();
-    expect(logged()).toContain("[aegis] turn answered by claude");
+    expect(logged()).toContain("[cosmo] turn answered by claude");
   });
 
   it("Claude unavailable, local answers: the local decision is used and the tier is logged without user content", async () => {
@@ -321,7 +321,7 @@ describe("Claude -> local -> rules", () => {
     expect(claude.calls()).toBe(1);
     expect(calls).toHaveLength(1);
     expect(d.replyText).toBe("Thanks for telling me.");
-    expect(logged()).toContain("[aegis] turn answered by local");
+    expect(logged()).toContain("[cosmo] turn answered by local");
     for (const line of logged()) expect(line).not.toContain("airlock");
   });
 
@@ -351,7 +351,7 @@ describe("Claude -> local -> rules", () => {
       expect(err, label).toBeInstanceOf(LlmUnavailable);
       expect((err as LlmUnavailable).reason, label).toMatch(/^claude: .*; local: /);
     }
-    expect(logged()).toContain("[aegis] turn answered by rules");
+    expect(logged()).toContain("[cosmo] turn answered by rules");
   });
 
   it("in the pipeline a failing local model falls back to the rules for the turn", async () => {
@@ -425,7 +425,7 @@ describe("Claude -> local -> rules", () => {
     expect(fn).not.toHaveBeenCalled();
     expect(eventsOf(events, "error")[0]).toMatchObject({ code: "LLM_FAILED" });
     expect(assistantText(events)).toBe(template);
-    expect(logged()).toContain("[aegis] turn: claude refused, answered by rules (later tiers not asked)");
+    expect(logged()).toContain("[cosmo] turn: claude refused, answered by rules (later tiers not asked)");
   });
 
   it("a Claude refusal is final for the wording methods too: null (the template), the local model is never asked", async () => {
@@ -447,7 +447,7 @@ describe("Claude -> local -> rules", () => {
     const args = { crew, ctx: initialCtx(), turn: 1, text: "rough day", lang: "en" as const, history: [] };
     expect(await agent.companionReply(args)).toBe("I'm here with you.");
     expect(await agent.companionReply(args)).toBeNull();
-    expect(logged()).toContain("[aegis] companion reply answered by local");
-    expect(logged()).toContain("[aegis] companion reply answered by rules");
+    expect(logged()).toContain("[cosmo] companion reply answered by local");
+    expect(logged()).toContain("[cosmo] companion reply answered by rules");
   });
 });

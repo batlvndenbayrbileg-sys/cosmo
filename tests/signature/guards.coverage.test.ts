@@ -27,7 +27,7 @@ describe("signature T10 fix: demo Cosmo lines pass the orbit-claim guard", () =>
     const facts = buildFacts(panel, { lang: "en", previous: null, qcLog: view.qcLog });
     const text = renderTriageTemplate(facts, "en");
     expect(demoLineOk(text, facts, "en")).toBe(true);
-    const claim = text.replace(SIGNATURE_DISCLAIMER.en, `AEGIS measures IL-6 in orbit every day. ${SIGNATURE_DISCLAIMER.en}`);
+    const claim = text.replace(SIGNATURE_DISCLAIMER.en, `Cosmo measures IL-6 in orbit every day. ${SIGNATURE_DISCLAIMER.en}`);
     expect(hasForbiddenWording(claim)).toBe(false);
     expect(demoLineOk(claim, facts, "en")).toBe(false);
   });

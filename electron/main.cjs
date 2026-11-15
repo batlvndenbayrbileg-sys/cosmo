@@ -1,4 +1,4 @@
-// lil cosmo: a frameless, transparent, always-on-top window showing /pet from the AEGIS website (ORIGIN).
+// lil cosmo: a frameless, transparent, always-on-top window showing /pet from the Cosmo website (ORIGIN).
 // Cosmo lives on the bottom edge of the screen (just above the taskbar): she only ever moves sideways, either dragged
 // by the user or running to where the camera sees them (the page sends "pet:goto"). docs/lil-cosmo.md has the how-to.
 //
@@ -24,7 +24,7 @@ const ACCEL = 0.45; // px per tick, per tick
 const configured = process.env.COSMO_ORIGIN || require("../package.json").cosmoOrigin || DEFAULT_ORIGIN;
 const ORIGIN = core.normalizeOrigin(configured);
 
-// its own name and profile folder (not "aegis" from package.json), so the single-instance lock and cookies are ours
+// its own name and profile folder (not "cosmo" from package.json), so the single-instance lock and cookies are ours
 app.setName("lil cosmo");
 app.setPath("userData", path.join(app.getPath("appData"), "lil cosmo"));
 
@@ -243,7 +243,7 @@ app.whenReady().then(async () => {
     if (!fromOrigin(e)) return;
     const url = core.dashboardUrl(ORIGIN, p);
     if (!url) return;
-    const dash = new BrowserWindow({ width: 1280, height: 820, autoHideMenuBar: true, title: "AEGIS", webPreferences: { ...SAFE_PREFS } });
+    const dash = new BrowserWindow({ width: 1280, height: 820, autoHideMenuBar: true, title: "Cosmo", webPreferences: { ...SAFE_PREFS } });
     lockToOrigin(dash);
     dash.loadURL(url);
   });

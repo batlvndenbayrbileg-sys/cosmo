@@ -60,8 +60,8 @@ export function LilCosmoControl({ crew }: { crew: Pick<CrewPublic, "id" | "name"
               className="size-12 shrink-0 rounded-2xl bg-[linear-gradient(135deg,#e6efff,#f7faff)] object-contain p-0.5"
             />
             <div className="min-w-0">
-              <p className="text-[15px] leading-tight font-semibold text-[var(--aegis-ink)]">{t("crew.pet.launch")}</p>
-              <p className="mt-1 text-[12.5px] leading-snug text-[var(--aegis-label)]">{t("crew.pet.lead")}</p>
+              <p className="text-[15px] leading-tight font-semibold text-[var(--cosmo-ink)]">{t("crew.pet.launch")}</p>
+              <p className="mt-1 text-[12.5px] leading-snug text-[var(--cosmo-label)]">{t("crew.pet.lead")}</p>
             </div>
           </div>
 
@@ -75,8 +75,8 @@ export function LilCosmoControl({ crew }: { crew: Pick<CrewPublic, "id" | "name"
                   rel="noopener"
                   data-download={d.platform}
                   className={cn(
-                    "flex h-11 items-center gap-2.5 rounded-xl bg-[var(--aegis-ink)] px-3.5 text-white outline-none",
-                    "transition-[transform,opacity] hover:-translate-y-px hover:opacity-95 focus-visible:ring-3 focus-visible:ring-[var(--aegis-accent)]/45",
+                    "flex h-11 items-center gap-2.5 rounded-xl bg-[var(--cosmo-ink)] px-3.5 text-white outline-none",
+                    "transition-[transform,opacity] hover:-translate-y-px hover:opacity-95 focus-visible:ring-3 focus-visible:ring-[var(--cosmo-accent)]/45",
                   )}
                 >
                   <Download className="size-4 shrink-0" aria-hidden="true" />
@@ -91,22 +91,22 @@ export function LilCosmoControl({ crew }: { crew: Pick<CrewPublic, "id" | "name"
                   download
                   rel="noopener"
                   data-download={d.platform}
-                  className="self-start rounded px-1 text-[12.5px] text-[var(--aegis-ink)] underline decoration-black/25 underline-offset-2 outline-none hover:decoration-black/60 focus-visible:ring-2 focus-visible:ring-[var(--aegis-accent)]/45"
+                  className="self-start rounded px-1 text-[12.5px] text-[var(--cosmo-ink)] underline decoration-black/25 underline-offset-2 outline-none hover:decoration-black/60 focus-visible:ring-2 focus-visible:ring-[var(--cosmo-accent)]/45"
                 >
                   {t(`crew.pet.also.${d.platform}`)}
                 </a>
               ))}
-              <p className="text-[11.5px] leading-snug text-[var(--aegis-label)]">{t("crew.pet.unsigned")}</p>
+              <p className="text-[11.5px] leading-snug text-[var(--cosmo-label)]">{t("crew.pet.unsigned")}</p>
             </div>
           ) : (
             <div
               className="flex items-center gap-2.5 rounded-xl border border-dashed border-black/15 bg-white/60 px-3.5 py-2.5"
               data-slot="lil-cosmo-soon"
             >
-              <Clock className="size-4 shrink-0 text-[var(--aegis-label)]" aria-hidden="true" />
+              <Clock className="size-4 shrink-0 text-[var(--cosmo-label)]" aria-hidden="true" />
               <div className="min-w-0">
-                <p className="text-[13.5px] font-semibold text-[var(--aegis-ink)]">{t("crew.pet.soon")}</p>
-                <p className="text-[11.5px] text-[var(--aegis-label)]">{t("crew.pet.soon.hint")}</p>
+                <p className="text-[13.5px] font-semibold text-[var(--cosmo-ink)]">{t("crew.pet.soon")}</p>
+                <p className="text-[11.5px] text-[var(--cosmo-label)]">{t("crew.pet.soon.hint")}</p>
               </div>
             </div>
           )}
@@ -115,12 +115,12 @@ export function LilCosmoControl({ crew }: { crew: Pick<CrewPublic, "id" | "name"
             <a
               href={link}
               data-slot="lil-cosmo-open"
-              className="flex items-center gap-2.5 rounded-xl px-2 py-1.5 text-left outline-none hover:bg-black/5 focus-visible:ring-2 focus-visible:ring-[var(--aegis-accent)]/45"
+              className="flex items-center gap-2.5 rounded-xl px-2 py-1.5 text-left outline-none hover:bg-black/5 focus-visible:ring-2 focus-visible:ring-[var(--cosmo-accent)]/45"
             >
-              <MonitorSmartphone className="size-4 shrink-0 text-[var(--aegis-ink)]" aria-hidden="true" />
+              <MonitorSmartphone className="size-4 shrink-0 text-[var(--cosmo-ink)]" aria-hidden="true" />
               <span className="min-w-0">
-                <span className="block text-[13.5px] font-medium text-[var(--aegis-ink)]">{t("crew.pet.open", { name })}</span>
-                <span className="block text-[11.5px] text-[var(--aegis-label)]">{t("crew.pet.open.hint")}</span>
+                <span className="block text-[13.5px] font-medium text-[var(--cosmo-ink)]">{t("crew.pet.open", { name })}</span>
+                <span className="block text-[11.5px] text-[var(--cosmo-label)]">{t("crew.pet.open.hint")}</span>
               </span>
             </a>
           ) : null}

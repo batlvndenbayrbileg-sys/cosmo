@@ -7,7 +7,7 @@
  */
 import type { CrewPublic } from "@/lib/types";
 
-export const SELECTED_CREW_KEY = "aegis.crew";
+export const SELECTED_CREW_KEY = "cosmo.crew";
 
 /** Validates the stored JSON; anything malformed (or from an older shape) is treated as absent. */
 export function parseStoredCrew(raw: string | null): CrewPublic | null {

@@ -899,7 +899,7 @@ export function buildStoryboard(input: StoryboardInput): Storyboard | null {
     if (isSaneCaption(b.caption.en, allowed, "en") && isSaneCaption(b.caption.mn, allowed, "mn")) {
       kept.push({ id: b.id, caption: b.caption, panel: b.panel });
     } else {
-      console.warn(`[aegis] explain beat ${b.id} dropped by the caption gate`);
+      console.warn(`[cosmo] explain beat ${b.id} dropped by the caption gate`);
     }
   }
   if (kept.length === 0) return null;
@@ -1010,7 +1010,7 @@ export async function explainSummaryEvent(p: {
     if (!board) return null;
     return (await storeWalkthrough(p.crewId, p.checkInId, board, p.lang, null)).event;
   } catch (err) {
-    console.error("[aegis] explain walkthrough failed:", err);
+    console.error("[cosmo] explain walkthrough failed:", err);
     return null;
   }
 }

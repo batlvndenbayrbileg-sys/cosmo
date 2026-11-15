@@ -73,7 +73,7 @@ export function Timeline({
           "flex shrink-0 flex-col items-center gap-1.5",
           large ? "w-11 lg:w-[clamp(44px,3.6vw,64px)]" : "w-11 lg:w-[clamp(36px,2.9vw,44px)] lg:gap-1",
         )} data-status={day.status} data-today={day.today ? "true" : undefined}>
-        <span aria-hidden="true" className="h-4 text-[11px] font-medium whitespace-nowrap text-[var(--aegis-label)]">
+        <span aria-hidden="true" className="h-4 text-[11px] font-medium whitespace-nowrap text-[var(--cosmo-label)]">
           {showMonth ? monthLabel(day.date, lang) : ""}
         </span>
         <span
@@ -83,7 +83,7 @@ export function Timeline({
             "relative inline-flex size-10 items-center justify-center rounded-full",
             large ? "lg:size-[clamp(40px,3.2vw,54px)]" : "lg:size-[clamp(32px,4.4vh,40px)]",
             BADGE[day.status],
-            day.today && "ring-2 ring-[var(--aegis-accent)] ring-offset-2 ring-offset-white",
+            day.today && "ring-2 ring-[var(--cosmo-accent)] ring-offset-2 ring-offset-white",
           )}
         >
           {day.status === "no_data" ? null : (
@@ -99,7 +99,7 @@ export function Timeline({
           aria-hidden="true"
           className={cn(
             "tnum text-[12px]",
-            day.today ? "font-semibold text-[var(--aegis-ink)]" : "text-[var(--aegis-label)]",
+            day.today ? "font-semibold text-[var(--cosmo-ink)]" : "text-[var(--cosmo-label)]",
           )}
         >
           {Number(day.date.slice(8, 10))}
@@ -127,17 +127,17 @@ export function Timeline({
       >
         <h2
           id="timeline-title"
-          className={cn("text-[18px] leading-tight font-normal text-[var(--aegis-ink)]", large && "lg:text-[22px]")}
+          className={cn("text-[18px] leading-tight font-normal text-[var(--cosmo-ink)]", large && "lg:text-[22px]")}
         >
           {t("dashboard.timeline.title")}
         </h2>
-        <p className={cn("text-[11px] leading-snug text-[var(--aegis-label)]", !large && "lg:line-clamp-3")}>
+        <p className={cn("text-[11px] leading-snug text-[var(--cosmo-label)]", !large && "lg:line-clamp-3")}>
           {t("dashboard.timeline.caption")}
           {payload.simulatedHistory ? ` · ${t("dashboard.simulatedHistory")}` : ""}
         </p>
       </div>
       <div
-        className="aegis-noscrollbar -mx-2 min-w-0 overflow-x-auto px-2 pb-1 lg:flex-1 lg:py-1"
+        className="cosmo-noscrollbar -mx-2 min-w-0 overflow-x-auto px-2 pb-1 lg:flex-1 lg:py-1"
         tabIndex={0}
         aria-label={t("dashboard.timeline.title")}
       >
@@ -147,7 +147,7 @@ export function Timeline({
           </ol>
           <ol
             className={cn(
-              "flex items-center gap-2.5 rounded-full bg-white px-4 py-2 shadow-[0_14px_30px_-16px_rgba(40,80,160,0.45)] ring-1 ring-[var(--aegis-hairline)]",
+              "flex items-center gap-2.5 rounded-full bg-white px-4 py-2 shadow-[0_14px_30px_-16px_rgba(40,80,160,0.45)] ring-1 ring-[var(--cosmo-hairline)]",
               !large && "lg:gap-[clamp(4px,0.5vw,10px)] lg:px-3 lg:py-1.5",
             )}
           >

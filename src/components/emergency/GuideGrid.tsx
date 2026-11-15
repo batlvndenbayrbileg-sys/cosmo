@@ -27,7 +27,7 @@ export function GuideIconChip({ icon, urgent = false, className }: { icon?: Guid
       aria-hidden="true"
       className={cn(
         "inline-flex size-10 shrink-0 items-center justify-center rounded-full text-white",
-        urgent ? "bg-[#C53030]" : "bg-[var(--aegis-ink)]",
+        urgent ? "bg-[#C53030]" : "bg-[var(--cosmo-ink)]",
         className,
       )}
     >
@@ -84,7 +84,7 @@ export function GuideGrid({
               onClick={() => onOpen(s.id)}
               className={cn(
                 "group flex h-full min-h-[132px] w-full flex-col gap-1.5 rounded-[22px] border bg-white/85 p-3 text-left shadow-[0_8px_24px_-14px_rgba(40,80,160,0.35)] outline-none transition-[transform,box-shadow] hover:-translate-y-0.5 hover:shadow-[0_14px_30px_-14px_rgba(40,80,160,0.45)] focus-visible:ring-3 focus-visible:ring-ring/60",
-                help ? "border-[#C53030]/30 bg-[#FFF5F5]" : "border-[var(--aegis-hairline)]",
+                help ? "border-[#C53030]/30 bg-[#FFF5F5]" : "border-[var(--cosmo-hairline)]",
                 isSuggested && "ring-2 ring-[#B7791F]/60",
                 dense && "lg:min-h-0",
               )}
@@ -92,9 +92,9 @@ export function GuideGrid({
               <span className="flex items-start gap-2">
                 <GuideIconChip icon={s.icon} urgent={help || s.id === "not-breathing"} className="size-9" />
                 <span className="flex min-w-0 flex-col">
-                  <span className="text-[16px] leading-tight font-medium text-[var(--aegis-ink)]">{s.title[lang]}</span>
+                  <span className="text-[16px] leading-tight font-medium text-[var(--cosmo-ink)]">{s.title[lang]}</span>
                   {s.summary ? (
-                    <span className="mt-0.5 line-clamp-2 text-[12px] leading-snug text-[var(--aegis-label)]">{s.summary[lang]}</span>
+                    <span className="mt-0.5 line-clamp-2 text-[12px] leading-snug text-[var(--cosmo-label)]">{s.summary[lang]}</span>
                   ) : null}
                 </span>
               </span>
@@ -105,7 +105,7 @@ export function GuideGrid({
               ) : (
                 <span className="flex-1" />
               )}
-              <span className="flex items-center justify-between gap-2 text-[11px] text-[var(--aegis-label)]">
+              <span className="flex items-center justify-between gap-2 text-[11px] text-[var(--cosmo-label)]">
                 <span className="tnum">{t("emergency.grid.steps", { n: s.steps.length })}</span>
                 {isSuggested ? (
                   <span className="rounded-full bg-[#FEFCBF] px-2 py-0.5 font-medium text-[#744210]">{t("emergency.grid.suggested")}</span>

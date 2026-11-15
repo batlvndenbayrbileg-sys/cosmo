@@ -419,7 +419,7 @@ export function DesktopPet({ crewId }: { crewId: string | null }) {
       }}
     >
       <style>{`
-        html[data-pet], html[data-pet] body, html[data-pet] .aegis-bg { background: transparent !important; }
+        html[data-pet], html[data-pet] body, html[data-pet] .cosmo-bg { background: transparent !important; }
         html[data-pet] [data-slot="app-frame"] > :not(main) { display: none !important; }
         html[data-pet] nextjs-portal { display: none; }
         .pet-idle { animation: pet-bob 3.4s ease-in-out infinite; }
@@ -451,7 +451,7 @@ export function DesktopPet({ crewId }: { crewId: string | null }) {
       {typing && (
         <div className="mb-1 w-[230px] space-y-1">
           {lastCosmo && (
-            <div className="max-h-[52px] overflow-hidden rounded-xl border border-white/80 bg-white/90 px-2.5 py-1 text-[11px] leading-snug text-[var(--aegis-ink)] shadow-sm">
+            <div className="max-h-[52px] overflow-hidden rounded-xl border border-white/80 bg-white/90 px-2.5 py-1 text-[11px] leading-snug text-[var(--cosmo-ink)] shadow-sm">
               {lastCosmo.text}
             </div>
           )}
@@ -465,7 +465,7 @@ export function DesktopPet({ crewId }: { crewId: string | null }) {
               if (e.key === "Escape") setTyping(false);
             }}
             placeholder={t("crew.pet.write.placeholder")}
-            className="w-full rounded-full bg-[var(--aegis-ink)]/90 px-3 py-1.5 text-xs text-white outline-none placeholder:text-white/50 focus-visible:ring-2 focus-visible:ring-[var(--aegis-accent)]/60"
+            className="w-full rounded-full bg-[var(--cosmo-ink)]/90 px-3 py-1.5 text-xs text-white outline-none placeholder:text-white/50 focus-visible:ring-2 focus-visible:ring-[var(--cosmo-accent)]/60"
           />
         </div>
       )}

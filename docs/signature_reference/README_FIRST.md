@@ -1,7 +1,7 @@
-# AEGIS Signature Triage — багц (v3)
+# Cosmo Signature Triage — багц (v3)
 
 ## 1. Хуулах
-Энэ багцын `docs/` ба `data/` хавтсыг AEGIS repo-ийн үндсэн хавтсанд хуулна (нэгтгэнэ, юу ч устгахгүй).
+Энэ багцын `docs/` ба `data/` хавтсыг Cosmo repo-ийн үндсэн хавтсанд хуулна (нэгтгэнэ, юу ч устгахгүй).
 
 - `docs/SIGNATURE_SPEC.md` — дизайн, томьёо, үр дүн, хязгаарлалт, эх сурвалж
 - `docs/SIGNATURE_ADDENDUM_SECOND_ASSAY.md` — хоёр шинжилгээний баталгаа, demo-ийн дараалал

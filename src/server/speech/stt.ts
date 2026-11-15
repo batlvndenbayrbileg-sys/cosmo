@@ -69,14 +69,14 @@ export async function transcribeAudio(
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
   } catch (err) {
-    console.error("[aegis] STT request failed:", err instanceof Error ? err.message : err);
+    console.error("[cosmo] STT request failed:", err instanceof Error ? err.message : err);
     throw new HttpError(502, "STT_FAILED", "Speech recognition did not respond. Please try again or type your answer.");
   }
   const ms = Date.now() - started;
 
   if (!res.ok) {
     const detail = (await res.text().catch(() => "")).slice(0, 200);
-    console.error(`[aegis] STT HTTP ${res.status}: ${detail}`);
+    console.error(`[cosmo] STT HTTP ${res.status}: ${detail}`);
     throw new HttpError(502, "STT_FAILED", "Speech recognition failed. Please try again or type your answer.");
   }
 

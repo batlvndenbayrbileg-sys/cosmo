@@ -94,7 +94,7 @@ const TIMESLICE_MS = 250;
 /** Marks the end of an utterance on the performance timeline (latency to Cosmo's reply can be read in devtools). */
 function markUtteranceEnd(): void {
   try {
-    performance.mark("aegis:utterance-end");
+    performance.mark("cosmo:utterance-end");
   } catch {
     // no performance timeline
   }

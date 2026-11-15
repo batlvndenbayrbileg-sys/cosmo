@@ -74,13 +74,13 @@ export function DashboardTalk({
               aria-live="polite"
             >
               {question ? (
-                <p className="line-clamp-1 text-[var(--aegis-muted,#5B6678)]" title={question}>
+                <p className="line-clamp-1 text-[var(--cosmo-muted,#5B6678)]" title={question}>
                   <span className="unit-label mr-2">{t("checkin.talk.you")}</span>
                   {question}
                 </p>
               ) : null}
               {answer ? (
-                <p className="line-clamp-2 text-[var(--aegis-ink,#0F1B2D)]" title={answer}>
+                <p className="line-clamp-2 text-[var(--cosmo-ink,#0F1B2D)]" title={answer}>
                   <span className="unit-label mr-2">{t("checkin.talk.cosmo")}</span>
                   {answer}
                 </p>
@@ -129,7 +129,7 @@ export function DashboardTalk({
               </button>
             </form>
           ) : (
-            <p className="min-w-0 flex-1 truncate px-1 text-[15px] text-[var(--aegis-muted,#5B6678)]" role="status">
+            <p className="min-w-0 flex-1 truncate px-1 text-[15px] text-[var(--cosmo-muted,#5B6678)]" role="status">
               {statusText}
             </p>
           )}

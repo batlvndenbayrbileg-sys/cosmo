@@ -136,9 +136,9 @@ export function EmergencyOverlay({
             />
           ) : (
             <div className="flex flex-col gap-3">
-              <p className="text-[15px] text-[var(--aegis-label)]">{t("emergency.grid.hint")}</p>
+              <p className="text-[15px] text-[var(--cosmo-label)]">{t("emergency.grid.hint")}</p>
               <GuideGrid scenarios={scenarios} lang={lang} onOpen={(id) => onSelect(id)} scope="sos" />
-              <p className="text-[12px] text-[var(--aegis-label)]">
+              <p className="text-[12px] text-[var(--cosmo-label)]">
                 {t("emergency.pending")} {t("emergency.offline")}
               </p>
             </div>

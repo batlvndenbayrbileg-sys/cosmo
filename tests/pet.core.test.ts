@@ -20,7 +20,7 @@ interface PetCore {
 }
 
 const core = createRequire(import.meta.url)("../electron/pet-core.cjs") as PetCore;
-const ORIGIN = "https://aegis.example.app";
+const ORIGIN = "https://cosmo.example.app";
 
 describe("lil cosmo links (lilcosmo://crew/<id>)", () => {
   it("reads the crew id from a link or --crew=, last valid one wins", () => {
@@ -69,22 +69,22 @@ describe("lil cosmo links (lilcosmo://crew/<id>)", () => {
 
 describe("the website the pet shows", () => {
   it("keeps https origins and local http only", () => {
-    expect(core.normalizeOrigin("https://aegis.example.app/some/path?q=1")).toBe(ORIGIN);
+    expect(core.normalizeOrigin("https://cosmo.example.app/some/path?q=1")).toBe(ORIGIN);
     expect(core.normalizeOrigin("http://localhost:3000")).toBe("http://localhost:3000");
     expect(core.normalizeOrigin("http://127.0.0.1:3126/")).toBe("http://127.0.0.1:3126");
-    expect(core.normalizeOrigin("http://aegis.example.app")).toBeNull(); // plain http to another computer
+    expect(core.normalizeOrigin("http://cosmo.example.app")).toBeNull(); // plain http to another computer
     expect(core.normalizeOrigin("file:///C:/x.html")).toBeNull();
     expect(core.normalizeOrigin("javascript:alert(1)")).toBeNull();
-    expect(core.normalizeOrigin("https://user:pw@aegis.example.app")).toBeNull();
+    expect(core.normalizeOrigin("https://user:pw@cosmo.example.app")).toBeNull();
     expect(core.normalizeOrigin("")).toBeNull();
     expect(core.normalizeOrigin(undefined)).toBeNull();
   });
 
   it("matches the exact origin, not a look-alike", () => {
     expect(core.sameOrigin(`${ORIGIN}/pet?crew=bat`, ORIGIN)).toBe(true);
-    expect(core.sameOrigin("https://aegis.example.app.evil.example/pet", ORIGIN)).toBe(false);
-    expect(core.sameOrigin("http://aegis.example.app/pet", ORIGIN)).toBe(false);
-    expect(core.sameOrigin("https://evil.example/?u=https://aegis.example.app", ORIGIN)).toBe(false);
+    expect(core.sameOrigin("https://cosmo.example.app.evil.example/pet", ORIGIN)).toBe(false);
+    expect(core.sameOrigin("http://cosmo.example.app/pet", ORIGIN)).toBe(false);
+    expect(core.sameOrigin("https://evil.example/?u=https://cosmo.example.app", ORIGIN)).toBe(false);
     expect(core.sameOrigin("not a url", ORIGIN)).toBe(false);
     expect(core.sameOrigin(undefined, ORIGIN)).toBe(false);
   });

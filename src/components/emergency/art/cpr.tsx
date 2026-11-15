@@ -35,7 +35,7 @@ export function CompressionsArt({ beatMs }: { beatMs?: number }) {
   return (
     <Canvas>
       <LyingPerson x={36} />
-      <g className={beatMs ? "aegis-compress" : undefined} style={style}>
+      <g className={beatMs ? "cosmo-compress" : undefined} style={style}>
         <Kneeler x={136} reach={[80, 126]} reach2={[84, 124]} lean={26} />
       </g>
       <Arrow d="M60 84 L60 112" color={ACCENT_DEEP} />

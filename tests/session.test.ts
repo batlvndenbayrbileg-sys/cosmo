@@ -121,12 +121,12 @@ describe("session cookie + role checks", () => {
     vi.useRealTimers();
   });
 
-  it("setSessionCookie writes aegis_session with httpOnly, sameSite lax, path / and a 12 h max age", async () => {
+  it("setSessionCookie writes cosmo_session with httpOnly, sameSite lax, path / and a 12 h max age", async () => {
     await setSessionCookie(CREW);
     expect(mocks.sets).toHaveLength(1);
     const c = mocks.sets[0];
     expect(c.name).toBe(SESSION_COOKIE);
-    expect(SESSION_COOKIE).toBe("aegis_session");
+    expect(SESSION_COOKIE).toBe("cosmo_session");
     expect(c.httpOnly).toBe(true);
     expect(c.sameSite).toBe("lax");
     expect(c.path).toBe("/");

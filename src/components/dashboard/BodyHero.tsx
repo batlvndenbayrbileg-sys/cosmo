@@ -27,7 +27,7 @@ const STATUS_RING: Record<Status, string> = {
 };
 
 const ROUND =
-  "inline-flex size-10 items-center justify-center rounded-full bg-white/90 text-[var(--aegis-ink)] shadow-[0_6px_16px_-8px_rgba(40,80,160,0.45)] ring-1 ring-white outline-none backdrop-blur transition-[transform,box-shadow] hover:-translate-y-px focus-visible:ring-3 focus-visible:ring-ring/60 disabled:opacity-40 disabled:hover:translate-y-0";
+  "inline-flex size-10 items-center justify-center rounded-full bg-white/90 text-[var(--cosmo-ink)] shadow-[0_6px_16px_-8px_rgba(40,80,160,0.45)] ring-1 ring-white outline-none backdrop-blur transition-[transform,box-shadow] hover:-translate-y-px focus-visible:ring-3 focus-visible:ring-ring/60 disabled:opacity-40 disabled:hover:translate-y-0";
 
 /**
  * The hero: the porcelain body figure with a radial glow and a floor ring, one status hotspot per body axis
@@ -150,11 +150,11 @@ export function BodyHero({ payload }: { payload: DashboardPayload }) {
             {animate ? (
               <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-[40%]">
                 <div
-                  className="aegis-sweep absolute inset-0"
+                  className="cosmo-sweep absolute inset-0"
                   style={{
                     background:
                       "linear-gradient(180deg, rgba(79,134,247,0) 40%, rgba(79,134,247,0.14) 50%, rgba(79,134,247,0) 60%)",
-                    animation: "aegis-sweep 6.5s ease-in-out 1.6s infinite",
+                    animation: "cosmo-sweep 6.5s ease-in-out 1.6s infinite",
                   }}
                 />
               </div>
@@ -194,14 +194,14 @@ export function BodyHero({ payload }: { payload: DashboardPayload }) {
                         className="absolute inset-0 rounded-full"
                         style={{
                           background: STATUS_RING[status],
-                          animation: `aegis-pulse ${status === "red" ? 1.8 : 2.6}s cubic-bezier(0.2,0.6,0.3,1) infinite`,
+                          animation: `cosmo-pulse ${status === "red" ? 1.8 : 2.6}s cubic-bezier(0.2,0.6,0.3,1) infinite`,
                         }}
                       />
                     ) : null}
                     <span
                       className={cn(
-                        "relative flex size-[24px] items-center justify-center rounded-full bg-white shadow-[0_4px_12px_-4px_rgba(15,27,45,0.45)] ring-[3px] transition-[box-shadow,transform] duration-200 group-hover:scale-110 group-focus-visible:ring-[var(--aegis-accent)]",
-                        isShown ? "scale-110 ring-[var(--aegis-accent)]" : "ring-white/80",
+                        "relative flex size-[24px] items-center justify-center rounded-full bg-white shadow-[0_4px_12px_-4px_rgba(15,27,45,0.45)] ring-[3px] transition-[box-shadow,transform] duration-200 group-hover:scale-110 group-focus-visible:ring-[var(--cosmo-accent)]",
+                        isShown ? "scale-110 ring-[var(--cosmo-accent)]" : "ring-white/80",
                       )}
                     >
                       <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" focusable="false">
@@ -261,7 +261,7 @@ export function BodyHero({ payload }: { payload: DashboardPayload }) {
           >
             <ChevronLeft aria-hidden="true" className="size-4" />
           </button>
-          <span aria-live="polite" className="min-w-24 px-1 text-center text-[12px] font-medium text-[var(--aegis-ink)]">
+          <span aria-live="polite" className="min-w-24 px-1 text-center text-[12px] font-medium text-[var(--cosmo-ink)]">
             {active ? t(`dashboard.axis.${active}`) : t("dashboard.body.title")}
           </span>
           <button
@@ -281,7 +281,7 @@ export function BodyHero({ payload }: { payload: DashboardPayload }) {
           {tooltipCard(shownAxis.axis, 'body-tip-phone', () => setActive(null))}
         </div>
       ) : (
-        <p className="mt-2 text-center text-[12px] leading-[1.1rem] text-[var(--aegis-label)]">{t("dashboard.body.hint")}</p>
+        <p className="mt-2 text-center text-[12px] leading-[1.1rem] text-[var(--cosmo-label)]">{t("dashboard.body.hint")}</p>
       )}
     </section>
   );
@@ -296,31 +296,31 @@ export function BodyHero({ payload }: { payload: DashboardPayload }) {
       <div className="flex flex-col gap-3 rounded-[22px] border border-white/90 bg-white/80 p-4 lg:gap-2.5 lg:p-[clamp(12px,1.6vh,16px)] shadow-[0_24px_50px_-20px_rgba(40,80,160,0.45)] backdrop-blur-xl">
         <div className="flex items-center gap-2.5">
           <IconChip icon={AXIS_ICON[axis]} size={32} />
-          <h3 id={idBase} className="min-w-0 flex-1 text-[16px] leading-tight font-medium text-[var(--aegis-ink)]">
+          <h3 id={idBase} className="min-w-0 flex-1 text-[16px] leading-tight font-medium text-[var(--cosmo-ink)]">
             {t(`dashboard.axis.${axis}`)}
           </h3>
           <button
             type="button"
             onClick={onClose}
             aria-label={t("dashboard.body.close")}
-            className="inline-flex size-7 items-center justify-center rounded-full text-[var(--aegis-label)] outline-none hover:bg-black/5 focus-visible:ring-3 focus-visible:ring-ring/60"
+            className="inline-flex size-7 items-center justify-center rounded-full text-[var(--cosmo-label)] outline-none hover:bg-black/5 focus-visible:ring-3 focus-visible:ring-ring/60"
           >
             <X aria-hidden="true" className="size-4" />
           </button>
         </div>
         <div className="flex items-end justify-between gap-2">
           {a.score === null ? (
-            <span className="text-[14px] text-[var(--aegis-label)]">{t("dashboard.body.noScore")}</span>
+            <span className="text-[14px] text-[var(--cosmo-label)]">{t("dashboard.body.noScore")}</span>
           ) : (
             <span className="flex flex-col">
               <span className="flex items-baseline gap-1">
-                <span className="tnum text-[32px] leading-none font-normal text-[var(--aegis-ink)] lg:text-[clamp(24px,3.4vh,32px)]">
+                <span className="tnum text-[32px] leading-none font-normal text-[var(--cosmo-ink)] lg:text-[clamp(24px,3.4vh,32px)]">
                   {Math.round(a.score)}
                 </span>
-                <span className="text-[11px] text-[var(--aegis-label)]">/100</span>
+                <span className="text-[11px] text-[var(--cosmo-label)]">/100</span>
               </span>
               {a.baseline !== null ? (
-                <span className="tnum mt-1 text-[12px] text-[var(--aegis-label)]">
+                <span className="tnum mt-1 text-[12px] text-[var(--cosmo-label)]">
                   {t("dashboard.body.usual", { usual: Math.round(a.baseline) })}
                 </span>
               ) : null}
@@ -329,11 +329,11 @@ export function BodyHero({ payload }: { payload: DashboardPayload }) {
           <StatusPill status={a.status} size="sm" />
         </div>
         {readings.length > 0 ? (
-          <ul aria-label={t("dashboard.body.readings")} className="flex flex-col gap-1.5 border-t border-[var(--aegis-hairline)] pt-2.5">
+          <ul aria-label={t("dashboard.body.readings")} className="flex flex-col gap-1.5 border-t border-[var(--cosmo-hairline)] pt-2.5">
             {readings.map((r) => (
               <li key={r.key} className="flex items-center justify-between gap-2 text-[13px]">
-                <span className="min-w-0 text-[var(--aegis-label)]">{KPI_DEFS[r.key].labels[lang]}</span>
-                <span className="flex shrink-0 items-center gap-1.5 font-medium whitespace-nowrap text-[var(--aegis-ink)]">
+                <span className="min-w-0 text-[var(--cosmo-label)]">{KPI_DEFS[r.key].labels[lang]}</span>
+                <span className="flex shrink-0 items-center gap-1.5 font-medium whitespace-nowrap text-[var(--cosmo-ink)]">
                   <span className="tnum">{r.value === null ? "–" : formatValue(r.key, r.value, lang)}</span>
                   <StatusGlyph status={r.status} size={12} />
                 </span>
@@ -346,7 +346,7 @@ export function BodyHero({ payload }: { payload: DashboardPayload }) {
             href={info.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 self-start rounded-full bg-[var(--aegis-pastel-blue)] px-2.5 py-1 text-[12px] font-medium text-[var(--aegis-accent-deep)] outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/60"
+            className="inline-flex items-center gap-1.5 self-start rounded-full bg-[var(--cosmo-pastel-blue)] px-2.5 py-1 text-[12px] font-medium text-[var(--cosmo-accent-deep)] outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/60"
           >
             <span className="sr-only">{t("dashboard.body.hazard")}: </span>
             {pick(info.name)}

@@ -19,7 +19,7 @@ const valid = {
 
 let dir: string;
 beforeAll(() => {
-  dir = fs.mkdtempSync(path.join(os.tmpdir(), "aegis-emergency-"));
+  dir = fs.mkdtempSync(path.join(os.tmpdir(), "cosmo-emergency-"));
   fs.mkdirSync(path.join(dir, "fainting-unconscious"));
   fs.writeFileSync(path.join(dir, "fainting-unconscious", "scenario.json"), JSON.stringify(valid));
   fs.writeFileSync(path.join(dir, "fainting-unconscious", "step-1.png"), Buffer.from([0x89, 0x50, 0x4e, 0x47]));

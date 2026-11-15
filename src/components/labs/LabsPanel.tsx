@@ -69,16 +69,16 @@ function Loader({ person }: { person: string }) {
   return (
     <LabsShell person={person}>
       {state.status === "loading" ? (
-        <p role="status" aria-live="polite" className="glass-card px-4 py-3 text-[15px] text-[var(--aegis-label)]">
+        <p role="status" aria-live="polite" className="glass-card px-4 py-3 text-[15px] text-[var(--cosmo-label)]">
           {t("dashboard.labs.loading")}
         </p>
       ) : (
         <div role="alert" className="glass-card flex flex-wrap items-center gap-3 px-4 py-3">
-          <p className="text-[15px] text-[var(--aegis-ink)]">{t("dashboard.labs.error")}</p>
+          <p className="text-[15px] text-[var(--cosmo-ink)]">{t("dashboard.labs.error")}</p>
           <button
             type="button"
             onClick={retry}
-            className="rounded-full bg-white px-3.5 py-1.5 text-[14px] font-medium text-[var(--aegis-ink)] ring-1 ring-[var(--aegis-hairline)] outline-none hover:bg-white/80 focus-visible:ring-3 focus-visible:ring-ring/60"
+            className="rounded-full bg-white px-3.5 py-1.5 text-[14px] font-medium text-[var(--cosmo-ink)] ring-1 ring-[var(--cosmo-hairline)] outline-none hover:bg-white/80 focus-visible:ring-3 focus-visible:ring-ring/60"
           >
             {t("dashboard.labs.retry")}
           </button>
@@ -95,7 +95,7 @@ export function LabsPanel({ crewId }: { crewId: string }) {
   if (!person) {
     return (
       <LabsShell person={null}>
-        <p role="status" className="glass-card px-4 py-3 text-[15px] text-[var(--aegis-label)]">
+        <p role="status" className="glass-card px-4 py-3 text-[15px] text-[var(--cosmo-label)]">
           {t("dashboard.labs.unlinked")}
         </p>
       </LabsShell>

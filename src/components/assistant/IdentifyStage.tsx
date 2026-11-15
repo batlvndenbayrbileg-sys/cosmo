@@ -200,12 +200,12 @@ export function IdentifyStage({ onResolved }: { onResolved: (r: Resolved) => voi
   const statusLines = (
     <>
       {!welcome ? (
-        <p role="status" className="text-center text-[14.5px] text-[var(--aegis-label)]">
+        <p role="status" className="text-center text-[14.5px] text-[var(--cosmo-label)]">
           {status}
         </p>
       ) : null}
       {error ? (
-        <p role="alert" className={cn(GLASS, "rounded-full px-4 py-2 text-center text-[14px] text-[var(--aegis-ink)]")}>
+        <p role="alert" className={cn(GLASS, "rounded-full px-4 py-2 text-center text-[14px] text-[var(--cosmo-ink)]")}>
           {error}
         </p>
       ) : null}
@@ -214,7 +214,7 @@ export function IdentifyStage({ onResolved }: { onResolved: (r: Resolved) => voi
 
   return (
     <MotionConfig reducedMotion="user">
-      <div data-slot="assistant-identify" data-phase={phase} className="aegis-bg fixed inset-0 z-50 overflow-x-hidden overflow-y-auto">
+      <div data-slot="assistant-identify" data-phase={phase} className="cosmo-bg fixed inset-0 z-50 overflow-x-hidden overflow-y-auto">
         <h1 className="sr-only">{t("checkin.assistant.stage.label")}</h1>
         <div className="relative w-full" style={{ height: layout.height }}>
           <FloorRing {...layout.floor} mode={ringMode} amplitude={0} level={recording ? recorder.level : null} />
@@ -232,7 +232,7 @@ export function IdentifyStage({ onResolved }: { onResolved: (r: Resolved) => voi
               onClick={tapMascot}
               aria-label={t("checkin.assistant.hint")}
               disabled={phase === "welcome" || phase === "identifying"}
-              className="size-full cursor-pointer rounded-[38%] outline-none focus-visible:ring-4 focus-visible:ring-[var(--aegis-accent)]/30 disabled:cursor-default"
+              className="size-full cursor-pointer rounded-[38%] outline-none focus-visible:ring-4 focus-visible:ring-[var(--cosmo-accent)]/30 disabled:cursor-default"
             >
               {/* the person's own look arrives with a short turn-and-pop */}
               <AnimatePresence mode="popLayout" initial={false}>
@@ -274,7 +274,7 @@ export function IdentifyStage({ onResolved }: { onResolved: (r: Resolved) => voi
                 <motion.p
                   key="welcome"
                   role="status"
-                  className={cn(align, "text-[26px] font-light text-[var(--aegis-ink)]")}
+                  className={cn(align, "text-[26px] font-light text-[var(--cosmo-ink)]")}
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0 }}
@@ -283,7 +283,7 @@ export function IdentifyStage({ onResolved }: { onResolved: (r: Resolved) => voi
                 </motion.p>
               ) : phase === "ask" && ask ? (
                 <motion.div key="ask" className={cn("flex flex-col gap-3", wide ? "items-start" : "items-center")} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-                  <p className={cn(align, "text-[22px] font-light text-[var(--aegis-ink)]")} lang={askLang}>
+                  <p className={cn(align, "text-[22px] font-light text-[var(--cosmo-ink)]")} lang={askLang}>
                     {dictionaries[askLang]["checkin.assistant.ask"]}
                   </p>
                   <div className={cn("flex flex-wrap gap-2", wide ? "justify-start" : "justify-center")} data-slot="identify-candidates">
@@ -292,14 +292,14 @@ export function IdentifyStage({ onResolved }: { onResolved: (r: Resolved) => voi
                         key={c.id}
                         type="button"
                         onClick={() => void choose(c)}
-                        className={cn(GLASS, "h-11 rounded-full px-5 text-[16px] font-medium text-[var(--aegis-ink)] outline-none focus-visible:ring-4 focus-visible:ring-[var(--aegis-accent)]/40")}
+                        className={cn(GLASS, "h-11 rounded-full px-5 text-[16px] font-medium text-[var(--cosmo-ink)] outline-none focus-visible:ring-4 focus-visible:ring-[var(--cosmo-accent)]/40")}
                       >
                         {displayName(c, askLang)}
                       </button>
                     ))}
                     <Link
                       href="/crew"
-                      className="inline-flex h-11 items-center rounded-full px-4 text-[15px] text-[var(--aegis-label)] underline-offset-4 outline-none hover:underline focus-visible:ring-4 focus-visible:ring-[var(--aegis-accent)]/40"
+                      className="inline-flex h-11 items-center rounded-full px-4 text-[15px] text-[var(--cosmo-label)] underline-offset-4 outline-none hover:underline focus-visible:ring-4 focus-visible:ring-[var(--cosmo-accent)]/40"
                     >
                       {dictionaries[askLang]["checkin.assistant.ask.other"]}
                     </Link>
@@ -308,7 +308,7 @@ export function IdentifyStage({ onResolved }: { onResolved: (r: Resolved) => voi
               ) : (
                 <motion.div key="greeting" className={cn("flex flex-col gap-1", wide ? "items-start" : "items-center")} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
                   {GREETING.map((g) => (
-                    <p key={g.lang} lang={g.lang} className={cn(align, "text-[24px] leading-tight font-light text-[var(--aegis-ink)] sm:text-[28px]")}>
+                    <p key={g.lang} lang={g.lang} className={cn(align, "text-[24px] leading-tight font-light text-[var(--cosmo-ink)] sm:text-[28px]")}>
                       {g.text}
                     </p>
                   ))}
@@ -330,7 +330,7 @@ export function IdentifyStage({ onResolved }: { onResolved: (r: Resolved) => voi
             aria-label={t("checkin.assistant.person.list")}
             title={t("checkin.assistant.person.list")}
             data-slot="identify-crew-list"
-            className={cn(GLASS, "inline-flex h-10 items-center gap-2 rounded-full px-4 text-[13px] font-medium text-[var(--aegis-ink)] opacity-60 outline-none hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-3 focus-visible:ring-[var(--aegis-accent)]/45")}
+            className={cn(GLASS, "inline-flex h-10 items-center gap-2 rounded-full px-4 text-[13px] font-medium text-[var(--cosmo-ink)] opacity-60 outline-none hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-3 focus-visible:ring-[var(--cosmo-accent)]/45")}
           >
             <Users className="size-4" aria-hidden="true" />
             <span className="hidden sm:inline">{t("checkin.assistant.person.list")}</span>
@@ -339,7 +339,7 @@ export function IdentifyStage({ onResolved }: { onResolved: (r: Resolved) => voi
         <Corner className="fixed right-4 bottom-16 items-end sm:bottom-9">
           <KeyboardControl open={keyboardOpen} onOpenChange={setKeyboardOpen} onSend={sendText} disabled={phase === "identifying" || phase === "welcome"} />
         </Corner>
-        <p className="fixed inset-x-0 bottom-0 z-10 px-4 py-1.5 text-center text-[11px] leading-tight text-[var(--aegis-label)]">
+        <p className="fixed inset-x-0 bottom-0 z-10 px-4 py-1.5 text-center text-[11px] leading-tight text-[var(--cosmo-label)]">
           {t("shell.ribbon.text")}
         </p>
       </div>
