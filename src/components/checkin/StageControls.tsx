@@ -15,7 +15,7 @@ export const GLASS =
   "border border-white/80 bg-white/65 shadow-[0_10px_30px_-14px_rgba(40,80,160,0.35)] backdrop-blur-xl backdrop-saturate-150";
 
 /** Ghost corner control: ~35% opacity, fully visible on hover or keyboard focus. */
-const GHOST = cn(
+export const GHOST = cn(
   GLASS,
   "inline-flex h-10 items-center justify-center gap-2 rounded-full text-[var(--aegis-ink)]",
   "opacity-35 transition-opacity duration-200 hover:opacity-100 focus-visible:opacity-100",

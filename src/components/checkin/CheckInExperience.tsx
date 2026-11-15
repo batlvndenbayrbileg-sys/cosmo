@@ -64,6 +64,7 @@ import { useI18n } from "@/i18n/I18nProvider";
 import { cn } from "@/lib/utils";
 import type { CrewPublic, DashboardPayload, HealthResponse, Lang, SummaryPayload } from "@/lib/types";
 import { IdentityChip, ModeControl } from "@/components/assistant/AssistantControls";
+import { LilCosmoControl } from "@/components/pet/LilCosmoControl";
 
 /** Let Cosmo's glide into the dashboard settle before she starts reading the summary. */
 const SUMMARY_SPEECH_DELAY_MS = 700;
@@ -155,6 +156,8 @@ export function CheckInExperience({ entry, assistant: entryProps }: { entry?: "a
 
   const rawCrew = useSyncExternalStore(subscribeNever, readSelectedCrewRaw, () => null);
   const crew = useMemo(() => parseStoredCrew(rawCrew), [rawCrew]);
+  /** who the "lil cosmo" desktop pet would open as */
+  const petCrew = assistantEntry?.crew ?? crew;
 
   const [phase, setPhase] = useState<Phase>("conversation");
   const [dashboard, setDashboard] = useState<DashboardPayload | null>(null);
@@ -1222,6 +1225,7 @@ export function CheckInExperience({ entry, assistant: entryProps }: { entry?: "a
           )}
           {!preparing ? modeControl("stage") : null}
           <Corner className="fixed top-4 right-4">
+            {petCrew ? <LilCosmoControl crew={petCrew} /> : null}
             <FaceFollowControl on={faceFollow} status={face.status} onToggle={toggleFaceFollow} />
             <LanguageCaptionControls captions={captions} onCaptions={setCaptions} />
           </Corner>

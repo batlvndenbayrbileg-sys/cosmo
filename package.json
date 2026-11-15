@@ -17,7 +17,10 @@
     "sig:ref": "python3 -I -X utf8 docs/signature_reference/reference_engine.py data/nasa",
     "urine:json": "python3 -I -X utf8 scripts/urine_xlsx_to_json.py",
     "demo:checkins": "tsx scripts/gen-demo-checkins.ts",
-    "demo:audio": "node --conditions=react-server --import tsx scripts/gen-signature-audio.ts"
+    "demo:audio": "node --conditions=react-server --import tsx scripts/gen-signature-audio.ts",
+    "pet": "node node_modules/electron/install.js && electron electron/main.cjs",
+    "pet:build": "electron-builder --win portable",
+    "pet:build:mac": "electron-builder --mac dmg"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.8.0",
@@ -47,6 +50,8 @@
     "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "electron": "45.3.2",
+    "electron-builder": "26.18.0",
     "eslint": "^9",
     "eslint-config-next": "16.4.6",
     "tailwindcss": "4.3.3",
