@@ -78,9 +78,10 @@ export const SOS_SPOKEN: Record<"sent" | "duplicate" | "failed", Bilingual> = {
     en: "Earth already has your urgent alert from a moment ago, so I haven't sent a second one. Stay with me.",
     mn: "Таны яаралтай мэдэгдэл саяхан Дэлхийд очсон тул дахин илгээгээгүй. Надтай хамт байгаарай.",
   },
+  // worded so that, heard back by the microphone, it is not itself a request to alert Earth (match.ts)
   failed: {
-    en: "I couldn't send the alert to Earth. Please use the station's own comms to call Earth right now.",
-    mn: "Дэлхий рүү мэдэгдэл илгээж чадсангүй. Станцын өөрийн холбоогоор Дэлхийтэй яг одоо холбогдоорой.",
+    en: "I couldn't send the alert to Earth. Please use the station's own comms right now to reach the ground.",
+    mn: "Дэлхий рүү мэдэгдэл илгээж чадсангүй. Станцын өөрийн холбоог яг одоо ашиглаарай.",
   },
 };
 

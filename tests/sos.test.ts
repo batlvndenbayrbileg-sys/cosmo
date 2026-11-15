@@ -21,13 +21,22 @@ vi.mock("@/server/db/repos/sos", async (importOriginal) => {
 });
 
 import { POST as postSos } from "@/app/api/sos/route";
-import { POST as postSosPhoto } from "@/app/api/sos/[id]/photo/route";
+import { DELETE as deleteSosPhotoRoute, POST as postSosPhoto } from "@/app/api/sos/[id]/photo/route";
 import { GET as getGroundSos } from "@/app/api/ground/sos/route";
 import { GET as getGroundSosPhoto } from "@/app/api/ground/sos/[id]/photo/route";
 import { POST as postGroundSosSeen } from "@/app/api/ground/sos/[id]/seen/route";
 import { parseTurnEvent } from "@/components/checkin/sse";
 import { encodeUnder, fitWithin } from "@/components/sos/camera";
-import { getSosState, noteSosFromTurn, sendSosToEarth, setSosEnvForTests, type SosEnv } from "@/components/sos/store";
+import {
+  getSosState,
+  noteSosFromTurn,
+  registerSosSpeaker,
+  removeSosPhoto,
+  sendSosToEarth,
+  setSosEnvForTests,
+  type SosEnv,
+  type SosLine,
+} from "@/components/sos/store";
 import { sirenSchedule } from "@/components/earth/siren";
 import {
   SOS_DEDUP_WINDOW_MS,
@@ -49,6 +58,7 @@ import { listAlerts } from "@/server/db/repos/alert";
 import { listTurns } from "@/server/db/repos/turn";
 import {
   attachSosPhoto,
+  deleteSosPhoto,
   getSosAlert,
   groundMarkSosSeen,
   listSosAlerts,
@@ -80,6 +90,8 @@ const sosPost = (body: unknown) =>
   postSos(new Request(url("/api/sos"), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }));
 const photoPost = (id: string, init: RequestInit) =>
   postSosPhoto(new Request(url(`/api/sos/${id}/photo`), { method: "POST", ...init }), { params: Promise.resolve({ id }) });
+const photoDelete = (id: string) =>
+  deleteSosPhotoRoute(new Request(url(`/api/sos/${id}/photo`), { method: "DELETE" }), { params: Promise.resolve({ id }) });
 const groundPhoto = (id: string, qs = "") =>
   getGroundSosPhoto(new Request(url(`/api/ground/sos/${id}/photo${qs}`)), { params: Promise.resolve({ id }) });
 const groundSeen = (id: string) =>
@@ -187,6 +199,29 @@ describe("matchSosRequest: what counts as asking to alert Earth", () => {
     expect(matchSosRequest(text)).toBeNull();
   });
 
+  // the microphone can hear Cosmo; her own lines must never raise an SOS (a second alert, Cosmo talking twice)
+  it.each([
+    SOS_SPOKEN.sent.en,
+    SOS_SPOKEN.sent.mn,
+    SOS_SPOKEN.duplicate.en,
+    SOS_SPOKEN.duplicate.mn,
+    SOS_SPOKEN.failed.en,
+    SOS_SPOKEN.failed.mn,
+    "I couldn't send the alert to Earth. Please use the station's own comms right now.",
+    "Дэлхий рүү яаралтай мэдэгдэл энэ мэдээлэлтэй хамт илгээлээ.",
+    "Таны яаралтай мэдэгдэл Дэлхийд очсон байгаа, энэ мэдээллийг нэмж илгээлээ.",
+    "Дэлхий рүү мэдэгдэл илгээж чадсангүй",
+    "Дэлхий рүү яаралтай мэдэгдэл", // a line cut short by the recogniser
+  ])("Cosmo's own line is not a request: %s", (text) => {
+    expect(matchSosRequest(text)).toBeNull();
+  });
+
+  it("the noun 'мэдэгдэл' (an alert) before the verb still asks: 'дэлхий рүү яаралтай мэдэгдэл илгээ'", () => {
+    expect(matchSosRequest("дэлхий рүү яаралтай мэдэгдэл илгээ")?.phrase).toBe("дэлхий рүү яаралтай мэдэгдэл илгээ");
+    expect(matchSosRequest("дэлхий рүү мэдэгдэл илгээгээрэй")).not.toBeNull();
+    expect(matchSosRequest("I can't breathe, call Earth")).not.toBeNull();
+  });
+
   it("returns only the trigger words, not the rest of the utterance", () => {
     expect(matchSosRequest("my chest hurts a lot, tell Earth please")!.phrase).toBe("tell earth");
     expect(matchSosRequest("толгой эргээд байна, дэлхий рүү мэдэгд")!.phrase).toBe("дэлхий рүү мэдэгд");
@@ -267,6 +302,45 @@ describe("raiseSosAlert (storage, crew isolation, idempotency)", () => {
     await expect(attachSosPhoto("bat", alert.id, new Uint8Array(0))).rejects.toMatchObject({ status: 400 });
     await expect(attachSosPhoto("bat", alert.id, new Uint8Array([0x89, 0x50, 0x4e, 0x47]))).rejects.toMatchObject({ status: 400 });
     expect((await attachSosPhoto("bat", alert.id, jpeg(SOS_PHOTO_MAX_BYTES))).photoStatus).toBe("attached");
+  });
+
+  it("deleteSosPhoto: own alert only, erases the bytes, the ground no longer gets the photo, the alert stays", async () => {
+    const { alert } = await raiseSosAlert("bat", { reason: "button" });
+    await attachSosPhoto("bat", alert.id, jpeg(4_000));
+
+    // another crew member: 404, the photo is untouched
+    await expect(deleteSosPhoto("mira", alert.id)).rejects.toMatchObject({ status: 404 });
+    expect((await getSosAlert("bat", alert.id)).photoStatus).toBe("attached");
+    expect(await groundGetSosPhoto(alert.id, NOW.toISOString())).not.toBeNull();
+    await expect(deleteSosPhoto("bat", "no-such-alert")).rejects.toMatchObject({ status: 404 });
+
+    const deleted = await deleteSosPhoto("bat", alert.id);
+    expect(deleted).toMatchObject({ id: alert.id, photoStatus: "denied", photoBytes: null, photoAt: null });
+    const db = await getDb();
+    const row = await db.get<{ photo_jpeg: string | null; photo_bytes: number | null; photo_at: string | null }>(
+      "SELECT photo_jpeg, photo_bytes, photo_at FROM sos_alert WHERE id = ?",
+      alert.id,
+    );
+    expect(row).toEqual({ photo_jpeg: null, photo_bytes: null, photo_at: null });
+    expect(await groundGetSosPhoto(alert.id, NOW.toISOString())).toBeNull();
+    // the alert itself is still on the console, now without a photo
+    const [ground] = await groundListSosAlerts(NOW.toISOString());
+    expect(ground).toMatchObject({ id: alert.id, photoStatus: "denied", photoBytes: null });
+
+    // idempotent, and a late upload (another tab) does not bring the photo back
+    expect((await deleteSosPhoto("bat", alert.id)).photoStatus).toBe("denied");
+    expect((await attachSosPhoto("bat", alert.id, jpeg(2_000))).photoStatus).toBe("denied");
+    expect(await groundGetSosPhoto(alert.id, NOW.toISOString())).toBeNull();
+  });
+
+  it("deleteSosPhoto while the photo is still awaited: no photo, for good", async () => {
+    const { alert } = await raiseSosAlert("bat", { reason: "button" });
+    expect((await deleteSosPhoto("bat", alert.id)).photoStatus).toBe("denied");
+    expect((await attachSosPhoto("bat", alert.id, jpeg())).photoStatus).toBe("denied");
+    // a refused camera stays as it was
+    const other = (await raiseSosAlert("mira", { reason: "button" })).alert;
+    await markSosPhotoMissing("mira", other.id, "unavailable");
+    expect((await deleteSosPhoto("mira", other.id)).photoStatus).toBe("unavailable");
   });
 
   it("ground sees an SOS after the simulated delay, newest first, and can mark it seen once", async () => {
@@ -359,6 +433,36 @@ describe("SOS routes: auth and behaviour", () => {
     await signInCrew("mira");
     const missing = await photoPost(second.id, { headers: { "content-type": "application/json" }, body: JSON.stringify({ missing: "unavailable" }) });
     expect(((await missing.json()) as SosAlert).photoStatus).toBe("unavailable");
+  });
+
+  it("DELETE /api/sos/[id]/photo: own alert only (401 / 403 / 404), then the ground photo route has nothing", async () => {
+    const { alert } = await raiseSosAlert("bat", { reason: "button" });
+    await attachSosPhoto("bat", alert.id, jpeg(3_000));
+
+    expect((await photoDelete(alert.id)).status).toBe(401);
+    await setGroundCookie();
+    expect((await photoDelete(alert.id)).status).toBe(403);
+    expect((await groundPhoto(alert.id)).status).toBe(200);
+    mocks.jar.clear();
+    await signInCrew("mira");
+    const foreign = await photoDelete(alert.id);
+    expect(foreign.status).toBe(404);
+    expect((await errorOf(foreign)).code).toBe("NOT_FOUND");
+    expect((await getSosAlert("bat", alert.id)).photoStatus).toBe("attached");
+
+    mocks.jar.clear();
+    await signInCrew("bat");
+    const res = await photoDelete(alert.id);
+    expect(res.status).toBe(200);
+    expect((await res.json()) as SosAlert).toMatchObject({ id: alert.id, photoStatus: "denied", photoBytes: null, photoAt: null });
+    // again: the same answer
+    expect((await photoDelete(alert.id)).status).toBe(200);
+
+    mocks.jar.clear();
+    await setGroundCookie();
+    expect((await groundPhoto(alert.id)).status).toBe(404);
+    const rows = (await (await getGroundSos(new Request(url("/api/ground/sos")))).json()) as GroundSosAlert[];
+    expect(rows.find((r) => r.id === alert.id)).toMatchObject({ photoStatus: "denied" });
   });
 
   it("ground routes: list, photo and seen are ground only (401 / 403), and the photo is served uncached", async () => {
@@ -478,7 +582,7 @@ describe("SOS by voice, in a conversation turn", () => {
 
 /* ───────────── the browser side ───────────── */
 
-function fakeEnv(opts: { raise?: () => Response; capture?: SosEnv["capture"] } = {}) {
+function fakeEnv(opts: { raise?: () => Response; capture?: SosEnv["capture"]; remove?: () => Response | Promise<Response> } = {}) {
   const calls: Array<{ url: string; init?: RequestInit }> = [];
   const spoken: Array<{ text: string; audioUrl: string | null; at: number }> = [];
   const result: SosRaiseResult = {
@@ -501,11 +605,13 @@ function fakeEnv(opts: { raise?: () => Response; capture?: SosEnv["capture"] } =
       const u = String(input);
       calls.push({ url: u, init });
       if (u === "/api/sos") return opts.raise ? opts.raise() : Response.json(result);
+      if (init?.method === "DELETE") return opts.remove ? opts.remove() : Response.json({ ...result.alert, photoStatus: "denied" });
       return Response.json({ ...result.alert, photoStatus: "attached" });
     }) as typeof fetch,
     capture: opts.capture ?? (async () => ({ ok: true, blob: new Blob([jpeg(1_000) as BlobPart], { type: "image/jpeg" }) })),
-    speak: (text, _lang, audioUrl) => spoken.push({ text, audioUrl, at: calls.length }),
+    speak: ({ text, audioUrl }) => void spoken.push({ text, audioUrl, at: calls.length }),
     objectUrl: () => "blob:still",
+    crewId: () => null,
   };
   return { env, calls, spoken };
 }
@@ -539,6 +645,45 @@ describe("the SOS card's store (button path)", () => {
     expect(capture).not.toHaveBeenCalled();
   });
 
+  it("a lost session (401) does not stop the SOS: the tab's crew member signs in again once and it is sent", async () => {
+    let signedIn = false;
+    const f = fakeEnv({
+      raise: () =>
+        signedIn
+          ? Response.json({
+              alert: { id: "sos-2", crewId: "bat", createdAt: NOW.toISOString(), reason: "button", phrase: null, photoStatus: "pending", photoBytes: null, photoAt: null, seenAt: null },
+              duplicate: false,
+              spoken: { text: SOS_SPOKEN.sent.en, language: "en", turnId: null },
+            })
+          : Response.json({ error: { code: "NO_SESSION", message: "x" } }, { status: 401 }),
+    });
+    const env: SosEnv = {
+      ...f.env,
+      crewId: () => "bat",
+      fetch: (async (input: RequestInfo | URL, init?: RequestInit) => {
+        if (String(input) === "/api/session") {
+          f.calls.push({ url: "/api/session", init });
+          signedIn = true;
+          return new Response(null, { status: 204 });
+        }
+        return f.env.fetch(input, init);
+      }) as typeof fetch,
+    };
+    setSosEnvForTests(env);
+    await sendSosToEarth({ checkInId: null, lang: "en" });
+    expect(f.calls.slice(0, 3).map((c) => c.url)).toEqual(["/api/sos", "/api/session", "/api/sos"]);
+    expect(JSON.parse(String(f.calls[1].init?.body))).toEqual({ crewId: "bat" });
+    expect(getSosState()).toMatchObject({ phase: "sent", alertId: "sos-2" });
+    expect(f.spoken.map((s) => s.text)).toEqual([SOS_SPOKEN.sent.en]);
+
+    // without a known crew member it is reported as failed (the station's comms), and not retried
+    const g = fakeEnv({ raise: () => Response.json({ error: { code: "NO_SESSION", message: "x" } }, { status: 401 }) });
+    setSosEnvForTests(g.env);
+    await sendSosToEarth({ checkInId: null, lang: "en" });
+    expect(g.calls.map((c) => c.url)).toEqual(["/api/sos"]);
+    expect(getSosState()).toMatchObject({ phase: "failed" });
+  });
+
   it("a refused camera is reported to the alert, which stands without a photo", async () => {
     const f = fakeEnv({ capture: async () => ({ ok: false, reason: "denied" }) });
     setSosEnvForTests(f.env);
@@ -557,6 +702,104 @@ describe("the SOS card's store (button path)", () => {
     noteSosFromTurn({ type: "sos", ok: true, alertId: "sos-1", createdAt: NOW.toISOString(), duplicate: true, photoStatus: "pending" }, "en", null);
     await settle();
     expect(capture).toHaveBeenCalledTimes(1);
+  });
+
+  it("Delete photo: deleting, then deleted (thumbnail gone, DELETE sent once), the alert stays sent", async () => {
+    const f = fakeEnv();
+    setSosEnvForTests(f.env);
+    await sendSosToEarth({ checkInId: null, lang: "en" });
+    await settle();
+    expect(getSosState()).toMatchObject({ phase: "sent", photo: "attached", photoUrl: "blob:still" });
+
+    const pending = removeSosPhoto();
+    expect(getSosState()).toMatchObject({ photo: "deleting", photoUrl: "blob:still" });
+    // a second tap while it runs does nothing
+    await removeSosPhoto();
+    await pending;
+    expect(getSosState()).toMatchObject({ phase: "sent", alertId: "sos-1", photo: "deleted", photoUrl: null });
+    const deletes = f.calls.filter((c) => c.init?.method === "DELETE");
+    expect(deletes).toHaveLength(1);
+    expect(deletes[0].url).toBe("/api/sos/sos-1/photo");
+    // nothing left to delete
+    await removeSosPhoto();
+    expect(f.calls.filter((c) => c.init?.method === "DELETE")).toHaveLength(1);
+  });
+
+  it("pressing SOS again (the same incident) keeps the photo and its thumbnail, and takes no second photo", async () => {
+    const capture = vi.fn(async () => ({ ok: true as const, blob: new Blob([jpeg(500) as BlobPart]) }));
+    const f = fakeEnv({ capture });
+    setSosEnvForTests(f.env);
+    await sendSosToEarth({ checkInId: null, lang: "en" });
+    await settle();
+    expect(getSosState()).toMatchObject({ photo: "attached", photoUrl: "blob:still" });
+    await sendSosToEarth({ checkInId: null, lang: "en" });
+    await settle();
+    expect(getSosState()).toMatchObject({ phase: "sent", alertId: "sos-1", photo: "attached", photoUrl: "blob:still" });
+    expect(capture).toHaveBeenCalledTimes(1);
+    // and the photo can still be deleted
+    await removeSosPhoto();
+    expect(getSosState()).toMatchObject({ photo: "deleted", photoUrl: null });
+  });
+
+  it("Delete photo that fails: the photo stays shown with a retry, which then works", async () => {
+    let fail = true;
+    const f = fakeEnv({
+      remove: () =>
+        fail
+          ? Response.json({ error: { code: "INTERNAL", message: "x" } }, { status: 500 })
+          : Response.json({ id: "sos-1", photoStatus: "denied" }),
+    });
+    setSosEnvForTests(f.env);
+    await sendSosToEarth({ checkInId: null, lang: "en" });
+    await settle();
+    await removeSosPhoto();
+    expect(getSosState()).toMatchObject({ photo: "deleteFailed", photoUrl: "blob:still" });
+    fail = false;
+    await removeSosPhoto();
+    expect(getSosState()).toMatchObject({ photo: "deleted", photoUrl: null });
+  });
+
+  it("no Delete before the photo is attached; a refused camera has nothing to delete", async () => {
+    const f = fakeEnv({ capture: async () => ({ ok: false, reason: "denied" }) });
+    setSosEnvForTests(f.env);
+    await sendSosToEarth({ checkInId: null, lang: "en" });
+    await settle();
+    await removeSosPhoto();
+    expect(getSosState()).toMatchObject({ photo: "denied" });
+    expect(f.calls.some((c) => c.init?.method === "DELETE")).toBe(false);
+  });
+
+  it("the upload answer decides: a photo the server did not keep is not shown as attached", async () => {
+    const f = fakeEnv();
+    const env: SosEnv = {
+      ...f.env,
+      fetch: (async (input: RequestInfo | URL, init?: RequestInit) =>
+        String(input).endsWith("/photo") ? Response.json({ id: "sos-1", photoStatus: "denied" }) : f.env.fetch(input, init)) as typeof fetch,
+    };
+    setSosEnvForTests(env);
+    await sendSosToEarth({ checkInId: null, lang: "en" });
+    await settle();
+    expect(getSosState()).toMatchObject({ photo: "deleted", photoUrl: null });
+  });
+
+  it("Cosmo's own player says the SOS line when the check-in screen registered it (one voice for the screen)", async () => {
+    const lines: SosLine[] = [];
+    const f = fakeEnv();
+    // the browser path of the store, with only the network faked
+    setSosEnvForTests(null);
+    const unregister = registerSosSpeaker((line) => lines.push(line));
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = f.env.fetch;
+    try {
+      await sendSosToEarth({ checkInId: "c1", lang: "en" });
+    } finally {
+      globalThis.fetch = realFetch;
+      unregister();
+      setSosEnvForTests(null);
+    }
+    expect(lines).toEqual([
+      { text: SOS_SPOKEN.sent.en, lang: "en", checkInId: "c1", turnId: "t-9", audioUrl: "/api/checkins/c1/turns/t-9/audio" },
+    ]);
   });
 
   it("the still is made small enough: falling quality, then smaller sizes", async () => {

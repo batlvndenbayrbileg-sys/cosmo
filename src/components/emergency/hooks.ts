@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { speakOnChannel, type VoiceHandle } from "@/components/voice/channel";
 import { BUILTIN_GUIDES, type EmergencyScenario } from "@/lib/emergency";
 import type { Lang } from "@/lib/types";
 
@@ -32,41 +33,25 @@ export function useEmergencyLibrary(): EmergencyScenario[] {
  * scripted mode) the browser voice reads it, and when there is none the text simply stays on screen.
  */
 export function useStepSpeech(lang: Lang) {
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  /** the line this view started; stopping it never silences a voice someone else started later */
+  const line = useRef<VoiceHandle | null>(null);
 
   const stop = useCallback(() => {
-    audioRef.current?.pause();
-    audioRef.current = null;
-    try {
-      window.speechSynthesis?.cancel();
-    } catch {
-      /* no speech synthesis */
-    }
+    line.current?.stop();
+    line.current = null;
   }, []);
 
+  // one voice at a time (src/components/voice/channel.ts): a step silences Cosmo, the SOS line and the previous step,
+  // and a stopped step never falls back to the browser voice afterwards
   const speak = useCallback(
-    (scenario: EmergencyScenario, index: number) => {
+    (scenario: Pick<EmergencyScenario, "id" | "steps">, index: number) => {
       const text = scenario.steps[index]?.text[lang];
       if (!text) return;
-      stop();
-      const browserVoice = () => {
-        try {
-          const u = new SpeechSynthesisUtterance(text);
-          u.lang = lang === "mn" ? "mn-MN" : "en-US";
-          window.speechSynthesis?.speak(u);
-        } catch {
-          /* text stays on screen */
-        }
-      };
-      if (typeof navigator !== "undefined" && navigator.onLine === false) {
-        browserVoice();
-        return;
-      }
-      const audio = new Audio(`/api/emergency/${scenario.id}/steps/${index}/audio?lang=${lang}`);
-      audioRef.current = audio;
-      audio.play().catch(browserVoice);
+      const offline = typeof navigator !== "undefined" && navigator.onLine === false;
+      line.current?.stop();
+      line.current = speakOnChannel(text, lang, offline ? null : `/api/emergency/${scenario.id}/steps/${index}/audio?lang=${lang}`);
     },
-    [lang, stop],
+    [lang],
   );
 
   useEffect(() => stop, [stop]);

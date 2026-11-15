@@ -133,8 +133,9 @@ export async function listSosAlerts(crewId: string): Promise<SosAlert[]> {
 }
 
 /**
- * Attaches the face still to the crew member's own alert. JPEG only, 1 byte .. SOS_PHOTO_MAX_BYTES. The first photo
- * is kept: attaching again returns the alert unchanged. Another member's alert is a 404.
+ * Attaches the face still to the crew member's own alert. JPEG only, 1 byte .. SOS_PHOTO_MAX_BYTES. Only while the
+ * photo is still awaited: the first photo is kept (attaching again returns the alert unchanged), and a photo the crew
+ * member deleted (deleteSosPhoto) or a camera they refused stays that way. Another member's alert is a 404.
  */
 export async function attachSosPhoto(crewId: string, id: string, jpeg: Uint8Array, at?: Date): Promise<SosAlert> {
   if (jpeg.byteLength === 0) throw new HttpError(400, "BAD_INPUT", "Empty photo");
@@ -143,7 +144,7 @@ export async function attachSosPhoto(crewId: string, id: string, jpeg: Uint8Arra
   const db = await getDb();
   await db.run(
     `UPDATE sos_alert SET photo_status = 'attached', photo_jpeg = ?, photo_bytes = ?, photo_at = ?
-      WHERE id = ? AND crew_id = ? AND photo_status <> 'attached'`,
+      WHERE id = ? AND crew_id = ? AND photo_status = 'pending'`,
     Buffer.from(jpeg).toString("base64"),
     jpeg.byteLength,
     toIso(at ?? now(), "at"),
@@ -164,6 +165,23 @@ export async function markSosPhotoMissing(
   await db.run(
     "UPDATE sos_alert SET photo_status = ? WHERE id = ? AND crew_id = ? AND photo_status = 'pending'",
     status,
+    id,
+    crewId,
+  );
+  return getSosAlert(crewId, id);
+}
+
+/**
+ * The crew member deletes the face still of their own alert: the bytes, the size and the time are erased and the alert
+ * says "no photo" ('denied': the schema's statuses are fixed, and the Earth console words it as "declined or removed by
+ * the crew member"). The alert itself stays. A photo still awaited is refused for good the same way. Idempotent;
+ * another member's alert (or an unknown id) is a 404.
+ */
+export async function deleteSosPhoto(crewId: string, id: string): Promise<SosAlert> {
+  const db = await getDb();
+  await db.run(
+    `UPDATE sos_alert SET photo_status = 'denied', photo_jpeg = NULL, photo_bytes = NULL, photo_at = NULL
+      WHERE id = ? AND crew_id = ? AND (photo_status IN ('attached', 'pending') OR photo_jpeg IS NOT NULL)`,
     id,
     crewId,
   );

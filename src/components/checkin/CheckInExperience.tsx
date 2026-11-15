@@ -45,7 +45,7 @@ import { EmergencyOverlay } from "@/components/emergency/EmergencyOverlay";
 import { EMERGENCY_REQUEST_EVENT } from "@/components/emergency/EmergencyGuidePanel";
 import { useEmergencyLibrary } from "@/components/emergency/hooks";
 import { matchEmergency } from "@/lib/emergency";
-import { SosStatus, sendSosToEarth } from "@/components/sos";
+import { SosStatus, registerSosSpeaker, sendSosToEarth } from "@/components/sos";
 import { PainStage } from "@/components/pain/PainStage";
 import { detectPain } from "@/lib/pain/detect";
 import { ShieldAlert } from "lucide-react";
@@ -630,6 +630,15 @@ export function CheckInExperience({ entry, assistant: entryProps }: { entry?: "a
     alerted: false,
   });
   const checkInIdNow = state.checkInId;
+
+  // Cosmo herself says the SOS line (one voice: stopping or interrupting Cosmo stops it, a guide step silences it)
+  useEffect(
+    () =>
+      registerSosSpeaker((line) => {
+        void speak({ checkInId: line.checkInId, turnId: line.turnId, text: line.text, language: line.lang });
+      }),
+    [speak],
+  );
 
   const openEmergency = useCallback(
     (id: string | null) => {

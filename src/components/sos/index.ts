@@ -1,2 +1,2 @@
 export { SosStatus, useSosState } from "./SosStatus";
-export { dismissSos, noteSosFromTurn, sendSosToEarth } from "./store";
+export { dismissSos, noteSosFromTurn, registerSosSpeaker, removeSosPhoto, sendSosToEarth } from "./store";

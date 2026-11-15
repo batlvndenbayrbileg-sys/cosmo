@@ -23,6 +23,7 @@ import type { SpeechStatus } from "@/components/checkin/state";
 import { useAudioAmplitude } from "@/hooks/useAudioAmplitude";
 import { useSimulatedAmplitude } from "@/hooks/useSimulatedAmplitude";
 import type { Lang } from "@/lib/types";
+import { registerPlayer, stopSideVoices } from "@/components/voice/channel";
 
 export interface SpeakTurn {
   /** needed (with turnId) to reach the server audio; without them only local speech is used */
@@ -143,7 +144,10 @@ export function useSpeechPlayer(options: UseSpeechPlayerOptions = {}): SpeechPla
   /** resolves the in-flight speak() promise early when something stops it */
   const cancelCurrent = useRef<(() => void) | null>(null);
 
+  /** the status as of now, for the voice channel (which stops this player only while it speaks) */
+  const statusNow = useRef<SpeechStatus>("idle");
   const setStatus = useCallback((next: SpeechStatus) => {
+    statusNow.current = next;
     setStatusState(next);
     statusCallback.current?.(next);
   }, []);
@@ -159,9 +163,20 @@ export function useSpeechPlayer(options: UseSpeechPlayerOptions = {}): SpeechPla
     const cancel = cancelCurrent.current;
     cancelCurrent.current = null;
     teardown();
+    stopSideVoices();
     setStatus("idle");
     cancel?.();
   }, [teardown, setStatus]);
+
+  // one voice at a time (src/components/voice/channel.ts): a guide step or the summary replay that starts while Cosmo
+  // speaks silences her first
+  useEffect(
+    () =>
+      registerPlayer(() => {
+        if (statusNow.current !== "idle" || cancelCurrent.current) stop();
+      }),
+    [stop],
+  );
 
   /** Plays the server clip. "failed" means: use the fallback. */
   const playServerAudio = useCallback(
@@ -254,6 +269,7 @@ export function useSpeechPlayer(options: UseSpeechPlayerOptions = {}): SpeechPla
       const previous = cancelCurrent.current;
       cancelCurrent.current = null;
       teardown();
+      stopSideVoices(); // a guide step or the summary replay never talks over Cosmo
       previous?.();
       setStatus("loading");
       setSource("audio");

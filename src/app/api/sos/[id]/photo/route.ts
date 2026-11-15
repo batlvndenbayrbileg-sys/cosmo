@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { SOS_PHOTO_MAX_BYTES } from "@/lib/sos";
 import { requireCrew } from "@/server/dashboard/roles";
-import { attachSosPhoto, getSosAlert, markSosPhotoMissing } from "@/server/db/repos/sos";
+import { attachSosPhoto, deleteSosPhoto, getSosAlert, markSosPhotoMissing } from "@/server/db/repos/sos";
 import { handle, HttpError, ok } from "@/server/http";
 
 export const runtime = "nodejs";
@@ -59,5 +59,19 @@ export function POST(request: Request, ctx: { params: Promise<{ id: string }> })
     const missing = missingSchema.safeParse(await request.json().catch(() => null));
     if (!missing.success) throw new HttpError(400, "BAD_INPUT", 'Expected a JPEG body or { "missing": "denied" | "unavailable" }');
     return ok(await markSosPhotoMissing(crewId, id, missing.data.missing));
+  });
+}
+
+/**
+ * DELETE /api/sos/[id]/photo - the crew member removes the face still from their own SOS alert: the bytes are erased,
+ * the Earth console shows "no photo" from its next poll, and the alert itself stays. Idempotent; another member's
+ * alert is a 404, the ground role a 403. Answers the alert.
+ */
+export function DELETE(_request: Request, ctx: { params: Promise<{ id: string }> }): Promise<Response> {
+  return handle(async () => {
+    const { crewId } = await requireCrew();
+    const parsed = paramsSchema.safeParse(await ctx.params);
+    if (!parsed.success) throw new HttpError(400, "BAD_INPUT", "Invalid SOS id");
+    return ok(await deleteSosPhoto(crewId, parsed.data.id));
   });
 }
