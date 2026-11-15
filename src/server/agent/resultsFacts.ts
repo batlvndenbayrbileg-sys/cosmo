@@ -4,6 +4,7 @@ import { formatValue, getKpi } from "@/lib/kpi/registry";
 import { evaluateDay, type HistoryDay } from "@/lib/health";
 import { formatNumber } from "@/lib/health/format";
 import { NASA_HAZARDS } from "@/lib/nasa/hazards";
+import { referenceSentence, type ReferenceTopic } from "@/lib/health/vitalReference";
 
 /**
  * Today's results as plain, code-computed facts in one language. Used (a) as the ONLY source the model may draw on
@@ -38,8 +39,15 @@ export interface ResultsFacts {
   alerts: string[];
   bodyAreas: Array<{ axis: AxisKey; name: string; score: number | null; status: string }>;
   hazards: Array<{ name: string; status: string }>;
+  /**
+   * General resting-adult ranges (src/lib/health/vitalReference.ts), so "what is a normal heart rate?" after the
+   * check-in can be answered with them; their numbers are grounded like every other fact.
+   */
+  generalReference: string[];
   disclaimer: string;
 }
+
+const REFERENCE_TOPICS: ReferenceTopic[] = ["heart_rate", "blood_pressure", "temperature", "glucose", "spo2", "breathing_rate"];
 
 export function buildResultsFacts(
   today: Partial<Record<KpiKey, MeasurementValue>>,
@@ -82,6 +90,9 @@ export function buildResultsFacts(
       name: NASA_HAZARDS[h.hazard].name[lang],
       status: h.status === "not_monitored" ? (lang === "mn" ? "хэмжээгүй" : "not monitored here") : STATUS_WORD[h.status][lang],
     })),
+    // the "not a diagnosis" caveat is added by code after the answer (turn.ts), never handed to the model to copy: the
+    // reply gate refuses model text with "diagnos" in it
+    generalReference: REFERENCE_TOPICS.map((t) => referenceSentence(t, lang)),
     disclaimer: day.summary.disclaimer[lang],
   };
 }

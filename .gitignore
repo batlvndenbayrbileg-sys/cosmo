@@ -43,6 +43,8 @@ yarn-error.log*
 !/data/nasa/
 # urine panel workbook for the dashboard's Labs tab (source of src/data/urine_panel.json, scripts/urine_xlsx_to_json.py)
 !/data/urine/
+# general vital-sign reference workbook (source of src/data/vital_reference.json, scripts/vital_reference_xlsx_to_json.py)
+!/data/reference/
 
 # vercel
 .vercel

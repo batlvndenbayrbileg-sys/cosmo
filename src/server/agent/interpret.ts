@@ -17,6 +17,7 @@
 import type { KpiKey, Lang, MeasurementValue, QuestionDef, QuestionId } from "@/lib/types";
 import { KPI_DEFS, MAX_TEXT_LENGTH, getQuestion, validateValue } from "@/lib/kpi/registry";
 import { extractNumbers } from "@/lib/numbers/extract";
+import { MGDL_PER_MMOL, isAgeOrCount, readContainers } from "@/lib/numbers/units";
 
 /* ───────────── public types ───────────── */
 
@@ -245,6 +246,8 @@ function mergeThousands(text: string, qs: Qty[]): Qty[] {
 function numberQtys(text: string): Qty[] {
   const base = extractNumbers(text)
     .filter((n) => !(isLoneNeg(text, n) && NEG_QUANTIFIER_RE.test(text.slice(n.end))))
+    // an age or a count of times is never a measurement ("a normal pulse for a 30 year old?", "woke up 2 or 3 times")
+    .filter((n) => !isAgeOrCount(text, n))
     .map((n): Qty => {
       const u = unitAfter(text, n.end);
       return {
@@ -259,23 +262,31 @@ function numberQtys(text: string): Qty[] {
   return mergeThousands(text, base);
 }
 
-/** phrases that carry their own quantity: "an hour", "half an hour", "цаг хагас", "a litre" ... */
-const SPECIAL_PHRASES: ReadonlyArray<readonly [RegExp, number, UnitKind]> = [
+/**
+ * phrases that carry their own quantity: "an hour", "half an hour", "цаг хагас", "a litre" ... A bare unit word
+ * ("литр", "litre") stands for one of it (team feedback 2026-11-15: "литр" alone was not understood); that reading is
+ * a guess, so it is weak.
+ */
+const SPECIAL_PHRASES: ReadonlyArray<readonly [RegExp, number, UnitKind, boolean?]> = [
   [rx(`${NB}(?:an?\\s+|one\\s+)?hour\\s+and\\s+(?:a\\s+)?half${NA}`), 1.5, "hour"],
   [rx(`${NB}half\\s+an?\\s+hour${NA}`), 0.5, "hour"],
   [rx(`${NB}(?:a\\s+)?quarter\\s+(?:of\\s+)?an?\\s+hour${NA}`), 0.25, "hour"],
   [rx(`${NB}an?\\s+hour${NA}`), 1, "hour"],
   [rx(`${NB}(?:нэг\\s+)?цаг\\s+хагас${NA}`), 1.5, "hour"],
   [rx(`${NB}half\\s+an?\\s+(?:litre|liter)${NA}`), 0.5, "litre"],
-  [rx(`${NB}an?\\s+(?:litre|liter)\\s+and\\s+(?:a\\s+)?half${NA}`), 1.5, "litre"],
+  // "a litre and a half", and the article-less "litre and a half" (never the bare "litre" below, which is 1 L)
+  [rx(`${NB}(?:an?\\s+|one\\s+)?(?:litre|liter)\\s+and\\s+(?:a\\s+)?half${NA}`), 1.5, "litre"],
   [rx(`${NB}an?\\s+(?:litre|liter)${NA}`), 1, "litre"],
+  // "литр хагас" is a litre and a half (1.5 L), never half a litre ("хагас литр")
+  [rx(`${NB}(?:нэг\\s+)?литр\\s+хагас${NA}`), 1.5, "litre"],
+  [rx(`${NB}(?:литр|litre|liter)${NA}`), 1, "litre", true],
 ];
 
 /** numbers (with their units) plus the special phrases above, in text order */
 function quantitiesOf(text: string): Qty[] {
   const specials = resolveHits(
     text,
-    SPECIAL_PHRASES.map(([re, value, unit]) => [re, { value, unit }] as const),
+    SPECIAL_PHRASES.map(([re, value, unit, weak]) => [re, { value, unit, weak }] as const),
   ).map(
     (h): Qty => ({
       value: h.value.value,
@@ -284,11 +295,13 @@ function quantitiesOf(text: string): Qty[] {
       unitEnd: h.end,
       unit: h.value.unit,
       kind: "phrase",
+      weak: h.value.weak,
     }),
   );
   const all = numberQtys(text);
-  // "7 цаг хагас" is 7.5 hours (merged later): the special "цаг хагас" only stands when no number owns its "цаг"
-  const standing = specials.filter((s) => !all.some((n) => n.unit === "hour" && n.start < s.start && n.unitEnd > s.start));
+  // "7 цаг хагас" is 7.5 hours and "2 литр" two litres (merged later): a special only stands when no number owns its
+  // unit word ("цаг", "литр")
+  const standing = specials.filter((s) => !all.some((n) => n.unit === s.unit && n.start < s.start && n.unitEnd > s.start));
   const numbers = all.filter((n) => !standing.some((s) => n.start < s.end && n.end > s.start));
   return [...numbers, ...standing].sort((a, b) => a.start - b.start);
 }
@@ -550,6 +563,41 @@ function hasRange(text: string, qs: Qty[]): boolean {
   return false;
 }
 
+/** "6-7", "6 to 7", "six or seven", "5 эсвэл 6": the words between the two ends of a spoken range */
+const RANGE_ONLY_GAP_RE = /^\s*(?:-|–|—|to|or|till|until|through|буюу|эсвэл|хүртэл)\s*$/iu;
+const AND_GAP_RE = /^\s*(?:and|ба|болон)\s*$/iu;
+const BETWEEN_BEFORE_RE = /(?<![\p{L}])between\s+$/iu;
+
+interface SpokenRange {
+  lo: number;
+  hi: number;
+  /** the unit of the upper end, which the lower end shares ("6-7 hours" is 6 to 7 hours) */
+  unit: UnitKind | null;
+  src: string;
+}
+
+/**
+ * A spoken range ("6-7 цаг", "six or seven", "between 6 and 7 hours", "30-40 минут", "зургаа долоон цаг"): two
+ * increasing numbers of one kind joined by a range word (or, in Mongolian speech, two consecutive number words). Cosmo
+ * takes the middle and says so (team feedback 2026-11-15) instead of asking again. "11 to 6" (decreasing: clock times)
+ * and far-apart numbers are not a range.
+ */
+function rangeOf(text: string, qs: Qty[], unitOk: (u: UnitKind | null) => boolean): SpokenRange | null {
+  for (let i = 0; i + 1 < qs.length; i++) {
+    const a = qs[i];
+    const b = qs[i + 1];
+    if (!unitOk(b.unit) || (a.unit !== null && a.unit !== b.unit)) continue;
+    if (!(a.value < b.value) || b.value - a.value > Math.max(3, a.value)) continue;
+    const gap = text.slice(a.unitEnd, b.start);
+    const between = AND_GAP_RE.test(gap) && BETWEEN_BEFORE_RE.test(text.slice(0, a.start));
+    const spokenPair =
+      /^\s+$/u.test(gap) && a.kind === "words" && b.kind === "words" && Number.isInteger(a.value) && b.value === a.value + 1;
+    if (!RANGE_ONLY_GAP_RE.test(gap) && !between && !spokenPair) continue;
+    return { lo: a.value, hi: b.value, unit: b.unit, src: text.slice(a.start, b.unitEnd) };
+  }
+  return null;
+}
+
 /**
  * Total absence of sleep. "didn't sleep well / much" is NOT this: that needs the number of hours, so it stays unclear
  * and Cosmo asks again instead of recording a false 0.
@@ -596,9 +644,21 @@ function totalNoSleep(text: string): string | null {
 
 function interpretSleep(text: string): InterpretResult {
   const all = mergeClockPairs(text, mergeCompound(text, quantitiesOf(text)));
+  const tagged = all.filter((q) => clockTagged(text, q));
+  // "6-7 цаг", "six or seven", "зургаа долоон цаг": the middle, said out loud in the acknowledgement (assumptions.ts);
+  // clock times ("11 to 6") stay unclear
+  const range = rangeOf(
+    text,
+    // "between 6 and 7 hours": "between" alone does not make the lower end a clock time ("between 11 and 6" decreases)
+    all.filter((q) => !tagged.includes(q) || BETWEEN_BEFORE_RE.test(text.slice(0, q.start))),
+    (u) => u === null || u === "hour" || u === "minute",
+  );
+  if (range) {
+    const mid = (range.lo + range.hi) / 2;
+    return resolveSingle("sleep_hours", [{ value: round(range.unit === "minute" ? mid / 60 : mid, 2), src: range.src, weak: true }]);
+  }
   if (hasRange(text, all)) return unclearResult("ambiguous");
 
-  const tagged = all.filter((q) => clockTagged(text, q));
   const qs = all.filter((q) => !tagged.includes(q));
   const timed = qs.filter((q) => q.unit === "hour" || q.unit === "minute");
   let cands: Cand[];
@@ -993,9 +1053,26 @@ function interpretBloodPressure(text: string): InterpretResult {
 
 /* ───────────── heart rate, temperature, glucose ───────────── */
 
+const HEART_RATE_RANGE_MAX_SPAN = 20;
+
 function interpretHeartRate(text: string): InterpretResult {
+  // "70-75", "seventy or eighty": the middle, said out loud in the acknowledgement
+  const range = rangeOf(
+    text,
+    numberQtys(text).filter((q) => q.unit === null || q.unit === "bpm"),
+    (u) => u === null || u === "bpm",
+  );
+  // a pulse reading spans a few beats ("70-75"); "60 to 100" is the normal range being quoted, not a reading
+  if (range && range.lo >= 30) {
+    if (range.hi - range.lo > HEART_RATE_RANGE_MAX_SPAN) return unclearResult("ambiguous");
+    return resolveSingle("heart_rate", [{ value: Math.round((range.lo + range.hi) / 2), src: range.src, weak: true }]);
+  }
   return resolveSingle("heart_rate", plainCands(text, [null, "bpm"], KW.heart_rate, ["bpm"]));
 }
+
+/** a bare body temperature this high can only be Fahrenheit ("98.6", "ninety nine"): converted, said out loud */
+const BARE_FAHRENHEIT_MIN = 93;
+const BARE_FAHRENHEIT_MAX = 108;
 
 function interpretTemperature(text: string): InterpretResult {
   const fahrenheit = /fahrenheit|°\s*f(?![\p{L}])|degrees?\s+f(?![\p{L}])|\d\s*f(?![\p{L}])|фаренгейт/iu.test(text);
@@ -1026,45 +1103,98 @@ function interpretTemperature(text: string): InterpretResult {
       continue;
     }
     let value = q.value;
-    if (fahrenheit || q.unit === "fahrenheit") value = round(((value - 32) * 5) / 9, 1);
+    const bareF = q.unit === null && !fahrenheit && q.value >= BARE_FAHRENHEIT_MIN && q.value <= BARE_FAHRENHEIT_MAX;
+    if (fahrenheit || q.unit === "fahrenheit" || bareF) value = round(((value - 32) * 5) / 9, 1);
     cands.push({
       value,
       src: text.slice(q.start, q.unitEnd),
       preferred: (value >= 34 && value <= 42) || q.unit === "celsius" || keywordBefore(text, KW.temperature, q.start),
+      weak: bareF,
     });
   }
   return resolveSingle("temperature_c", cands);
 }
 
+/**
+ * mg/dL is what the registry stores. A bare number below the mg/dL range ("5.5", "5,4", "таван") is a reading in
+ * mmol/L, the unit most meters outside the US show: converted (1 mmol/L = 18.016 mg/dL) and said out loud.
+ */
+const BARE_MMOL_MAX = 33;
+
 function interpretGlucose(text: string): InterpretResult {
   const mmol = /mmol|ммоль/iu.test(text);
   const cands = numberQtys(text)
     .filter((q) => q.unit === null || q.unit === "mgdl" || q.unit === "mmol")
-    .map(
-      (q): Cand => ({
-        value: mmol || q.unit === "mmol" ? Math.round(q.value * 18.016) : q.value,
+    .map((q): Cand => {
+      // a decimal ("5.5", "5,4") up to 33, or a whole number a meter shows in mmol/L (2-15); "20" stays out of range
+      const bareMmol =
+        q.unit === null && !mmol && (Number.isInteger(q.value) ? q.value >= 2 && q.value <= 15 : q.value > 1 && q.value <= BARE_MMOL_MAX);
+      return {
+        value: mmol || q.unit === "mmol" || bareMmol ? Math.round(q.value * MGDL_PER_MMOL) : q.value,
         src: text.slice(q.start, q.unitEnd),
         preferred: q.unit === "mgdl" || q.unit === "mmol" || keywordBefore(text, KW.glucose, q.start),
-      }),
-    );
+        weak: bareMmol,
+      };
+    });
   return resolveSingle("glucose_mgdl", cands);
 }
 
 /* ───────────── water ───────────── */
 
-const CONTAINER_RE = /^\s*(?:glass(?:es)?|cups?|bottles?|mugs?|аяга[\p{L}]*|лонх[\p{L}]*|шил[\p{L}]*)(?![\p{L}])/iu;
+const UNSIZED_CONTAINER_RE = /^\s*(?:bags?|pouch(?:es)?|packs?|уут[\p{L}]*|сав(?:аар|тай|ыг)?)(?![\p{L}])/iu;
+
+/** "1 литр 200" / "1 litre 200": bare digits straight after a litre are its millilitres */
+function mergeLitreMl(text: string, qs: Qty[]): Qty[] {
+  const out: Qty[] = [];
+  for (let i = 0; i < qs.length; i++) {
+    const a = qs[i];
+    const b = qs[i + 1];
+    if (
+      a.unit === "litre" &&
+      b &&
+      b.unit === null &&
+      Number.isInteger(b.value) &&
+      b.value >= 100 &&
+      b.value <= 999 &&
+      /^\s*$/u.test(text.slice(a.unitEnd, b.start))
+    ) {
+      out.push({ ...a, value: a.value + b.value / 1000, end: b.end, unitEnd: b.end });
+      i++;
+      continue;
+    }
+    out.push(a);
+  }
+  return out;
+}
 
 function interpretWater(text: string): InterpretResult {
-  const qs = mergeCompound(text, quantitiesOf(text));
+  const qs = mergeLitreMl(text, mergeCompound(text, quantitiesOf(text)));
   const volumes = qs.filter((q) => q.unit === "litre" || q.unit === "ml");
   if (volumes.length > 0) {
+    // "1-2 литр", "1500 or 2000 ml": the middle, said out loud in the acknowledgement
+    const range = rangeOf(text, qs, (u) => u === "litre" || u === "ml");
+    if (range) {
+      const mid = (range.lo + range.hi) / 2;
+      return resolveSingle("water_ml", [{ value: Math.round(range.unit === "litre" ? mid * 1000 : mid), src: range.src, weak: true }]);
+    }
     const cands = volumes.map(
       (q): Cand => ({
         value: Math.round(q.unit === "litre" ? q.value * 1000 : q.value),
         src: text.slice(q.start, q.unitEnd),
+        weak: q.weak,
       }),
     );
     return resolveSingle("water_ml", cands);
+  }
+
+  // "3 glasses", "гурван аяга ус", "a bottle": a glass / cup is taken as 250 ml and a bottle as 500 ml, said out loud
+  // in the acknowledgement (assumptions.ts) so the astronaut can correct it at the read-back
+  const containers = readContainers(text);
+  if (containers.length > 0) {
+    const total = containers.reduce((sum, c) => sum + c.ml, 0);
+    const first = containers[0];
+    const last = containers[containers.length - 1];
+    return resolveSingle("water_ml", [{ value: total, src: text.slice(first.start, last.end), weak: true }]);
   }
 
   const bare = qs.filter((q) => q.unit === null);
@@ -1072,8 +1202,8 @@ function interpretWater(text: string): InterpretResult {
   let ambiguous = false;
   for (const q of bare) {
     const src = text.slice(q.start, q.end);
-    // "8 glasses": the size of a glass is unknown, so ask for millilitres or litres instead of guessing
-    if (CONTAINER_RE.test(text.slice(q.end))) {
+    // "2 bags": drink bags differ in size (the label says it), so ask instead of guessing
+    if (UNSIZED_CONTAINER_RE.test(text.slice(q.end))) {
       ambiguous = true;
       continue;
     }
@@ -1106,6 +1236,12 @@ const EXERCISE_HEDGE_RE = new RegExp(
 function interpretExercise(text: string): InterpretResult {
   const qs = mergeCompound(text, quantitiesOf(text));
   const timed = qs.filter((q) => q.unit === "hour" || q.unit === "minute");
+  // "30-40 минут", "1-2 цаг", "thirty or forty": the middle, said out loud in the acknowledgement
+  const range = rangeOf(text, qs, (u) => u === null || u === "hour" || u === "minute");
+  if (range) {
+    const mid = (range.lo + range.hi) / 2;
+    return resolveSingle("exercise_min", [{ value: Math.round(range.unit === "hour" ? mid * 60 : mid), src: range.src, weak: true }]);
+  }
   let cands: Cand[];
   if (timed.length > 0) {
     cands = timed.map((q) => ({
@@ -1343,6 +1479,11 @@ const CHANGE_WORD_RE = new RegExp(
   `${NB}(?:change|changed|wrong|incorrect|mistake|mistaken|fix|different|actually|засах|буруу|өөрчил[\\p{L}]*|алдаа[\\p{L}]*)${NA}`,
   "iu",
 );
+
+/** true when the words say a value is wrong or has to change ("no, ...", "actually ...", "засах", "буруу") */
+export function isCorrectionWorded(text: string): boolean {
+  return CORRECTION_LEAD_RE.test(text) || CHANGE_WORD_RE.test(text);
+}
 
 /** a yes followed by "but / except ..." that names a value or a measurement takes the yes back */
 function carriesCorrection(tail: string): boolean {

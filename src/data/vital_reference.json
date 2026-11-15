@@ -1,0 +1,96 @@
+{
+  "source": "data/reference/vital_signs_reference.xlsx",
+  "signs": [
+    {
+      "id": "heart_rate",
+      "name": "Heart rate",
+      "unit": "beats/min",
+      "normalText": "60–100",
+      "dangerText": "Below 40 or above 130",
+      "normalLow": 60,
+      "normalHigh": 100,
+      "dangerBelow": 40,
+      "dangerAbove": 130,
+      "note": "Athletes can have a resting rate in the 40s without a problem"
+    },
+    {
+      "id": "bp_systolic",
+      "name": "Blood pressure, systolic",
+      "unit": "mmHg",
+      "normalText": "Below 120",
+      "dangerText": "180 or higher, or below 90",
+      "normalLow": null,
+      "normalHigh": 120,
+      "dangerBelow": 90,
+      "dangerAbove": 180,
+      "note": "Low pressure matters only with symptoms; 180/120 or higher is a hypertensive crisis"
+    },
+    {
+      "id": "bp_diastolic",
+      "name": "Blood pressure, diastolic",
+      "unit": "mmHg",
+      "normalText": "Below 80",
+      "dangerText": "120 or higher",
+      "normalLow": null,
+      "normalHigh": 80,
+      "dangerBelow": null,
+      "dangerAbove": 120,
+      "note": null
+    },
+    {
+      "id": "breathing_rate",
+      "name": "Breathing rate",
+      "unit": "breaths/min",
+      "normalText": "12–20",
+      "dangerText": "Below 8 or above 25",
+      "normalLow": 12,
+      "normalHigh": 20,
+      "dangerBelow": 8,
+      "dangerAbove": 25,
+      "note": null
+    },
+    {
+      "id": "spo2",
+      "name": "Oxygen saturation (SpO2)",
+      "unit": "%",
+      "normalText": "95–100",
+      "dangerText": "Below 90 (below 92 is already concerning)",
+      "normalLow": 95,
+      "normalHigh": 100,
+      "dangerBelow": 90,
+      "dangerAbove": null,
+      "note": null
+    },
+    {
+      "id": "temperature",
+      "name": "Body temperature",
+      "unit": "°C",
+      "normalText": "36.1–37.2",
+      "dangerText": "Above 39.5 or below 35",
+      "normalLow": 36.1,
+      "normalHigh": 37.2,
+      "dangerBelow": 35,
+      "dangerAbove": 39.5,
+      "note": "97–99 °F normal; danger above 103 °F or below 95 °F"
+    },
+    {
+      "id": "glucose",
+      "name": "Blood glucose (fasting)",
+      "unit": "mmol/L",
+      "normalText": "3.9–5.5",
+      "dangerText": "Below 3.0 or above 16.7",
+      "normalLow": 3.9,
+      "normalHigh": 5.5,
+      "dangerBelow": 3,
+      "dangerAbove": 16.7,
+      "note": "70–99 mg/dL normal; danger below 54 mg/dL or above 300 mg/dL"
+    }
+  ],
+  "notes": [
+    "Resting adult values. Not for children or pregnancy.",
+    "Danger threshold = get urgent medical help, especially if symptoms come with it.",
+    "Symptoms count more than the number: chest pain, fainting, confusion, trouble breathing or blue lips need emergency care.",
+    "Several cutoffs (heart rate, breathing rate) are rules of thumb and vary by source.",
+    "General reference information, not a diagnosis."
+  ]
+}

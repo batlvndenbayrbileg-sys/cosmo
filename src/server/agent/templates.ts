@@ -12,6 +12,7 @@ import type { CrewPublic, KpiKey, Lang, MeasurementValue, QuestionDef, RedFlag, 
 import { KPI_DEFS, QUESTIONS, asNumber, formatValue } from "@/lib/kpi/registry";
 import { formatNumber } from "@/lib/health/format";
 import type { InterpretedRecord } from "./interpret";
+import { ASSUMPTION_CHECK, answerExample, assumptionNote } from "./assumptions";
 
 export type ClarifyReason = "range" | "type" | "unclear";
 
@@ -204,15 +205,20 @@ function acknowledgement(ack: InterpretedRecord[], lang: Lang): string {
     const d = formatNumber(asNumber(dia.value) ?? 0, 0);
     parts.push(lang === "mn" ? `${s} дээр ${d}` : `${s} over ${d}`);
   }
+  let assumed = false;
   for (const r of ack) {
     if (r.key === "bp_systolic" || r.key === "bp_diastolic" || r.key === "symptom_note") continue;
     if (KPI_DEFS[r.key].type === "text") {
       return lang === "mn" ? "Тэмдэглэлээ." : "Noted.";
     }
-    parts.push(spokenValue(r.key, r.value, lang));
+    const spoken = spokenValue(r.key, r.value, lang);
+    // a loose answer read with a rule of thumb ("3 glasses", "6-7 hours") says that reading (assumptions.ts)
+    const note = assumptionNote(r, lang, spoken);
+    if (note?.check) assumed = true;
+    parts.push(note?.text ?? spoken);
   }
   if (parts.length === 0) return lang === "mn" ? "Тэмдэглэлээ." : "Noted.";
-  return `${opener}, ${parts.join(", ")}.`;
+  return join([`${opener}, ${parts.join(", ")}.`, assumed ? ASSUMPTION_CHECK[lang] : ""]);
 }
 
 /** the registry prompt for q, preceded by a short acknowledgement of what was just recorded */
@@ -254,19 +260,21 @@ export function clarify(q: QuestionDef, lang: Lang, reason: ClarifyReason, attem
     }
     return join([second ? "That still looks outside the range." : "That looks outside the expected range.", hint, "Could you say it again?"]);
   }
+  // an example of an answer that works makes the second try easy (assumptions.ts)
+  const example = answerExample(q.id, lang);
   if (reason === "type") {
     return lang === "mn"
-      ? join([second ? "Тоо дахиад сонсогдсонгүй." : "Тоо сонсогдсонгүй.", prompt])
-      : join([second ? "I still didn't catch a number." : "I didn't catch a number.", prompt]);
+      ? join([second ? "Тоо дахиад сонсогдсонгүй." : "Тоо сонсогдсонгүй.", prompt, example])
+      : join([second ? "I still didn't catch a number." : "I didn't catch a number.", prompt, example]);
   }
   if (lang === "mn") {
     return second
-      ? join(["Дахин сайн сонссонгүй.", prompt, "Эсвэл «алгасъя» гэж хэлбэл дараа нэмж болно."])
-      : join(["Уучлаарай, сайн сонссонгүй.", prompt]);
+      ? join(["Дахин сайн сонссонгүй.", prompt, example, "Эсвэл «алгасъя» гэж хэлбэл дараа нэмж болно."])
+      : join(["Уучлаарай, сайн сонссонгүй.", prompt, example]);
   }
   return second
-    ? join(["I still didn't catch that.", prompt, "Or say skip and we can add it later."])
-    : join(["Sorry, I didn't catch that.", prompt]);
+    ? join(["I still didn't catch that.", prompt, example, "Or say skip and we can add it later."])
+    : join(["Sorry, I didn't catch that.", prompt, example]);
 }
 
 /* ───────────── confirmation ───────────── */

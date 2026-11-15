@@ -57,12 +57,15 @@ describe("answerAskedQuestion", () => {
     expect(a).not.toMatch(/уучлаарай/iu);
   });
 
-  it("answers the same in English, and says it is not a medical judgement", () => {
+  // changed 2026-11-15: the answer leads with the general fasting range (vital_reference.json) and closes with the
+  // workbook's "general reference, not a diagnosis" caveat
+  it("answers the same in English, with the general range, and says it is not a diagnosis", () => {
     const a = answerAskedQuestion("normal", "glucose", "en", baselines);
+    expect(a).toMatch(/70-99 mg\/dL/);
     expect(a).toMatch(/70-140/);
     expect(a).not.toMatch(/·/); // no card-only "· demo parameter" suffix inside the sentence
     expect(a).toContain("96");
-    expect(a).toMatch(/not a medical judgement/i);
+    expect(a).toMatch(/not a diagnosis/i);
   });
 
   it("gives both blood pressure numbers", () => {

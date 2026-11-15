@@ -1,6 +1,16 @@
-import type { KpiKey, Lang, QuestionId } from "@/lib/types";
+import type { KpiKey, Lang, MeasurementValue, QuestionId } from "@/lib/types";
 import type { Baseline } from "@/lib/health/baseline";
-import { KPI_DEFS, formatValue, getQuestion, rangeText } from "@/lib/kpi/registry";
+import { KPI_DEFS, asNumber, formatValue, getQuestion, rangeText } from "@/lib/kpi/registry";
+import { formatNumber } from "@/lib/health/format";
+import {
+  REFERENCE_CAVEAT,
+  referenceBand,
+  referenceSentence,
+  type ReferenceBand,
+  type ReferenceTopic,
+} from "@/lib/health/vitalReference";
+import { extractNumbers } from "@/lib/numbers/extract";
+import { MGDL_PER_MMOL, isNotAVitalValue } from "@/lib/numbers/units";
 // (rangeText is the dashboard card's "Normal ... · demo parameter" text; bareRange below drops the card suffix)
 
 /**
@@ -177,6 +187,186 @@ function bareRange(key: KpiKey): { en: string; mn: string } | null {
   return { en: strip(r.en), mn: strip(r.mn) };
 }
 
+/* ───────────── general reference ranges (src/lib/health/vitalReference.ts) ───────────── */
+
+/** the check-in questions that have a general resting-adult reference range */
+const REFERENCE_OF: Partial<Record<QuestionId, ReferenceTopic>> = {
+  heart_rate: "heart_rate",
+  blood_pressure: "blood_pressure",
+  temperature: "temperature",
+  glucose: "glucose",
+};
+
+const QUESTION_OF: Partial<Record<ReferenceTopic, QuestionId>> = {
+  heart_rate: "heart_rate",
+  blood_pressure: "blood_pressure",
+  temperature: "temperature",
+  glucose: "glucose",
+};
+
+/** which vital a question names, including the two the check-in does not ask (breathing, oxygen); first match wins */
+const REFERENCE_TOPICS: Array<{ topic: ReferenceTopic; re: RegExp }> = [
+  // "is 120 over 80 ok?", "120/80 хэвийн үү?": a pair said the blood-pressure way names it without the word
+  { topic: "blood_pressure", re: /blood\s+pressure|\bbp\b|даралт|\d{2,3}\s*(?:\/|over|дээр)\s*\d{2,3}/iu },
+  { topic: "spo2", re: /spo2|sp\s*o2|oxygen|saturation|хүчилтөрөгч|сатураци/iu },
+  { topic: "breathing_rate", re: /\bbreath\w*|respirat\w*|амьсгал/iu },
+  { topic: "glucose", re: /blood\s+sugar|glucose|\bsugar|сахар|глюкоз/iu },
+  { topic: "heart_rate", re: /heart\s*rate|heartbeat|\bpulse|\bbpm\b|зүрх|пульс|лугшилт/iu },
+  { topic: "temperature", re: /temperature|fever|температур|халуу/iu },
+];
+
+export function referenceTopicOf(text: string): ReferenceTopic | null {
+  return REFERENCE_TOPICS.find((t) => t.re.test(text))?.topic ?? null;
+}
+
+/** a question that judges a value ("is 85 a good pulse?", "is my blood pressure ok?", "миний пульс их байна уу?") */
+const JUDGE_RE =
+  /\b(?:ok(?:ay)?|good|bad|fine|high|low|dangerous|worr\w*|concern\w*|safe)\b|хэвийн|сайн|муу|өндөр|бага|(?<![\p{L}])их(?![\p{L}])|нам|аюул|санаа\s+зов/iu;
+
+/**
+ * The general reference topic a question asks about ("what is a normal heart rate?", "зүрхний цохилт хэд байх ёстой
+ * вэ?", "is 85 a good pulse?", "what should my oxygen be?"), or null: "why / how / say again" questions and questions
+ * that do not name a vital are not reference questions.
+ */
+export function referenceQuestionTopic(text: string, lang: Lang): ReferenceTopic | null {
+  const kind = detectAskedQuestion(text, lang);
+  if (kind === null || kind === "greeting" || kind === "repeat" || kind === "why" || kind === "how") return null;
+  // a statement ("my blood pressure is normal today") is not a question, even with a "normal" word in it
+  const t = text.trim();
+  if (!QUESTION_MARK.test(t) && !MN_QUESTION.test(t) && !EN_QUESTION.test(t)) return null;
+  const topic = referenceTopicOf(text);
+  if (!topic) return null;
+  return kind === "normal" || JUDGE_RE.test(text) ? topic : null;
+}
+
+const BAND_WORDS: Record<ReferenceBand, { en: string; mn: string }> = {
+  normal: { en: "which is within that general range", mn: "энэ нь ерөнхий хэвийн хүрээнд байна" },
+  outside: { en: "which is outside that general range, though not at the urgent level", mn: "энэ нь ерөнхий хэвийн хүрээнээс гадуур, гэхдээ яаралтай түвшинд хүрээгүй байна" },
+  danger: {
+    en: "which is past the urgent threshold, so please tell the crew medical officer now",
+    mn: "энэ нь яаралтай босгоос давсан тул багийн эмнэлгийн офицерт одоо мэдэгдээрэй",
+  },
+};
+
+/** the numbers a question can mean for each vital (registry units: bpm, mmHg, breaths/min, %, °C, mg/dL) */
+const PLAUSIBLE: Record<ReferenceTopic, readonly [number, number]> = {
+  heart_rate: [20, 250],
+  blood_pressure: [30, 260],
+  breathing_rate: [3, 60],
+  spo2: [50, 100],
+  temperature: [30, 45],
+  glucose: [20, 600],
+};
+
+const OTHER_UNITS: Partial<Record<ReferenceTopic, { en: string; mn: string }>> = {
+  breathing_rate: { en: "breaths a minute", mn: "удаа/мин" },
+  spo2: { en: "%", mn: "%" },
+};
+
+/** a bare body temperature this high is Fahrenheit (as in interpret.ts) */
+const FAHRENHEIT_MIN = 86;
+const FAHRENHEIT_MAX = 113;
+
+/**
+ * A number in a question, in the registry's unit: "is 98.6 a normal temperature?" is 37 °C (from 98.6 °F) and "is 5.5
+ * good for blood sugar?" is 99 mg/dL (from 5.5 mmol/L), the same readings the check-in takes (interpret.ts).
+ */
+function inRegistryUnit(topic: ReferenceTopic, value: number, text: string, lang: Lang): { value: number; from: string | null } {
+  if (topic === "temperature" && value >= FAHRENHEIT_MIN && value <= FAHRENHEIT_MAX) {
+    return { value: Math.round((((value - 32) * 5) / 9) * 10) / 10, from: `${formatNumber(value, 1)} °F` };
+  }
+  if (topic === "glucose" && !/mg|мг/iu.test(text)) {
+    const mmol =
+      /mmol|ммоль/iu.test(text) || (Number.isInteger(value) ? value >= 2 && value <= 15 : value > 1 && value <= 33);
+    if (mmol) return { value: Math.round(value * MGDL_PER_MMOL), from: `${formatNumber(value, 2)} ${lang === "mn" ? "ммоль/л" : "mmol/L"}` };
+  }
+  return { value, from: null };
+}
+
+/** "Today you told me 68 bpm, which is within that general range." / the number in the question, judged the same way */
+function valueSentence(
+  topic: ReferenceTopic,
+  lang: Lang,
+  text: string,
+  today: Partial<Record<KpiKey, MeasurementValue>>,
+): string | null {
+  // only numbers that can be this vital count ("is my pulse ok after 2 hours of exercise?" asks about today's value):
+  // never an age, a count of times or a time span ("a normal pulse for a 30 year old?", "after 30 minutes")
+  const [lo, hi] = PLAUSIBLE[topic];
+  const read = extractNumbers(text)
+    .filter((n) => !isNotAVitalValue(text, n))
+    .map((n) => inRegistryUnit(topic, n.value, text, lang))
+    .filter((r) => r.value >= lo && r.value <= hi);
+  const nums = read.map((r) => r.value);
+  const asked = nums.length > 0;
+  let shown: string;
+  let band: ReferenceBand;
+  if (topic === "blood_pressure") {
+    let sys: number | null = null;
+    let dia: number | null = null;
+    if (nums.length >= 2 && nums[0] > nums[1]) [sys, dia] = nums;
+    else if (!asked) [sys, dia] = [asNumber(today.bp_systolic), asNumber(today.bp_diastolic)];
+    if (sys === null || dia === null) return null;
+    shown = lang === "mn" ? `${formatNumber(sys, 0)} дээр ${formatNumber(dia, 0)}` : `${formatNumber(sys, 0)} over ${formatNumber(dia, 0)}`;
+    band = referenceBand(topic, sys, dia);
+  } else {
+    const key: KpiKey | null =
+      topic === "heart_rate" ? "heart_rate" : topic === "temperature" ? "temperature_c" : topic === "glucose" ? "glucose_mgdl" : null;
+    const n = asked ? nums[0] : key ? asNumber(today[key]) : null;
+    if (n === null) return null;
+    const from = asked ? read[0].from : null;
+    shown = key ? formatValue(key, n, lang) : `${formatNumber(n, 1)} ${OTHER_UNITS[topic]?.[lang] ?? ""}`.trim();
+    if (from) shown = `${shown} (${from})`;
+    band = referenceBand(topic, n);
+  }
+  const words = BAND_WORDS[band][lang];
+  if (asked) return `${shown}: ${words}.`;
+  return lang === "mn" ? `Өнөөдөр ${shown} гэж хэлсэн, ${words}.` : `Today you told me ${shown}, ${words}.`;
+}
+
+/**
+ * The answer to a general reference question at any point (small talk, the check-in, after it): the general resting
+ * range and its urgent thresholds, the value asked about or today's value judged against it, the person's own 14-day
+ * average, and the "general reference, not a diagnosis" caveat. Every number comes from the reference workbook, the
+ * registry, the baseline, today's stored values or the astronaut's own words. Null when the text is not such a question.
+ */
+export function answerReferenceQuestion(
+  text: string,
+  lang: Lang,
+  ctx: { baselines: Partial<Record<KpiKey, Baseline>>; today: Partial<Record<KpiKey, MeasurementValue>> },
+): { topic: ReferenceTopic; questionId: QuestionId | null; text: string; brief: string } | null {
+  const topic = referenceQuestionTopic(text, lang);
+  if (!topic) return null;
+  const questionId = QUESTION_OF[topic] ?? null;
+  const value = valueSentence(topic, lang, text, ctx.today);
+  return {
+    topic,
+    questionId,
+    // after a value that was recorded from the same words ("is 85 a good pulse?"): the range, the judgement and a
+    // short form of the caveat (a judgement is never said without "not a diagnosis")
+    brief: join([referenceSentence(topic, lang), value, REFERENCE_CAVEAT_SHORT[lang]]),
+    text: join([
+      referenceSentence(topic, lang),
+      value,
+      questionId ? demoBandSentence(questionId, lang) : null,
+      questionId ? baselineSentence(questionId, ctx.baselines, lang) : null,
+      REFERENCE_CAVEAT[lang],
+    ]),
+  };
+}
+
+const REFERENCE_CAVEAT_SHORT: Readonly<Record<Lang, string>> = {
+  en: "General reference, not a diagnosis.",
+  mn: "Ерөнхий лавлагаа, онош биш.",
+};
+
+/** a model-worded answer to a general reference question gets the caveat when it does not carry one */
+export function withReferenceCaveat(answer: string, userText: string, lang: Lang): string {
+  if (!referenceQuestionTopic(userText, lang)) return answer;
+  if (/reference|judgement|лавлагаа|дүгнэлт/iu.test(answer)) return answer;
+  return join([answer, REFERENCE_CAVEAT[lang]]);
+}
+
 /** "Normal 70-140 mg/dL" -> "the demo range is 70-140 mg/dL" style sentence for the question's keys */
 function normalSentence(id: QuestionId, lang: Lang): string | null {
   const q = getQuestion(id);
@@ -194,6 +384,21 @@ function normalSentence(id: QuestionId, lang: Lang): string | null {
   return lang === "mn"
     ? `Демо параметрээр ${KPI_DEFS[ranges[0].k].labels.mn.toLowerCase()}: ${r.mn.replace(/^Хэвийн:?\s*/u, "")} бол хэвийн.`
     : `As a demo parameter, ${KPI_DEFS[ranges[0].k].labels.en.toLowerCase()} of ${r.en.replace(/^Normal:?\s*/u, "")} counts as normal.`;
+}
+
+/** the dashboard card's band in a few words, after a general range: "The dashboard's demo watch band is 50-90 bpm." */
+function demoBandSentence(id: QuestionId, lang: Lang): string | null {
+  const q = getQuestion(id);
+  const ranges = q.keys.map((k) => bareRange(k)).filter((r): r is { en: string; mn: string } => r !== null);
+  if (ranges.length === 0) return null;
+  const strip = (s: string) => s.replace(/^(?:Normal|Хэвийн):?\s*/u, "");
+  const band =
+    id === "blood_pressure" && ranges.length === 2
+      ? lang === "mn"
+        ? `дээд ${strip(ranges[0].mn)}, доод ${strip(ranges[1].mn)}`
+        : `${strip(ranges[0].en)} upper and ${strip(ranges[1].en)} lower`
+      : strip(ranges[0][lang]);
+  return lang === "mn" ? `Самбар дээрх демо параметрийн хүрээ: ${band}.` : `On the dashboard, the demo parameter band is ${band}.`;
 }
 
 function baselineSentence(id: QuestionId, baselines: Partial<Record<KpiKey, Baseline>>, lang: Lang): string | null {
@@ -227,12 +432,19 @@ export function answerAskedQuestion(
       return lang === "mn" ? "Дахиад асууя." : "Sure, again.";
     case "greeting":
       return lang === "mn" ? "Сайн байна, баярлалаа!" : "Hi again!";
-    case "normal":
+    case "normal": {
+      // the general resting-adult range first (vital_reference.json), then the dashboard's demo band and the person's own
+      // 14-day average; without a general range (sleep, water, mood ...) the demo band is the answer
+      const topic = REFERENCE_OF[id];
+      if (topic) {
+        return join([referenceSentence(topic, lang), demoBandSentence(id, lang), baselineSentence(id, baselines, lang), REFERENCE_CAVEAT[lang]]);
+      }
       return join([
         normalSentence(id, lang) ?? WHY[id][lang],
         baselineSentence(id, baselines, lang),
         lang === "mn" ? "Энэ нь эмчийн дүгнэлт биш." : "This is not a medical judgement.",
       ]);
+    }
     case "why":
       return WHY[id][lang];
     case "how":
@@ -250,7 +462,10 @@ export function answerAskedQuestion(
  * astronaut's words).
  */
 export function questionFacts(id: QuestionId, lang: Lang, baselines: Partial<Record<KpiKey, Baseline>>): string {
+  const topic = REFERENCE_OF[id];
   return join([
+    // the general resting-adult range: the model may quote these numbers (the sanity gate allows what is in the facts)
+    topic ? referenceSentence(topic, lang) : null,
     normalSentence(id, lang),
     baselineSentence(id, baselines, lang),
     WHY[id][lang],

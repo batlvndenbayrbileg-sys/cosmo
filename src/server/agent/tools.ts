@@ -13,6 +13,7 @@ import { KPI_KEYS } from "@/lib/types";
 import { computeBaselines, evaluateDay } from "@/lib/health";
 import { KPI_DEFS, validateValue } from "@/lib/kpi/registry";
 import { extractNumbers } from "@/lib/numbers/extract";
+import { BOTTLE_ML, GLASS_ML, readContainers } from "@/lib/numbers/units";
 import { HttpError, NotFoundError } from "@/server/http";
 import { getCheckIn } from "@/server/db/repos/checkin";
 import { upsertMeasurement } from "@/server/db/repos/measurement";
@@ -255,6 +256,8 @@ export function isSubstringOfUtterance(needle: string, haystack: string): boolea
 
 const FRACTION_WORDS = /(?<![\p{L}])(?:half|quarter|point|хагас|аравны|цэг)(?![\p{L}])/iu;
 
+const RANGE_KEYS: ReadonlySet<KpiKey> = new Set<KpiKey>(["sleep_hours", "water_ml", "exercise_min", "heart_rate"]);
+
 /** every value the words in `source` can legitimately stand for (unit conversions, compounds, halves) */
 function derivedValues(key: KpiKey, source: string): number[] {
   const nums = extractNumbers(source).map((n) => n.value);
@@ -266,18 +269,27 @@ function derivedValues(key: KpiKey, source: string): number[] {
   const pairs = (f: (a: number, b: number) => number) => {
     for (let i = 0; i + 1 < nums.length; i++) out.push(f(nums[i], nums[i + 1]));
   };
+  // a spoken range ("6-7 hours", "70-75") stands for its middle (interpret.ts rangeOf), whole for whole-number keys;
+  // only for the keys the rules read ranges for (never blood pressure: "120/80" is not 100)
+  if (RANGE_KEYS.has(key)) {
+    pairs((a, b) => (a + b) / 2);
+    pairs((a, b) => Math.round((a + b) / 2));
+  }
   switch (key) {
     case "sleep_hours":
       each((n) => [n / 60]); // minutes
       pairs((a, b) => a + b / 60); // "6 hours 30 minutes"
       break;
     case "water_ml":
-      each((n) => [n * 1000, (n + 0.5) * 1000]); // litres
+      each((n) => [n * 1000, (n + 0.5) * 1000, n * GLASS_ML, n * BOTTLE_ML]); // litres, glasses, bottles
       pairs((a, b) => a * 1000 + b); // "1 litre 500 ml"
+      pairs((a, b) => ((a + b) / 2) * 1000); // "1-2 litres"
+      out.push(readContainers(source).reduce((sum, c) => sum + c.ml, 0)); // "2 glasses and a bottle", "2-3 glasses"
       break;
     case "exercise_min":
       each((n) => [n * 60]); // hours
       pairs((a, b) => a * 60 + b);
+      pairs((a, b) => ((a + b) / 2) * 60); // "1-2 hours"
       break;
     case "temperature_c":
       each((n) => [((n - 32) * 5) / 9]); // Fahrenheit
