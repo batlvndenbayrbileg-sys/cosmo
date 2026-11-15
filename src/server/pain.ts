@@ -190,9 +190,16 @@ export async function painTurn(p: PainTurnInput): Promise<TurnEvent[] | null> {
 
   if (!decision && reading) {
     // the words answer the open check-in question ("I have a headache" to the symptom question): recorded as usual,
-    // unless the pain is urgent
+    // unless the pain is urgent or goes with a first-aid guide ("I hit my head and it hurts": the browser leaves the
+    // guide to this pain check, so swallowing it here would show neither)
     const expected = ctx.state === "KPI_CAPTURE" && !ctx.companion ? cursorQuestion(ctx) : null;
-    if (expected && reading.redFlags.length === 0 && interpretAnswer(getQuestion(expected), p.text, p.lang).records.length > 0) {
+    const withGuide = painGuide({ location: reading.location, clause: reading.clause, redFlags: [], urgent: false }) !== null;
+    if (
+      expected &&
+      reading.redFlags.length === 0 &&
+      !withGuide &&
+      interpretAnswer(getQuestion(expected), p.text, p.lang).records.length > 0
+    ) {
       if (pending) await clearPainAwaiting(p.crewId, pending.id);
       return null;
     }

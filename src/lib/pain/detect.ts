@@ -65,13 +65,20 @@ function clausesOf(text: string): Clause[] {
 const EN_PAIN =
   /\b(?:hurts?|hurting|pains?|painful|aches?|aching|ached|sore|soreness|cramps?|cramping|throbbing|stabbing|killing\s+me|(?:head|stomach|tummy|belly|back|tooth|ear)aches?)\b/g;
 
-/** the words that end a negation's reach: "I can't breathe and my chest hurts" */
-const EN_SCOPE_CUT = /\b(?:and|but|or|so|because|since|why|that|while|then|though|although|when)\b/g;
+/**
+ * the words that end a negation's reach: "I can't breathe and my chest hurts". Not "or": "no chest pain or headache"
+ * denies both.
+ */
+const EN_SCOPE_CUT = /\b(?:and|but|so(?!\s+(?:much|bad|badly|hard|strong|severe|terrible|terribly|awful|many))|because|since|why|that|while|then|though|although|when)\b/g;
 const EN_NEGATION =
   /\b(?:no|not|never|without|nothing|none|nor|neither|don'?t|doesn'?t|didn'?t|isn'?t|aren'?t|wasn'?t|weren'?t|won'?t|wouldn'?t|can'?t|cannot|haven'?t|hasn'?t|hardly)\b/;
 /** after the pain word: "the pain is gone", "pain-free", "doesn't hurt anymore" */
 const EN_NEGATED_AFTER = /^\s*(?:-?\s*free\b|(?:is|has|have|are|was)?\s*(?:gone|went\s+away|stopped|over\b|better\s+now)|any\s?more\b|no\s+more\b)/;
-const EN_EXCLUDED = /\bfeelings?\b|\bsore\s+loser\b/;
+/** not a pain: hurt feelings, "it's a pain to ...", "a pain in the neck", "no pain, no gain" */
+const EN_EXCLUDED =
+  /\bfeelings?\b|\bsore\s+loser\b|\b(?:it'?s|is|was|such|what)\s+a\s+(?:real\s+|bit\s+of\s+a\s+)?pain\b(?!\s+in\s+my\b)|\bpain\s+in\s+the\s+(?:neck|butt|ass)\b|\bno\s+pain,?\s+no\s+gain\b/;
+/** "killing me" is a pain only with a body part named ("my back is killing me", never "the noise is killing me") */
+const EN_IDIOM_ONLY_WITH_PLACE = /^killing/;
 const EN_FIRST_PERSON = /\b(?:my|i|i'm|i've|i'd|me|mine)\b/;
 const EN_QUESTION_START = /^(?:(?:hey|cosmo|so|and|but|um|uh|ok|okay|please)\s+)*(?:what|how|does|do|did|is|are|was|can|could|should|would|will|which|who|whom|where|when|why|may|might)\b/;
 const EN_HYPOTHETICAL_START = /^(?:(?:hey|cosmo|so|and|but|um|uh|ok|okay|please)\s+)*(?:if|whenever|in\s+case|suppose|imagine)\b/;
@@ -91,6 +98,7 @@ function enPainAt(clause: string): { index: number; end: number; word: string } 
     const near = before.trim().split(" ").slice(-5).join(" ");
     if (EN_NEGATION.test(near)) continue;
     if (EN_NEGATED_AFTER.test(clause.slice(end))) continue;
+    if (EN_IDIOM_ONLY_WITH_PLACE.test(m[0]) && enLocation(clause) === null) continue;
     return { index, end, word: m[0] };
   }
   return null;
@@ -127,18 +135,22 @@ function mnPainWord(w: string): boolean {
   return /^(?:шанал|хатгу|хатгаж|хатгаад|базла|базал|хорсо|хорсч|янгина|чилээ|чилж|хөндүүр)/.test(w);
 }
 
-const MN_NEGATED_NEXT = /^(?:байхгүй|үгүй|биш|байгаагүй|байсангүй|больсон|арилсан|намдсан|гүй)$/;
+/** within the next three words: "өвдөлт байхгүй", "өвдөлт алга", "өвдөөд байгаа юм алга" (nothing hurts) */
+const MN_NEGATED_NEXT = /^(?:байхгүй|үгүй|биш|байгаагүй|байсангүй|больсон|арилсан|намдсан|гүй|алга)$/;
+/** "толгой өвдөж байвал" (if my head hurts): the conditional on the helper verb right after the pain word */
+const MN_CONDITIONAL_NEXT = /^(?:бай|болвол|болбол|бол)\p{L}*[вб][аэоө]л$/u;
 const MN_CONDITIONAL = /(?:[вб][аэоө]л)$/;
 const MN_QUESTION_PARTICLE = /^(?:вэ|бэ|уу|үү|юу|юү)$/;
 const MN_FIRST_PERSON = /^(?:миний|минь|би|надад|намайг|өөрийн|маань)$/;
 
-function mnPainAt(words: readonly string[]): number {
-  for (let i = 0; i < words.length; i++) {
+function mnPainAt(words: readonly string[], from = 0): number {
+  for (let i = from; i < words.length; i++) {
     const w = words[i];
     if (!mnPainWord(w)) continue;
     if (/гүй$/.test(w)) continue; // өвдөхгүй, өвдөөгүй, өвдөлтгүй
     if (MN_CONDITIONAL.test(w)) continue; // өвдвөл
-    if (words.slice(i + 1, i + 3).some((x) => MN_NEGATED_NEXT.test(x))) continue; // өвдөлт байхгүй
+    if (words.slice(i + 1, i + 4).some((x) => MN_NEGATED_NEXT.test(x))) continue; // өвдөлт байхгүй, өвдөлт алга
+    if (MN_CONDITIONAL_NEXT.test(words[i + 1] ?? "")) continue; // өвдөж байвал
     if (words[i + 1] === "бол" || words[i + 2] === "бол") continue; // өвдөх юм бол
     return i;
   }
@@ -205,6 +217,108 @@ function enLocation(clause: string): PainLocation | null {
   return best?.location ?? null;
 }
 
+/** the clause cut at the scope words (and, but, so, ...), each piece with where it starts */
+function enSpans(clause: string): Array<{ text: string; start: number }> {
+  const out: Array<{ text: string; start: number }> = [];
+  let from = 0;
+  for (const m of clause.matchAll(EN_SCOPE_CUT)) {
+    const at = m.index ?? 0;
+    out.push({ text: clause.slice(from, at), start: from });
+    from = at + m[0].length;
+  }
+  out.push({ text: clause.slice(from), start: from });
+  return out;
+}
+
+/** the piece of the clause the pain word is in ("my head hurts" in "my head hurts and my chest is fine") */
+function enOwnSpan(clause: string, at: number): string {
+  const spans = enSpans(clause);
+  let own = spans[0];
+  for (const s of spans) if (s.start <= at) own = s;
+  return own.text;
+}
+
+/**
+ * Where the pain is: named next to the pain word ("my head hurts and my chest is fine" is the head), else in another
+ * piece of the clause that is not denied ("my chest feels tight and it hurts" is the chest; "it hurts and I have no
+ * chest pain" is not).
+ */
+function enPainLocation(clause: string, at: number): PainLocation | null {
+  const ownText = enOwnSpan(clause, at);
+  const own = enLocation(ownText);
+  // the chest anywhere it is not denied: "my chest and my head hurt" is chest pain
+  let best: PainLocation | null = null;
+  for (const s of enSpans(clause)) {
+    if (s.text !== ownText && (EN_NEGATION.test(s.text) || EN_SPAN_FINE.test(s.text))) continue;
+    const loc = enLocation(s.text);
+    if (loc === "chest") return "chest";
+    if (loc && !best) best = loc;
+  }
+  return own ?? best;
+}
+
+/** a piece that says the place is fine: "my head hurts and my chest is fine" */
+const EN_SPAN_FINE = /\b(?:is|are|feels?|seems?)\s+(?:fine|ok|okay|good|normal|alright|all\s+right)\b/;
+
+/**
+ * Where the pain is: the place named with the pain word at `at`, but the chest named with any pain word of the clause
+ * that is not denied wins ("толгой өвдөөд цээж базлаад байна" is chest pain; "толгой өвдөөд цээж өвдөхгүй" is not).
+ */
+function mnPainLocation(words: readonly string[], at: number): PainLocation | null {
+  for (let k = mnPainAt(words, at + 1); k >= 0; k = mnPainAt(words, k + 1)) {
+    if (mnPlaceOf(words, k) === "chest") return "chest";
+  }
+  return mnPlaceOf(words, at);
+}
+
+/** the words that belong to the pain word at `at`: since the previous pain word, else those after it */
+function mnPlaceOf(words: readonly string[], at: number): PainLocation | null {
+  let start = 0;
+  for (let j = at - 1; j >= 0; j--) {
+    if (mnPainWord(words[j])) {
+      start = j + 1;
+      break;
+    }
+  }
+  const own = mnLocation(words.slice(start, at + 1));
+  if (own) return own;
+  let end = words.length;
+  for (let j = at + 1; j < words.length; j++) {
+    if (mnPainWord(words[j])) {
+      end = j;
+      break;
+    }
+  }
+  return mnLocation(words.slice(at + 1, end));
+}
+
+/**
+ * The clause without its denied parts, for the first-aid guide's trigger words: "my head hurts and I don't have chest
+ * pain" keeps "my head hurts", "толгой өвдөөд цээж өвдөхгүй байна" keeps "толгой өвдөөд байна" (the guides match words,
+ * not meaning, so a denied "chest pain" would open the chest pain guide for a headache).
+ */
+function enStatedPart(clause: string, at: number): string {
+  const ownText = enOwnSpan(clause, at);
+  return enSpans(clause)
+    .filter((s) => s.text === ownText || !(EN_NEGATION.test(s.text) || EN_SPAN_FINE.test(s.text)))
+    .map((s) => s.text.trim())
+    .join(" and ");
+}
+
+function mnStatedPart(words: readonly string[]): string {
+  const kept: string[] = [];
+  let group: string[] = [];
+  for (let i = 0; i < words.length; i++) {
+    group.push(words[i]);
+    if (!mnPainWord(words[i])) continue;
+    if (mnPainAt(words, i) === i) kept.push(...group);
+    else while (MN_NEGATED_NEXT.test(words[i + 1] ?? "")) i++; // "өвдөлт байхгүй": the denial goes with it
+    group = [];
+  }
+  kept.push(...group);
+  return kept.join(" ");
+}
+
 function wordsOf(clause: string): string[] {
   return clause.split(/[^\p{L}\p{N}-]+/u).filter((w) => w.length > 0);
 }
@@ -222,7 +336,8 @@ export function readPainLocation(text: string): PainLocation | null {
 
 const EN_SEVERITY: ReadonlyArray<[SeverityWord, RegExp]> = [
   ["mild", /\bnot\s+(?:too|that|very|so)\s+bad\b|\bnot\s+(?:too\s+)?(?:strong|severe)\b/],
-  ["severe", /\b(?:severe(?:ly)?|terrible|terribly|awful|unbearable|excruciating|worst|really\s+bad|very\s+bad|so\s+bad|extreme(?:ly)?|intense|killing\s+me|so\s+much|really\s+(?:hurts|strong)|very\s+strong)\b/],
+  // "so much" only about the pain ("it hurts so much", never "I have so much work"); "killing me" is no rating
+  ["severe", /\b(?:severe(?:ly)?|terrible|terribly|awful|unbearable|excruciating|worst|really\s+bad|very\s+bad|so\s+bad|extreme(?:ly)?|intense|(?:hurts?|hurting|aches?|aching)\s+so\s+much|so\s+much\s+pain|really\s+(?:hurts|strong)|very\s+strong)\b/],
   ["moderate", /\b(?:moderate(?:ly)?|medium|quite\s+(?:bad|a\s+bit)|pretty\s+bad|a\s+lot|fairly|bad)\b/],
   ["mild", /\b(?:a\s+(?:little|bit)|slight(?:ly)?|mild(?:ly)?|minor|a\s+tiny\s+bit)\b/],
 ];
@@ -240,42 +355,43 @@ const TIME_BEFORE = /(?:\bsince|\bat|\bfor|\bafter|\bbefore|\babout\s+the|өгл
 /** the scale itself: "out of 10", "/10", "10-аас", "аравнаас" */
 const DENOMINATOR_BEFORE = /(?:\bout\s+of|\bof|\/)\s*$/;
 const DENOMINATOR_AFTER = /^\s*-?\s*(?:аас|оос|ээс|өөс|наас|ноос)/u;
-const SCALE_NEAR = /\bout\s+of\s+(?:10|ten)\b|\/\s*10\b|\b(?:level|score|severity|scale|rate\s+it)\b|(?:10|арав)\s*-?\s*(?:аас|наас)|оноо|түвшин/u;
+/**
+ * The scale tied to this very number: "7 out of 10", "8/10", "10-аас 6", "6 оноо", "pain level 7", "rate it a 7".
+ * Never a scale word elsewhere in the sentence ("my stress level is 9 and my head hurts" says nothing about the pain).
+ */
+const SCALE_AFTER = /^\s*(?:\/\s*(?:10|ten)\b|(?:out\s+of|of)\s+(?:10|ten)\b|оноо)/u;
+const SCALE_BEFORE =
+  /(?:(?:10|арав)\s*-?\s*(?:аас|наас)\s*|\b(?:pain|ache|hurts?)\s+(?:(?:level|score|rating)\s+)?(?:is\s+|at\s+|of\s+)?(?:a\s+|about\s+|around\s+)?|\brate\s+it\s+(?:a\s+|at\s+)?|(?:өвдөлт\p{L}*)\s+)$/u;
+
+function severityValue(t: string, bare: boolean): number | null {
+  for (const n of extractNumbers(t)) {
+    if (!Number.isInteger(n.value) || n.value < 0 || n.value > 10) continue;
+    const before = t.slice(0, n.start);
+    const after = t.slice(n.end);
+    if (TIME_AFTER.test(after) || TIME_BEFORE.test(before)) continue;
+    if (DENOMINATOR_BEFORE.test(before) || DENOMINATOR_AFTER.test(after)) continue;
+    if (!bare && !SCALE_AFTER.test(after) && !SCALE_BEFORE.test(before)) continue;
+    return n.value;
+  }
+  return null;
+}
+
+function severityWord(t: string): SeverityWord | null {
+  for (const [w, re] of EN_SEVERITY) if (re.test(t)) return w;
+  for (const [w, re] of MN_SEVERITY) if (re.test(t)) return w;
+  return null;
+}
 
 /**
  * How strong the pain is. `bare`: a plain number 0-10 counts (Cosmo just asked "how strong, from 0 to 10?");
- * otherwise a number counts only with the scale named ("7 out of 10", "10-аас 7", "level 7"). Words count either way.
+ * otherwise a number counts only with the scale tied to it ("7 out of 10", "10-аас 7", "pain level 7"). Words count
+ * either way; `wordsIn` limits them to the words about the pain (detectPain: "I feel awful, my head hurts" rates
+ * nothing, "my head hurts so much" is severe).
  */
-export function readPainSeverity(text: string, opts: { bare?: boolean } = {}): PainSeverity | null {
+export function readPainSeverity(text: string, opts: { bare?: boolean; wordsIn?: string } = {}): PainSeverity | null {
   const t = normalise(text);
-  let value: number | null = null;
-  const scaleNamed = SCALE_NEAR.test(t);
-  if (opts.bare || scaleNamed) {
-    for (const n of extractNumbers(t)) {
-      if (!Number.isInteger(n.value) || n.value < 0 || n.value > 10) continue;
-      const before = t.slice(0, n.start);
-      const after = t.slice(n.end);
-      if (TIME_AFTER.test(after) || TIME_BEFORE.test(before)) continue;
-      if (DENOMINATOR_BEFORE.test(before) || DENOMINATOR_AFTER.test(after)) continue;
-      value = n.value;
-      break;
-    }
-  }
-  let word: SeverityWord | null = null;
-  for (const [w, re] of EN_SEVERITY) {
-    if (re.test(t)) {
-      word = w;
-      break;
-    }
-  }
-  if (!word) {
-    for (const [w, re] of MN_SEVERITY) {
-      if (re.test(t)) {
-        word = w;
-        break;
-      }
-    }
-  }
+  const value = severityValue(t, opts.bare === true);
+  const word = severityWord(opts.wordsIn === undefined ? t : normalise(opts.wordsIn));
   if (value === null && word === null) return null;
   return { value, word };
 }
@@ -426,18 +542,32 @@ export function painRedFlags(location: PainLocation | null, severity: PainSeveri
 
 /* ───────────── the reading ───────────── */
 
+/** the clause right after the pain says it is over ("but it's gone now", "it's better now") */
+const EN_RESOLVED =
+  /^(?:(?:and|so|but)\s+)?(?:now\s+)?(?:it'?s|it\s+is|it\s+has|it|that'?s|the\s+pain\s+(?:is|has)|the\s+pain)\s+(?:all\s+)?(?:now\s+)?(?:gone|over|passed|stopped|went\s+away|better\s+now|fine\s+now|ok(?:ay)?\s+now)\b/;
+/** "одоо зүгээр", "одоо гайгүй", "арилсан", "намдсан" as the whole next clause */
+const MN_RESOLVED =
+  /^(?:одоо\s+)?(?:(?:өвдөлт\p{L}*|бүр)\s+)?(?:одоо\s+)?(?:зүгээр|гайгүй|дажгүй|дээрдсэн|арилсан|арилчихсан|намдсан|намдчихсан|өнгөрсөн)(?:\s+(?:болсон|байна|ээ|дээ))?$/u;
+
 /**
  * The pain stated in these words, or null when nothing is said to hurt (or only denied, asked about in general, or
  * imagined). See the file comment for the rules.
  */
 export function detectPain(text: string): PainReading | null {
-  for (const c of clausesOf(text)) {
+  const clauses = clausesOf(text);
+  for (let ci = 0; ci < clauses.length; ci++) {
+    const c = clauses[ci];
     const en = enNotAStatement(c) ? null : enPainAt(c.text);
     const words = wordsOf(c.text);
     const mnAt = en ? -1 : mnNotAStatement(c, words) ? -1 : mnPainAt(words);
     if (!en && mnAt < 0) continue;
-    const location = en ? enLocation(c.text) : mnLocation(words);
-    const severity = readPainSeverity(text);
+    // "I had a headache yesterday, but it's gone now", "толгой өвдөж байсан, одоо зүгээр": over already
+    const next = clauses[ci + 1]?.text ?? "";
+    if (EN_RESOLVED.test(next) || MN_RESOLVED.test(next)) continue;
+    const location = en ? enPainLocation(c.text, en.index) : mnPainLocation(words, mnAt);
+    // severity words about this pain only; a 0-10 with its scale anywhere in the utterance
+    const scope = en ? enOwnSpan(c.text, en.index) : words.slice(Math.max(0, mnAt - 3), mnAt + 3).join(" ");
+    const severity = readPainSeverity(text, { wordsIn: scope });
     const onset = readPainOnset(text);
     let phrase: string;
     if (en) {
@@ -451,7 +581,7 @@ export function detectPain(text: string): PainReading | null {
       severity,
       onset,
       redFlags: painRedFlags(location, severity, text),
-      clause: c.text,
+      clause: en ? enStatedPart(c.text, en.index) : mnStatedPart(words),
       phrase: phrase.slice(0, MAX_PHRASE),
     };
   }

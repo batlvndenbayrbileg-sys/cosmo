@@ -249,10 +249,14 @@ function vitalItem(key: KpiKey, input: RelatedInput): PainItem | null {
     const th = def.thresholds;
     high = th?.high !== undefined && n > th.high.yellow;
     const rt = rangeText(key);
-    note = {
-      en: `${high ? "Above" : "Below"} the app's range${rt ? ` (${rt.en})` : ""}.`,
-      mn: `Аппын хэмжээнээс ${high ? "дээш" : "доош"}${rt ? ` (${rt.mn})` : ""}.`,
-    };
+    // a category ("slightly blurred") is outside the range, never "above" it
+    note =
+      def.type === "category"
+        ? { en: `Outside the app's range${rt ? ` (${rt.en})` : ""}.`, mn: `Аппын хэмжээнээс гадуур${rt ? ` (${rt.mn})` : ""}.` }
+        : {
+            en: `${high ? "Above" : "Below"} the app's range${rt ? ` (${rt.en})` : ""}.`,
+            mn: `Аппын хэмжээнээс ${high ? "дээш" : "доош"}${rt ? ` (${rt.mn})` : ""}.`,
+          };
   } else if (personalOut && personal) {
     band = "outside_personal";
     high = n > personal.high;
@@ -266,6 +270,8 @@ function vitalItem(key: KpiKey, input: RelatedInput): PainItem | null {
     });
   }
   note = joinNote(note, DATE_NOTE(latest.date));
+  // a category's codes are no amount: no "higher than usual", no "Normal ≤ 0" range, no HIGH / LOW tag
+  const category = def.type === "category";
   return {
     id: `vital-${key}`,
     kind: "vital",
@@ -274,11 +280,11 @@ function vitalItem(key: KpiKey, input: RelatedInput): PainItem | null {
     valueText: { en: formatValue(key, n, "en"), mn: formatValue(key, n, "mn") },
     spoken: { en: spokenValue(key, n, "en"), mn: spokenValue(key, n, "mn") },
     value: n,
-    direction: high ? "high" : "low",
+    direction: category ? null : high ? "high" : "low",
     band,
     date: latest.date,
     personal: personal ? { low: personal.low, high: personal.high } : null,
-    normal: general ?? demoRange(key),
+    normal: category ? null : (general ?? demoRange(key)),
     history: historySeries(key, latest.before),
     note,
   };

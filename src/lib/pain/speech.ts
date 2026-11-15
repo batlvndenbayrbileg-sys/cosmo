@@ -113,7 +113,23 @@ function ackLine(location: PainLocation | null, severity: PainSeverity | null, o
 /** the data line: up to two unusual items by name and number, then "not a diagnosis" */
 function dataLine(items: readonly PainItem[], lang: Lang): string {
   const spoken = items.slice(0, 2).map((i) => {
-    const how = i.band === "reported" || i.band === "flagged" ? "" : i.direction === "high" ? (lang === "mn" ? ", ердийнхөөс их" : ", higher than usual") : lang === "mn" ? ", ердийнхөөс бага" : ", lower than usual";
+    // which range it is outside of: "higher than usual" only against the person's own range (a value above the general
+    // range can be usual for them)
+    const up = i.direction === "high";
+    const how =
+      i.band === "reported" || i.band === "flagged"
+        ? ""
+        : i.band === "outside_general"
+          ? lang === "mn"
+            ? `, ерөнхий хэвийн хэмжээнээс ${up ? "дээш" : "доош"}`
+            : `, ${up ? "above" : "below"} the general normal range`
+          : i.band === "outside_demo" || i.direction === null
+            ? lang === "mn"
+              ? ", аппын хэмжээнээс гадуур"
+              : ", outside the app's range"
+            : lang === "mn"
+              ? `, ердийнхөөс ${up ? "их" : "бага"}`
+              : `, ${up ? "higher" : "lower"} than usual`;
     const urgent = i.band === "danger" ? (lang === "mn" ? ", яаралтай түвшинд" : ", at an urgent level") : "";
     return `${i.spoken[lang]}${urgent || how}`;
   });

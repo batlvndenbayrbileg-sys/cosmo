@@ -47,6 +47,13 @@ describe("detectPain: pain statements and their place (English)", () => {
     ["no chest pain, but my head hurts", "head"],
     ["I have a headache, but my legs don't hurt", "head"],
     ["my head and my chest hurt", "chest"],
+    // review fixes: the place goes with its own pain word; the chest wins wherever it is not denied
+    ["my chest and my head hurt", "chest"],
+    ["my head hurts and my chest is fine", "head"],
+    ["my head hurts and I don't have chest pain", "head"],
+    ["my chest feels tight and it hurts", "chest"],
+    ["my back is killing me", "back"],
+    ["it is a pain in my side", "side"],
   ];
   for (const [text, location] of cases) {
     it(`"${text}" -> ${location ?? "no place"}`, () => {
@@ -81,6 +88,10 @@ describe("detectPain: pain statements and their place (Mongolian)", () => {
     ["бие минь чилээд байна", "whole_body"],
     ["яагаад толгой өвдөөд байна вэ?", "head"],
     ["толгой өвдөхгүй, гэхдээ гэдэс өвдөж байна", "abdomen"],
+    // review fixes: a denied chest in the same clause is not chest pain; a stated one is, even after another place
+    ["толгой өвдөөд цээж өвдөхгүй байна", "head"],
+    ["толгой өвдөөд цээж базлаад байна", "chest"],
+    ["хүчтэй дасгал хийгээд хөл өвдөж байна", "leg"],
   ];
   for (const [text, location] of cases) {
     it(`"${text}" -> ${location ?? "no place"}`, () => {
@@ -118,6 +129,19 @@ describe("detectPain: no false triggers", () => {
     "өвдөг минь зүгээр",
     "зүрхний цохилт 72",
     "сансрын хөлөг дээр",
+    // review fixes (each of these used to open the pain check; the first three raised an URGENT alert to Earth)
+    "the noise is killing me",
+    "this workout is killing me",
+    "No, no chest pain or headache",
+    "no chest pain or back pain",
+    "I had a headache yesterday, but it's gone now",
+    "I had a headache but now it's gone",
+    "it's a pain to do these exercises",
+    "what a pain in the neck",
+    "өвдөлт алга",
+    "өвдөөд байгаа юм алга",
+    "толгой өвдөж байвал хэлээрэй",
+    "толгой өвдөж байсан, одоо зүгээр",
   ];
   for (const text of negatives) {
     it(`"${text}" is not a pain statement`, () => {
@@ -141,6 +165,22 @@ describe("severity", () => {
     // a time is never a severity
     expect(readPainSeverity("for 2 hours", { bare: true })).toBeNull();
     expect(readPainSeverity("2 цагийн өмнөөс", { bare: true })).toBeNull();
+  });
+
+  it("a scale word elsewhere, or strong words about something else, rate nothing (no false 'severe' red flag)", () => {
+    expect(readPainSeverity("my stress level is 9 and my head hurts")).toBeNull();
+    expect(detectPain("my stress level is 9 and my head hurts")?.redFlags).toEqual([]);
+    expect(detectPain("my head hurts, I have so much work")?.severity).toBeNull();
+    expect(detectPain("I feel awful, my head hurts")?.redFlags).toEqual([]);
+    expect(detectPain("my back is killing me")?.redFlags).toEqual([]);
+    expect(detectPain("хүчтэй дасгал хийгээд хөл өвдөж байна")?.redFlags).toEqual([]);
+    // still read when they are about the pain
+    expect(detectPain("my head hurts so much")?.severity?.word).toBe("severe");
+    expect(detectPain("I have a terrible headache")?.redFlags).toEqual(["severe"]);
+    expect(detectPain("маш хүчтэй өвдөж байна")?.redFlags).toEqual(["severe"]);
+    expect(readPainSeverity("pain level 8")?.value).toBe(8);
+    expect(readPainSeverity("I'd rate it a 9")?.value).toBe(9);
+    expect(detectPain("my head hurts, 9 out of 10")?.redFlags).toEqual(["severe"]);
   });
 
   it("reads severity words in both languages", () => {

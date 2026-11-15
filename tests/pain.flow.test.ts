@@ -23,7 +23,7 @@ vi.mock("@/server/db/repos/sos", async (importOriginal) => {
 import { GET as getGroundPain } from "@/app/api/ground/pain/route";
 import { parseTurnEvent } from "@/components/checkin/sse";
 import { dismissPain, getPainState, notePainFromTurn, resetPainStoreForTests } from "@/components/pain/store";
-import { relatedItems, type GroundPainReport } from "@/lib/pain";
+import { painScript, relatedItems, type GroundPainReport } from "@/lib/pain";
 import type { KpiKey, TurnEvent } from "@/lib/types";
 import { namesConditionOrDrug } from "@/server/agent/companion";
 import { setClockForTests } from "@/server/clock";
@@ -131,6 +131,16 @@ describe("a pain mid check-in (English)", () => {
     expect(painOf(events)).toBeUndefined();
     expect(eventsOf(events, "measurement").some((m) => m.key === "symptom_headache" && m.value === 1)).toBe(true);
   });
+
+  it("a pain that goes with a first-aid guide is never swallowed by the open question (the browser waits for it)", async () => {
+    const id = await startCheckIn("bat", "en");
+    for (const line of ["Hi Cosmo", "let's start", "6.5 hours", "4"]) await playTurn("bat", id, line);
+    const before = await ctxOf("bat", id);
+    const events = await playTurn("bat", id, "yes, I hit my head and it hurts");
+    expect(painOf(events)).toMatchObject({ location: "head", guideId: "head-injury" });
+    expect(assistantText(events)).toMatch(/The head injury guide is on screen if you need it\./);
+    expect(await ctxOf("bat", id)).toEqual(before);
+  });
 });
 
 describe("a pain in Mongolian", () => {
@@ -189,6 +199,16 @@ describe("red flags: urgent through the SOS flow", () => {
     const breathing = painOf(await playTurn("bat", id, "my stomach hurts and I can't breathe"));
     expect(breathing).toMatchObject({ urgent: true, redFlags: ["breathing"], sos: "duplicate" });
     expect(await listSosAlerts("bat")).toHaveLength(1);
+  });
+
+  it("no false urgent alert: denials and figures of speech never reach Earth", async () => {
+    const id = await atSleep();
+    for (const line of ["the noise is killing me", "No, no chest pain or headache", "my stress level is 9 and my head hurts"]) {
+      const events = await playTurn("bat", id, line);
+      expect(eventsOf(events, "sos"), line).toEqual([]);
+      expect(painOf(events)?.urgent ?? false, line).toBe(false);
+    }
+    expect(await listSosAlerts("bat")).toEqual([]);
   });
 
   it("a value today past a danger threshold makes any pain urgent", async () => {
@@ -259,7 +279,18 @@ describe("related data: only what is unusual, numbers from the data", () => {
     expect(bp?.valueText.en).toBe("150/95 mmHg");
     expect(pain.items.some((i) => i.key === "heart_rate")).toBe(false);
     expect(pain.items.some((i) => i.key === "temperature_c")).toBe(false);
-    expect(assistantText(events)).toMatch(/In your data, this may be related: blood pressure 150 over 95, higher than usual/);
+    // review fix: it is outside the GENERAL range, which says nothing about the person's usual (was "higher than usual")
+    expect(assistantText(events)).toMatch(/In your data, this may be related: blood pressure 150 over 95, above the general normal range/);
+  });
+
+  it("a denied chest pain next to a headache opens no chest pain guide (either language)", async () => {
+    const id = await atSleep();
+    const en = painOf(await playTurn("bat", id, "my head hurts and I don't have chest pain"));
+    expect(en).toMatchObject({ location: "head", urgent: false, guideId: null });
+    const id2 = await atSleep("mn");
+    const mn = painOf(await playTurn("bat", id2, "толгой өвдөөд цээж өвдөхгүй байна"));
+    expect(mn).toMatchObject({ location: "head", urgent: false, guideId: null });
+    expect(await listSosAlerts("bat")).toEqual([]);
   });
 
   it("nothing unusual: says so, still not a diagnosis", async () => {
@@ -291,6 +322,29 @@ describe("related data: only what is unusual, numbers from the data", () => {
     ]);
     expect(items[0]).toMatchObject({ date: "2026-11-13", value: 4, direction: "low" });
     expect(items[0].note.en).toMatch(/From your last check-in \(2026-11-13\)\./);
+  });
+
+  it("a category value (vision 'slightly blurred') is 'outside the range', never 'higher' with a made-up 'normal ≤ 0'", () => {
+    const items = relatedItems({ location: "eye", today: { vision_check: 1 }, history: [] });
+    expect(items[0]).toMatchObject({ id: "vital-vision_check", band: "outside_demo", direction: null, normal: null });
+    expect(items[0].note.en).toMatch(/^Outside the app's range/);
+    const said = painScript({
+      lang: "en",
+      location: "eye",
+      severity: null,
+      onset: null,
+      items,
+      guideId: null,
+      urgent: false,
+      reportSent: true,
+      sos: null,
+      awaiting: null,
+      updated: false,
+      resume: null,
+    });
+    const data = said.find((p) => p.step === "data")?.text ?? "";
+    expect(data).toMatch(/vision check slightly blurred, outside the app's range/i);
+    expect(data).not.toMatch(/higher|lower/);
   });
 
   it("the linked Signature panel (chest) and urine panel (abdomen) appear only when flagged", () => {
