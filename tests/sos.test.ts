@@ -32,7 +32,9 @@ import { sirenSchedule } from "@/components/earth/siren";
 import {
   SOS_DEDUP_WINDOW_MS,
   SOS_PHOTO_MAX_BYTES,
+  SOS_PHOTO_WAIT_MS,
   SOS_SPOKEN,
+  groundPhotoView,
   matchSosRequest,
   type GroundSosAlert,
   type SosAlert,
@@ -575,6 +577,18 @@ describe("the SOS card's store (button path)", () => {
       [0.4, 0.75],
     ]);
     expect(await encodeUnder(async () => new Blob([new Uint8Array(SOS_PHOTO_MAX_BYTES + 1)]))).toBeNull();
+  });
+
+  it("the Earth console stops waiting for a photo that never comes (a crew tab closed mid-capture)", () => {
+    const raised = { createdAt: NOW.toISOString() };
+    const at = (ms: number) => NOW.getTime() + ms;
+    expect(groundPhotoView({ ...raised, photoStatus: "pending" }, at(10_000))).toBe("pending");
+    expect(groundPhotoView({ ...raised, photoStatus: "pending" }, at(SOS_PHOTO_WAIT_MS))).toBe("pending");
+    expect(groundPhotoView({ ...raised, photoStatus: "pending" }, at(SOS_PHOTO_WAIT_MS + 1))).toBe("missing");
+    // a stated outcome is shown as it is, however old
+    expect(groundPhotoView({ ...raised, photoStatus: "attached" }, at(3_600_000))).toBe("attached");
+    expect(groundPhotoView({ ...raised, photoStatus: "denied" }, at(3_600_000))).toBe("denied");
+    expect(groundPhotoView({ ...raised, photoStatus: "unavailable" }, at(5_000))).toBe("unavailable");
   });
 
   it("the Earth alarm alternates two tones", () => {

@@ -19,6 +19,22 @@ export const SOS_PHOTO_MAX_SIDE = 640;
 export const SOS_PHOTO_QUALITY = 0.7;
 /** how often the Earth console asks for new SOS alerts */
 export const SOS_POLL_MS = 3_000;
+/**
+ * how long the Earth console waits for the face still before saying that none arrived (the permission prompt may
+ * wait 30 s, then the capture and the upload). A crew tab closed mid-capture never reports back, and "photo on its
+ * way" must not stay on the console for ever.
+ */
+export const SOS_PHOTO_WAIT_MS = 90_000;
+
+/** what the Earth console shows in place of the photo */
+export type GroundPhotoView = "attached" | "pending" | "missing" | "denied" | "unavailable";
+
+/** `asOfMs`: the console's "now" (minus the simulated delay) */
+export function groundPhotoView(alert: Pick<SosAlert, "photoStatus" | "createdAt">, asOfMs: number): GroundPhotoView {
+  if (alert.photoStatus !== "pending") return alert.photoStatus;
+  const raised = Date.parse(alert.createdAt);
+  return Number.isFinite(raised) && asOfMs - raised > SOS_PHOTO_WAIT_MS ? "missing" : "pending";
+}
 
 /** an SOS alert as its crew member and the ground console see it (never the photo bytes) */
 export interface SosAlert {

@@ -11,6 +11,8 @@ import { ensureGroundSession, groundGet, postJson } from "./api";
  */
 export function useSosAlerts(delayMs: number, crewId?: string) {
   const [alerts, setAlerts] = useState<GroundSosAlert[]>([]);
+  /** when the list was last fetched (ms); with the delay it says how long a photo has been awaited */
+  const [fetchedAt, setFetchedAt] = useState(0);
   const [tick, setTick] = useState(0);
   const query = `delayMs=${delayMs}${crewId ? `&crewId=${encodeURIComponent(crewId)}` : ""}`;
 
@@ -23,7 +25,10 @@ export function useSosAlerts(delayMs: number, crewId?: string) {
       const signal = controller.signal;
       groundGet<GroundSosAlert[]>(`/api/ground/sos?${query}`, signal).then(
         (data) => {
-          if (!cancelled && !signal.aborted) setAlerts(data ?? []);
+          if (!cancelled && !signal.aborted) {
+            setAlerts(data ?? []);
+            setFetchedAt(Date.now());
+          }
         },
         () => {
           // offline or a hiccup: keep what is shown, the next poll tries again
@@ -52,5 +57,5 @@ export function useSosAlerts(delayMs: number, crewId?: string) {
     }
   }, []);
 
-  return { alerts, markSeen, delayQuery: `delayMs=${delayMs}` };
+  return { alerts, markSeen, delayQuery: `delayMs=${delayMs}`, asOfMs: fetchedAt - delayMs };
 }

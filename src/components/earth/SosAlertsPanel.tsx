@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import { BellOff, BellRing, CameraOff, Check, Eye, ImageIcon, SatelliteDish, Volume2 } from "lucide-react";
-import type { GroundSosAlert } from "@/lib/sos";
+import { groundPhotoView, type GroundSosAlert } from "@/lib/sos";
 import { formatClockLabel } from "@/components/dashboard/logic";
 import { useI18n } from "@/i18n/I18nProvider";
 import { cn } from "@/lib/utils";
@@ -20,9 +20,10 @@ function reasonText(a: GroundSosAlert, t: ReturnType<typeof useI18n>["t"]): stri
   return a.phrase ? t("emergency.sos.earth.reasonVoice", { phrase: a.phrase }) : t("emergency.sos.earth.reasonVoicePlain");
 }
 
-function Photo({ alert, delayQuery }: { alert: GroundSosAlert; delayQuery: string }) {
+function Photo({ alert, delayQuery, asOfMs }: { alert: GroundSosAlert; delayQuery: string; asOfMs: number }) {
   const { t } = useI18n();
-  if (alert.photoStatus === "attached") {
+  const view = groundPhotoView(alert, asOfMs);
+  if (view === "attached") {
     return (
       // served by the authenticated ground route; next/image would proxy and cache it
       // eslint-disable-next-line @next/next/no-img-element
@@ -33,7 +34,7 @@ function Photo({ alert, delayQuery }: { alert: GroundSosAlert; delayQuery: strin
       />
     );
   }
-  const pending = alert.photoStatus === "pending";
+  const pending = view === "pending";
   return (
     <span className="flex size-28 shrink-0 flex-col items-center justify-center gap-1.5 rounded-2xl bg-white/70 px-2 text-center text-[12px] leading-tight text-[#742A2A] ring-1 ring-[#C53030]/25 sm:size-32">
       {pending ? (
@@ -43,9 +44,11 @@ function Photo({ alert, delayQuery }: { alert: GroundSosAlert; delayQuery: strin
       )}
       {pending
         ? t("emergency.sos.earth.photoPending")
-        : alert.photoStatus === "denied"
+        : view === "denied"
           ? t("emergency.sos.earth.photoDenied")
-          : t("emergency.sos.earth.photoUnavailable")}
+          : view === "missing"
+            ? t("emergency.sos.earth.photoMissing")
+            : t("emergency.sos.earth.photoUnavailable")}
     </span>
   );
 }
@@ -58,7 +61,7 @@ function Photo({ alert, delayQuery }: { alert: GroundSosAlert; delayQuery: strin
  */
 export function SosAlertsPanel({ delayMs, delayId, crewId }: { delayMs: number; delayId: DelayId; crewId?: string }) {
   const { t, lang } = useI18n();
-  const { alerts, markSeen, delayQuery } = useSosAlerts(delayMs, crewId);
+  const { alerts, markSeen, delayQuery, asOfMs } = useSosAlerts(delayMs, crewId);
   const shown = useMemo(() => {
     const unseen = alerts.filter((a) => !a.seenAt);
     const seen = alerts.filter((a) => a.seenAt);
@@ -169,7 +172,7 @@ export function SosAlertsPanel({ delayMs, delayId, crewId }: { delayMs: number; 
                     <span aria-hidden className="pointer-events-none absolute inset-0 bg-[#FC8181]/45 motion-safe:animate-pulse" style={{ animationDuration: "1s" }} />
                   ) : null}
                   <div className="relative flex items-center gap-3 sm:contents">
-                    <Photo alert={a} delayQuery={delayQuery} />
+                    <Photo alert={a} delayQuery={delayQuery} asOfMs={asOfMs} />
                   </div>
                   <div className="relative flex min-w-0 flex-1 flex-col gap-1">
                     <p className={cn("text-[12px] font-bold tracking-[0.14em] uppercase", unseen ? "text-white/90" : "text-[#C53030]")}>
