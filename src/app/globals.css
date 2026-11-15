@@ -347,25 +347,20 @@
    DashboardView is exactly one viewport high and switches views with tabs, so the page itself never scrolls.
    The guard below keeps html/body from scrolling while a dashboard is on screen (panels that need it scroll inside). */
 @media (min-width: 1024px) {
-  html:has([data-slot="dashboard"][data-fit="screen"]),
-  html:has([data-slot="dashboard"][data-fit="screen"]) body {
+  html:has([data-slot="dashboard"][data-fit="screen"]):not(:has([data-slot="earth-crew"])),
+  html:has([data-slot="dashboard"][data-fit="screen"]):not(:has([data-slot="earth-crew"])) body {
     height: 100dvh;
     overflow: hidden;
     overscroll-behavior: none;
   }
 
-  /* Earth console (/earth/[crewId]): the ground bar sits above the dashboard, so the page column becomes one
-     viewport high and the dashboard takes the rest of it instead of its own 100dvh */
-  [data-slot="earth-crew"]:has(> [data-slot="dashboard"]) {
-    height: 100dvh;
-    padding-top: clamp(10px, 1.6vh, 20px);
-    padding-bottom: clamp(10px, 1.6vh, 20px);
-    gap: clamp(6px, 1vh, 12px);
-  }
+  /* Earth console (/earth/[crewId]): the ground bar, the SOS alerts and the pain reports sit above the dashboard, so
+     the page scrolls and the dashboard keeps a full screen of its own (it used to share one screen with them and was
+     squeezed to a few dozen pixels, everything drawn on top of everything). Never shorter than 720 px. */
   [data-slot="earth-crew"] > [data-slot="dashboard"] {
-    height: auto;
-    flex: 1 1 0;
-    min-height: 0;
+    height: 100dvh;
+    min-height: 720px;
+    flex: none;
     padding: 0;
   }
 }
