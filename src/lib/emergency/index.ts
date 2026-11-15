@@ -4,3 +4,6 @@
  */
 export * from "./schema";
 export * from "./match";
+export * from "./guides";
+export * from "./metronome";
+export * from "./suggest";
