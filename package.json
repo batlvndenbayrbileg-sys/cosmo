@@ -14,7 +14,9 @@
     "db:seed": "tsx scripts/seed.ts",
     "probe:elevenlabs": "tsx scripts/probe-elevenlabs.ts",
     "gen:demo-audio": "node --conditions=react-server --import tsx scripts/gen-demo-audio.ts",
-    "sig:ref": "python3 -I -X utf8 docs/signature_reference/reference_engine.py data/nasa"
+    "sig:ref": "python3 -I -X utf8 docs/signature_reference/reference_engine.py data/nasa",
+    "demo:checkins": "tsx scripts/gen-demo-checkins.ts",
+    "demo:audio": "node --conditions=react-server --import tsx scripts/gen-signature-audio.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.8.0",

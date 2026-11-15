@@ -59,6 +59,7 @@ export function RecoveryCard({
   timepoint,
   dss = [],
   simulated = false,
+  today,
 }: {
   view: SignatureViewData;
   crew: string;
@@ -66,10 +67,12 @@ export function RecoveryCard({
   /** daily strain scores of linked check-ins, oldest first (the demo passes simulated ones) */
   dss?: readonly (number | null)[];
   simulated?: boolean;
+  /** draw-advisor clock (day after landing) when it is not the panel's day (the demo's check-in beat) */
+  today?: number;
 }) {
   const { t } = useI18n();
   const tl = recoveryTimeline(view, crew, timepoint);
-  const draw = drawView(view, crew, timepoint, dss);
+  const draw = drawView(view, crew, timepoint, dss, today);
   const a = draw.advice;
   const rec = SIGNATURE_REFERENCE.recovery;
   const caption = t("dashboard.signature.rec.caption", {

@@ -1,0 +1,145 @@
+{
+  "simulated": true,
+  "generatedBy": "scripts/gen-demo-checkins.ts (pnpm demo:checkins)",
+  "rule": "build prompt T5: 14 calm days, then 3 days {sleep_hours 5.0, sleep_quality 2, resting_hr 66, fatigue 4, mood 3}",
+  "crew": "C001",
+  "today": 91,
+  "days": [
+    {
+      "day": 75,
+      "sleep_hours": 7,
+      "sleep_quality": 4,
+      "resting_hr": 58,
+      "fatigue": 2,
+      "mood": 4
+    },
+    {
+      "day": 76,
+      "sleep_hours": 7.1,
+      "sleep_quality": 4,
+      "resting_hr": 59,
+      "fatigue": 2,
+      "mood": 4
+    },
+    {
+      "day": 77,
+      "sleep_hours": 7.2,
+      "sleep_quality": 4,
+      "resting_hr": 58,
+      "fatigue": 2,
+      "mood": 4
+    },
+    {
+      "day": 78,
+      "sleep_hours": 7,
+      "sleep_quality": 4,
+      "resting_hr": 59,
+      "fatigue": 2,
+      "mood": 4
+    },
+    {
+      "day": 79,
+      "sleep_hours": 7.1,
+      "sleep_quality": 4,
+      "resting_hr": 58,
+      "fatigue": 2,
+      "mood": 4
+    },
+    {
+      "day": 80,
+      "sleep_hours": 7.2,
+      "sleep_quality": 4,
+      "resting_hr": 59,
+      "fatigue": 2,
+      "mood": 4
+    },
+    {
+      "day": 81,
+      "sleep_hours": 7,
+      "sleep_quality": 4,
+      "resting_hr": 58,
+      "fatigue": 2,
+      "mood": 4
+    },
+    {
+      "day": 82,
+      "sleep_hours": 7.1,
+      "sleep_quality": 4,
+      "resting_hr": 59,
+      "fatigue": 2,
+      "mood": 4
+    },
+    {
+      "day": 83,
+      "sleep_hours": 7.2,
+      "sleep_quality": 4,
+      "resting_hr": 58,
+      "fatigue": 2,
+      "mood": 4
+    },
+    {
+      "day": 84,
+      "sleep_hours": 7,
+      "sleep_quality": 4,
+      "resting_hr": 59,
+      "fatigue": 2,
+      "mood": 4
+    },
+    {
+      "day": 85,
+      "sleep_hours": 7.1,
+      "sleep_quality": 4,
+      "resting_hr": 58,
+      "fatigue": 2,
+      "mood": 4
+    },
+    {
+      "day": 86,
+      "sleep_hours": 7.2,
+      "sleep_quality": 4,
+      "resting_hr": 59,
+      "fatigue": 2,
+      "mood": 4
+    },
+    {
+      "day": 87,
+      "sleep_hours": 7,
+      "sleep_quality": 4,
+      "resting_hr": 58,
+      "fatigue": 2,
+      "mood": 4
+    },
+    {
+      "day": 88,
+      "sleep_hours": 7.1,
+      "sleep_quality": 4,
+      "resting_hr": 59,
+      "fatigue": 2,
+      "mood": 4
+    },
+    {
+      "day": 89,
+      "sleep_hours": 5,
+      "sleep_quality": 2,
+      "resting_hr": 66,
+      "fatigue": 4,
+      "mood": 3
+    },
+    {
+      "day": 90,
+      "sleep_hours": 5,
+      "sleep_quality": 2,
+      "resting_hr": 66,
+      "fatigue": 4,
+      "mood": 3
+    },
+    {
+      "day": 91,
+      "sleep_hours": 5,
+      "sleep_quality": 2,
+      "resting_hr": 66,
+      "fatigue": 4,
+      "mood": 3
+    }
+  ]
+}
