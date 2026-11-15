@@ -1,6 +1,9 @@
 allowBuilds:
   better-sqlite3: true
+  # lil cosmo (docs/lil-cosmo.md): never download the ~100 MB Electron binary during `pnpm install` (Vercel, CI and
+  # every teammate who only runs the website). `pnpm pet` fetches it on first use (node_modules/electron/install.js).
+  electron: false
+  electron-winstaller: false
   esbuild: true
   sharp: false
   unrs-resolver: false
-

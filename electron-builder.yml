@@ -1,0 +1,31 @@
+# lil cosmo, the desktop pet (docs/lil-cosmo.md). `pnpm pet:build` (Windows portable .exe) / `pnpm pet:build:mac`
+# (.dmg, on a Mac). Output goes to dist-electron/ (git-ignored); host the files elsewhere and point
+# NEXT_PUBLIC_LIL_COSMO_URL / NEXT_PUBLIC_LIL_COSMO_MAC_URL at them. Pick the website the app opens with
+#   pnpm pet:build -c.extraMetadata.cosmoOrigin=https://<your-site>
+appId: mn.cosmo.lilcosmo
+productName: lil cosmo
+directories:
+  output: dist-electron
+# the app is only the window shell: the pet page itself is loaded from the website
+extraMetadata:
+  main: electron/main.cjs
+files:
+  - electron/**
+  - public/mascot/cosmo-front.png
+  - package.json
+  - "!node_modules/**"
+npmRebuild: false
+protocols:
+  - name: lil cosmo
+    schemes:
+      - lilcosmo
+portable:
+  artifactName: lil-cosmo.exe
+mac:
+  target: dmg
+  category: public.app-category.healthcare-fitness
+  extendInfo:
+    NSCameraUsageDescription: lil cosmo uses the camera to see where you are and turn toward you. Nothing leaves your computer.
+    NSMicrophoneUsageDescription: lil cosmo listens so you can talk to Cosmo during your check-in.
+dmg:
+  artifactName: lil-cosmo.dmg

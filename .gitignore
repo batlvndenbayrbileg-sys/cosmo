@@ -55,3 +55,8 @@ next-env.d.ts
 
 # Python bytecode (the Signature Triage reference scripts import each other)
 __pycache__/
+
+# lil cosmo build output (pnpm pet:build)
+/dist-electron/
+/public/lil-cosmo.exe
+/public/lil-cosmo.dmg
