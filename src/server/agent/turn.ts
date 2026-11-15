@@ -354,7 +354,11 @@ export function missingNotice(ctx: { skipped: readonly QuestionId[]; filled: rea
     questionName(q.id, lang),
   );
   if (names.length === 0) return "";
-  if (lang === "mn") return `${names.join(", ")} бүртгэгдээгүй байна. Одоо нэмж болно.`;
+  if (lang === "mn") {
+    // the notice opens Cosmo's sentence: capitalise its first letter ("Шинж тэмдгийн асуулт, ...")
+    const list = names.join(", ");
+    return `${list.charAt(0).toLocaleUpperCase("mn")}${list.slice(1)} бүртгэгдээгүй байна. Одоо нэмж болно.`;
+  }
   const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
   return `I don't have ${list} yet. You can add ${names.length === 1 ? "it" : "them"} now.`;
 }

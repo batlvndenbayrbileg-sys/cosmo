@@ -1354,10 +1354,25 @@ function ownPart(question: QuestionDef, text: string): string {
   return out.trim();
 }
 
+/** two 2-3 digit numbers joined the blood-pressure way: "120/80", "120 over 80", "120 дээр 80" */
+const BP_PAIR_RE = /(?<!\d)\d{2,3}\s*(?:\/|over|дээр)\s*\d{2,3}(?!\d)/iu;
+
 export function interpretAnswer(question: QuestionDef, text: string, lang: Lang): InterpretResult {
   void lang; // both vocabularies are always active
   const t = ownPart(question, text.trim());
   if (t.length === 0) return unclearResult("no_value");
+  // "120 дээр 80" / "120 over 80" / "120/80" is blood pressure whatever question is open (heard live 2026-11-15: a
+  // skipped blood pressure given at the pulse question was stored as a pulse of 120)
+  // only when the pair is the whole numeric answer: "120/80 and 30 minutes" at the exercise question stays exercise
+  if (
+    question.id !== "blood_pressure" &&
+    question.id !== "symptoms" &&
+    question.id !== "day_note" &&
+    BP_PAIR_RE.test(t) &&
+    !/\d/u.test(t.replace(BP_PAIR_RE, ""))
+  ) {
+    return interpretBloodPressure(t);
+  }
   switch (question.id) {
     case "sleep":
       return interpretSleep(t);

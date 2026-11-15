@@ -72,7 +72,7 @@ const HEALTH_TOPIC =
 const QUESTION_TOPICS: Array<{ id: QuestionId; re: RegExp }> = [
   { id: "blood_pressure", re: /blood\s+pressure|\bbp\b|даралт/iu },
   { id: "glucose", re: /blood\s+sugar|glucose|sugar|сахар|глюкоз/iu },
-  { id: "heart_rate", re: /heart\s*rate|pulse|\bbpm\b|лугшилт|зүрхний\s+цохилт|зүрх/iu },
+  { id: "heart_rate", re: /heart\s*rate|heartbeat|pulse|\bbpm\b|пульс|лугшилт|зүрхний\s+цохилт|зүрх/iu },
   { id: "temperature", re: /temperature|fever|температур|халуу/iu },
   { id: "sleep", re: /\bsleep|\bslept|унт|нойр/iu },
   { id: "mood", re: /\bmood|сэтгэл/iu },
