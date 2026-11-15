@@ -14,6 +14,7 @@ import { DSS_HISTORY_DAYS, DSS_TRIGGER_DAYS, TIMEPOINT_DAY, type StrainKpi } fro
 import { median } from "./engine";
 import { assertNumbersGrounded, buildDrawFacts, buildFacts, hasDisclaimer, hasForbiddenWording } from "./facts";
 import { drawAdvice, drawStateFromPanels, dssSeries, type DrawAdvice, type StrainDay } from "./strain";
+import { assertNoOrbitClaim } from "./spaceMeasurability";
 import { renderDrawTemplate, renderTriageTemplate } from "./templates";
 import type { PanelResult, Timepoint } from "./types";
 import type { SignatureViewData } from "./view";
@@ -153,6 +154,14 @@ function panelAt(view: SignatureViewData, crew: string, tp: Timepoint): { panel:
   return { panel: panels[i], previous: i > 0 ? panels[i - 1] : null };
 }
 
+/**
+ * The guards every demo Cosmo line passes (T10 fix: the same set as model wording, orbit-claim guard included): numbers
+ * grounded, disclaimer last, no forbidden wording, no claim of in-flight measurement.
+ */
+export function demoLineOk(text: string, facts: { allowedNumbers: readonly string[] }, lang: Lang): boolean {
+  return assertNumbersGrounded(text, facts) && hasDisclaimer(text, lang) && !hasForbiddenWording(text) && assertNoOrbitClaim(text);
+}
+
 /** a Cosmo triage line, or null when the panel is missing or the text fails a guard (the beat is then skipped) */
 function triageLine(view: SignatureViewData, crew: string, tp: Timepoint, id: DemoBeatId, lang: Lang): DemoCosmoLine | null {
   const at = panelAt(view, crew, tp);
@@ -160,7 +169,7 @@ function triageLine(view: SignatureViewData, crew: string, tp: Timepoint, id: De
   const render = (l: Lang): string | null => {
     const facts = buildFacts(at.panel, { lang: l, previous: at.previous, qcLog: view.qcLog });
     const text = renderTriageTemplate(facts, l);
-    return assertNumbersGrounded(text, facts) && hasDisclaimer(text, l) && !hasForbiddenWording(text) ? text : null;
+    return demoLineOk(text, facts, l) ? text : null;
   };
   const text = render(lang);
   const caption = lang === "en" ? text : render("en");
@@ -180,7 +189,7 @@ export function demoDrawLine(view: SignatureViewData, checkins: DemoCheckins, la
     restingHrUsual: usualRestingHr(checkins),
   });
   const text = renderDrawTemplate(facts, lang);
-  return assertNumbersGrounded(text, facts) && hasDisclaimer(text, lang) && !hasForbiddenWording(text) ? text : null;
+  return demoLineOk(text, facts, lang) ? text : null;
 }
 
 interface BeatPlan {
