@@ -2,3 +2,5 @@
 # SHA-256 manifest and the byte-identical reference-script check hold on every checkout (no CRLF conversion).
 /data/nasa/*.csv -text
 /docs/signature_reference/** -text
+# the app's copy of the fixture stays a byte copy of docs/signature_reference/expected_values.json
+/src/data/signature_reference.json -text

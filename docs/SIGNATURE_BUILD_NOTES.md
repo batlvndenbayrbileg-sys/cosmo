@@ -46,4 +46,4 @@ Entry point `docs/PROMPT_SIGNATURE_INTEGRATE.md`; tasks `docs/PROMPT_SIGNATURE_B
 
 | Task | Commit | Tests added | Deviation |
 |---|---|---|---|
-| T-1 integration map | (this commit) | 0 | branch = main (user request); bundle docs, data/nasa CSVs, map, notes, `.gitignore`, `.gitattributes` |
+| T-1 integration map | 88cff68 | 0 | branch = main (user request); bundle docs, data/nasa CSVs, map, notes, `.gitignore`, `.gitattributes` |
