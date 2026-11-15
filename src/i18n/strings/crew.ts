@@ -28,6 +28,9 @@ export const crewStrings: AreaDicts = {
 
     // lil cosmo, the desktop pet (src/components/pet, src/app/pet, docs/lil-cosmo.md)
     "crew.pet.launch": "lil cosmo",
+    "crew.pet.stroll.hello": "Hi! I'm lil cosmo 👋",
+    "crew.pet.stroll.label": "lil cosmo: say hello",
+    "crew.pet.stroll.hide": "Hide lil cosmo",
     "crew.pet.aria": "lil cosmo: Cosmo on your desktop",
     "crew.pet.lead": "A small Cosmo that lives at the bottom of your screen. Talk to her while you work.",
     "crew.pet.download": "Download lil cosmo",
@@ -86,6 +89,9 @@ export const crewStrings: AreaDicts = {
     "crew.role.medical_officer": "Эмнэлгийн офицер",
 
     "crew.pet.launch": "lil cosmo",
+    "crew.pet.stroll.hello": "Сайн уу! Би lil cosmo 👋",
+    "crew.pet.stroll.label": "lil cosmo: мэндлэх",
+    "crew.pet.stroll.hide": "lil cosmo-г нуух",
     "crew.pet.aria": "lil cosmo: таны дэлгэц дээрх Cosmo",
     "crew.pet.lead": "Дэлгэцийн доод хэсэгт амьдардаг бяцхан Cosmo. Ажиллаж байхдаа түүнтэй ярилцаарай.",
     "crew.pet.download": "lil cosmo татах",

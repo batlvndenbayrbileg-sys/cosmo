@@ -1,5 +1,5 @@
 /**
- * Timing of lil cosmo's 12-frame running cycle (public/mascot/run, src/app/pet/RunSprite.tsx). The frame comes from
+ * Timing of lil cosmo's 12-frame running cycle (public/mascot/run, src/components/pet/RunSprite.tsx). The frame comes from
  * the time since the run started, not from counting animation callbacks, so a slow or skipped frame never makes the
  * legs drift out of step with the window's movement.
  */

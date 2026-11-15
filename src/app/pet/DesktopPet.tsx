@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { CosmoAvatar } from "@/components/cosmo/CosmoAvatar";
@@ -15,7 +15,7 @@ import type { PetMenuInfo } from "@/lib/pet/bridge";
 import { explainLines } from "@/lib/pet/explain";
 import { isPetCrewId } from "@/lib/pet/link";
 import type { CrewPublic } from "@/lib/types";
-import { RunSprite } from "./RunSprite";
+import { RunSprite } from "@/components/pet/RunSprite";
 
 const MIN_AUDIO_BYTES = 2000;
 const RELISTEN_DELAY_MS = 300;

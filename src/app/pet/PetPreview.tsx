@@ -8,7 +8,7 @@ import { usePrefersReducedMotion } from "@/components/cosmo/usePrefersReducedMot
 import { GLASS } from "@/components/checkin/StageControls";
 import { useI18n } from "@/i18n/I18nProvider";
 import { cn } from "@/lib/utils";
-import { RunSprite } from "./RunSprite";
+import { RunSprite } from "@/components/pet/RunSprite";
 
 /** how long she runs one way, then stands, in the preview loop */
 const RUN_MS = 2400;

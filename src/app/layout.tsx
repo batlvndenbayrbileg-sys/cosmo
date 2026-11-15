@@ -7,6 +7,7 @@ import { I18nProvider } from "@/i18n/I18nProvider";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { CosmoConfigProvider } from "@/components/cosmo/CosmoConfig";
 import { AppFrame } from "@/components/shell/AppFrame";
+import { LilCosmoStroll } from "@/components/pet/LilCosmoStroll";
 
 // Inter covers Latin and Cyrillic, so Mongolian text renders in the same face as English.
 // The plain "cyrillic" subset lacks the Mongolian letters Ө/ө (U+04E8/04E9) and Ү/ү (U+04AE/04AF);
@@ -46,6 +47,8 @@ export default function RootLayout({
           <TooltipProvider>
             <CosmoConfigProvider rive={rive}>
               <AppFrame>{children}</AppFrame>
+              {/* lil cosmo strolling along the bottom of the screen (src/components/pet/LilCosmoStroll.tsx) */}
+              <LilCosmoStroll />
             </CosmoConfigProvider>
           </TooltipProvider>
         </I18nProvider>
