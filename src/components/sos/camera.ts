@@ -69,7 +69,41 @@ async function openStream(): Promise<MediaStream> {
   }
 }
 
+/** draws one frame of a playing video as a JPEG under the size limits */
+async function stillFromVideo(video: HTMLVideoElement): Promise<Blob | null> {
+  const fitted = fitWithin(video.videoWidth, video.videoHeight, SOS_PHOTO_MAX_SIDE);
+  const canvas = document.createElement("canvas");
+  return encodeUnder(async (quality, scale) => {
+    canvas.width = Math.max(1, Math.round(fitted.width * scale));
+    canvas.height = Math.max(1, Math.round(fitted.height * scale));
+    const g = canvas.getContext("2d");
+    if (!g) return null;
+    g.drawImage(video, 0, 0, canvas.width, canvas.height);
+    return new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
+  });
+}
+
+/**
+ * When Cosmo already follows the face, the camera is open in this tab: its frame is used, so no second stream is
+ * requested (a second request fails on many laptops with "camera in use", which showed as an error on the SOS card).
+ */
+function liveFaceFollowVideo(): HTMLVideoElement | null {
+  if (typeof document === "undefined") return null;
+  const v = document.querySelector<HTMLVideoElement>('video[data-slot="face-follow-video"]');
+  return v && v.videoWidth > 0 && v.readyState >= 2 && !v.paused ? v : null;
+}
+
 export async function captureFaceStill(): Promise<StillResult> {
+  const live = liveFaceFollowVideo();
+  if (live) {
+    try {
+      const blob = await stillFromVideo(live);
+      if (blob) return { ok: true, blob };
+    } catch {
+      /* fall through to a stream of its own */
+    }
+  }
+
   let stream: MediaStream;
   try {
     stream = await openStream();
@@ -91,16 +125,7 @@ export async function captureFaceStill(): Promise<StillResult> {
     if (!video.videoWidth) return { ok: false, reason: "unavailable" };
     await sleep(WARM_UP_MS);
 
-    const fitted = fitWithin(video.videoWidth, video.videoHeight, SOS_PHOTO_MAX_SIDE);
-    const canvas = document.createElement("canvas");
-    const blob = await encodeUnder(async (quality, scale) => {
-      canvas.width = Math.max(1, Math.round(fitted.width * scale));
-      canvas.height = Math.max(1, Math.round(fitted.height * scale));
-      const g = canvas.getContext("2d");
-      if (!g) return null;
-      g.drawImage(video, 0, 0, canvas.width, canvas.height);
-      return new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
-    });
+    const blob = await stillFromVideo(video);
     return blob ? { ok: true, blob } : { ok: false, reason: "unavailable" };
   } catch (error) {
     return { ok: false, reason: failureReason(error) };

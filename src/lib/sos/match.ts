@@ -56,8 +56,10 @@ const EN_SHORT = /^(?:(?:please|cosmo|hey|ok|okay)\s+)*(?:sos|mayday)(?:\s+(?:so
  * a negation that governs the request, right before it ("don't", "you don't need to", "no need to", "i'd rather
  * not"); "i'm not okay call earth" or "it won't stop bleeding call earth" are not negated requests
  */
+// "couldn't / can't / failed to": a report that it did not work ("I couldn't send the alert to Earth", Cosmo's own
+// line when storing failed, heard back by the microphone), not a request
 const EN_NEGATED =
-  /\b(?:don'?t|do\s+not|dont|never|not|no\s+need|shouldn'?t|won'?t|wouldn'?t|without|stop)(?:\s+(?:want|need|wanna|have|going|gonna|try|bother|you|to|me|us|just|ever|even|yet|please|cosmo|really))*$/;
+  /\b(?:don'?t|do\s+not|dont|never|not|no\s+need|shouldn'?t|won'?t|wouldn'?t|without|stop|couldn'?t|could\s+not|can'?t|cannot|didn'?t|did\s+not|failed\s+to|unable\s+to|wasn'?t\s+able\s+to)(?:\s+(?:want|need|wanna|have|going|gonna|try|bother|you|to|me|us|just|ever|even|yet|please|cosmo|really))*$/;
 /** a question about alerting Earth, not a request: "how long does it take to message Earth", "what if I call Earth" */
 const EN_WH = /\b(?:how|why|when|where|which|whether|if)\b/;
 const EN_WHAT = /^(?:(?:hey|cosmo|ok|okay|so|and|but|um|uh|please)\s+)*(?:what|who|whom|whose)\b|\b(?:what|who)(?:'s|\s+(?:does|do|did|is|are|was|were|happens|happened|would|will|should|can|could|if))\b/;
@@ -106,9 +108,12 @@ function mnTargetAt(w: readonly string[], i: number): number {
   return 0;
 }
 
-/** tell / notify / report / signal / contact / call / send */
+/**
+ * tell / notify / report / signal / contact / call / send; not the noun "мэдэгдэл" (an alert): "дэлхий рүү мэдэгдэл
+ * илгээж чадсангүй" and "таны яаралтай мэдэгдэл Дэлхийд очсон" are Cosmo's own lines, never a request
+ */
 function isMnVerb(word: string): boolean {
-  return /^(?:хэл(?!элц|бэр|хээ|ний|ээр$)|мэдэгд|мэдээл(?!эл)|дохио|холбогд|дууд|илгээ|дамжуул)/.test(word);
+  return /^(?:хэл(?!элц|бэр|хээ|ний|ээр$)|мэдэгд(?!эл|л)|мэдээл(?!эл)|дохио|холбогд|дууд|илгээ|дамжуул)/.test(word);
 }
 
 /**
@@ -127,7 +132,7 @@ function mnClosedForm(word: string): boolean {
 const MN_CONVERB = /(?:ж|[аэоө]{2}д)$/;
 /** words that may stand between the target and the verb ("дэлхий рүү яаралтай мэдэгд", "дэлхийд миний байдлыг хэл") */
 const MN_BETWEEN =
-  /^(?:яаралтай(?:гаар)?|одоо|шууд|яг|даруй|нэн|түргэн|хурдан|бушуу|бас|тэр|тэдэнд|sos|сос|тусламж|туслалцаа|хүсэлт|мэдээ|миний|манай|минь|энэ|үүнийг|тухай)$|(?:ыг|ийг)$/;
+  /^(?:яаралтай(?:гаар)?|одоо|шууд|яг|даруй|нэн|түргэн|хурдан|бушуу|бас|тэр|тэдэнд|sos|сос|тусламж|туслалцаа|хүсэлт|мэдээ|мэдэгдэл|миний|манай|минь|энэ|үүнийг|тухай)$|(?:ыг|ийг)$/;
 /** question words: Cosmo answers these, no SOS ("дэлхий рүү яаж холбогдох вэ") */
 const MN_QWORD = /^(?:яаж|яагаад|хэрхэн|хэзээ|хаана|ямар|хэн|юу|юуг|яах|аль|хэд|хэдэн)$/;
 const MN_FRIENDLY = /^(?:сайн|зүгээр|мэнд|баярлалаа|хайртай|амар|сайхан)/;

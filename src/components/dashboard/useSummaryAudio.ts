@@ -13,6 +13,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "
 import { useAudioAmplitude } from "@/hooks/useAudioAmplitude";
 import { useSimulatedAmplitude } from "@/hooks/useSimulatedAmplitude";
 import type { Lang } from "@/lib/types";
+import { claimVoice } from "@/components/voice/channel";
 import { summaryAudioUrl } from "./logic";
 
 export type SummaryAudioMode = "idle" | "audio" | "speech";
@@ -88,14 +89,25 @@ export function useSummaryAudio({
     synth.speak(utterance);
   }, []);
 
-  const stop = useCallback(() => {
+  /** the replay holds the one voice of the tab (src/components/voice/channel.ts) while it plays */
+  const release = useRef<(() => void) | null>(null);
+  const silence = useCallback(() => {
+    release.current = null;
     audioRef.current?.pause();
     cancelSpeech();
     setMode("idle");
   }, [cancelSpeech]);
 
+  const stop = useCallback(() => {
+    release.current?.();
+    silence();
+  }, [silence]);
+
   const play = useCallback(() => {
     setFailed(false);
+    release.current?.();
+    // Cosmo, a guide step or the SOS line stop first; another voice starting later stops this replay
+    release.current = claimVoice(silence);
     cancelSpeech();
     if (audioTurnId === null) {
       speak();
@@ -117,15 +129,19 @@ export function useSummaryAudio({
       el.currentTime = 0;
     }
     setMode("audio");
-    el.play().catch(() => {
+    el.play().catch((error: unknown) => {
+      // stopped before it started (AbortError): never voice it afterwards
+      if ((error as { name?: unknown } | null)?.name === "AbortError" || release.current === null) return;
       // missing file, blocked autoplay or unsupported source: fall back to the browser voice
       speak();
     });
-  }, [audioTurnId, checkInId, cancelSpeech, speak]);
+  }, [audioTurnId, checkInId, cancelSpeech, silence, speak]);
 
   // leaving the page stops any sound
   useEffect(() => {
     return () => {
+      release.current?.();
+      release.current = null;
       audioRef.current?.pause();
       if (speechSupported()) window.speechSynthesis.cancel();
     };

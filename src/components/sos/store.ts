@@ -7,13 +7,32 @@
  *  - noteSosFromTurn: the words "tell Earth" in a conversation turn; the server has already stored the alert and
  *    Cosmo's spoken line arrives with the turn, so only the status card and the photo are left to do here.
  * Then, once per alert, the front camera takes one still (camera.ts) and it is attached to that alert; a refused or
- * missing camera is reported instead, and the alert stands without a photo.
+ * missing camera is reported instead, and the alert stands without a photo. The crew member may delete the photo
+ * afterwards (removeSosPhoto): the Earth console no longer has it, the alert stays.
+ *
+ * One voice at a time: Cosmo's line is said by Cosmo's own player when the check-in screen is mounted (it registers
+ * itself with registerSosSpeaker), so the mouth moves, the microphone knows Cosmo is talking, and stopping Cosmo stops
+ * it; otherwise it goes through the shared voice channel (src/components/voice/channel.ts). Either way a new line
+ * (a second press, a guide step) silences the one before.
  */
 import type { Lang, TurnEvent } from "@/lib/types";
-import { sosSpoken, type SosPhotoStatus, type SosRaiseResult } from "@/lib/sos";
+import { sosSpoken, type SosAlert, type SosPhotoStatus, type SosRaiseResult } from "@/lib/sos";
+import { speakOnChannel } from "@/components/voice/channel";
+import { parseStoredCrew, readSelectedCrewRaw } from "@/components/crew/selectedCrew";
 import { captureFaceStill, type StillResult } from "./camera";
 
-export type SosPhotoUi = "waiting" | "taking" | "attached" | "denied" | "unavailable" | "failed";
+export type SosPhotoUi =
+  | "waiting"
+  | "taking"
+  | "attached"
+  | "denied"
+  | "unavailable"
+  | "failed"
+  /** the crew member asked to delete the attached photo */
+  | "deleting"
+  | "deleted"
+  /** the delete did not go through: the photo is still with Earth, the card offers to try again */
+  | "deleteFailed";
 
 export type SosUiState =
   | { phase: "idle" }
@@ -31,12 +50,24 @@ export type SosUiState =
 
 export const SOS_IDLE: SosUiState = { phase: "idle" };
 
+/** one line Cosmo says about the SOS */
+export interface SosLine {
+  text: string;
+  lang: Lang;
+  /** set when the line is a stored turn of the check-in: its server voice is at `audioUrl` */
+  checkInId: string | null;
+  turnId: string | null;
+  audioUrl: string | null;
+}
+
 /** injectable for tests */
 export interface SosEnv {
   fetch: typeof fetch;
   capture: () => Promise<StillResult>;
-  speak: (text: string, lang: Lang, audioUrl: string | null) => void;
+  speak: (line: SosLine) => void;
   objectUrl: (blob: Blob) => string | null;
+  /** the crew member chosen in this tab (selectedCrew), to renew a lost session; null when unknown */
+  crewId: () => string | null;
 }
 
 let state: SosUiState = SOS_IDLE;
@@ -44,16 +75,41 @@ const listeners = new Set<() => void>();
 /** alerts whose photo was already taken (or is being taken) in this tab */
 const photoDone = new Set<string>();
 
-function set(next: SosUiState): void {
-  if (state.phase === "sent" && state.photoUrl && (next.phase !== "sent" || next.photoUrl !== state.photoUrl)) {
+type SentState = Extract<SosUiState, { phase: "sent" }>;
+/**
+ * the alert on the card before a press now "sending": a second press of SOS within the incident is the same alert,
+ * and its photo (state and thumbnail) must come back with the answer, not be lost
+ */
+let lastSent: SentState | null = null;
+/** the object URL of the thumbnail, kept while it is shown or may come back (revoked once it cannot) */
+let heldUrl: string | null = null;
+
+function holdUrl(url: string | null): void {
+  if (heldUrl && heldUrl !== url) {
     try {
-      URL.revokeObjectURL(state.photoUrl);
+      URL.revokeObjectURL(heldUrl);
     } catch {
       /* not a browser */
     }
   }
+  heldUrl = url;
+}
+
+function set(next: SosUiState): void {
+  if (next.phase === "sent") {
+    lastSent = next;
+    holdUrl(next.photoUrl);
+  } else if (next.phase !== "sending") {
+    lastSent = null;
+    holdUrl(null);
+  }
   state = next;
   for (const l of listeners) l();
+}
+
+/** the alert shown (or, while a second press is on its way, the one shown before it) */
+function currentSent(): SentState | null {
+  return state.phase === "sent" ? state : state.phase === "sending" ? lastSent : null;
 }
 
 export function getSosState(): SosUiState {
@@ -65,27 +121,34 @@ export function subscribeSos(listener: () => void): () => void {
   return () => listeners.delete(listener);
 }
 
-function browserVoice(text: string, lang: Lang): void {
-  try {
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = lang === "mn" ? "mn-MN" : "en-US";
-    window.speechSynthesis?.speak(u);
-  } catch {
-    /* the card shows the text */
-  }
+/** Cosmo's own player (the check-in screen), when it is mounted */
+let speaker: ((line: SosLine) => void) | null = null;
+
+/** the check-in screen hands Cosmo's player to the store while it is mounted; returns the unregister function */
+export function registerSosSpeaker(fn: (line: SosLine) => void): () => void {
+  speaker = fn;
+  return () => {
+    if (speaker === fn) speaker = null;
+  };
 }
 
 const browserEnv: SosEnv = {
   fetch: (...args) => fetch(...args),
   capture: captureFaceStill,
-  speak: (text, lang, audioUrl) => {
-    if (!audioUrl) return browserVoice(text, lang);
-    const audio = new Audio(audioUrl);
-    audio.play().catch(() => browserVoice(text, lang));
+  speak: (line) => {
+    if (speaker) speaker(line);
+    else speakOnChannel(line.text, line.lang, line.audioUrl);
   },
   objectUrl: (blob) => {
     try {
       return URL.createObjectURL(blob);
+    } catch {
+      return null;
+    }
+  },
+  crewId: () => {
+    try {
+      return parseStoredCrew(readSelectedCrewRaw())?.id ?? null;
     } catch {
       return null;
     }
@@ -99,11 +162,61 @@ export function setSosEnvForTests(next: SosEnv | null): void {
   env = next ?? browserEnv;
   photoDone.clear();
   state = SOS_IDLE;
+  lastSent = null;
+  heldUrl = null;
+  speaker = null;
 }
 
-function updatePhoto(alertId: string, photo: SosPhotoUi, photoUrl: string | null = null): void {
-  if (state.phase !== "sent" || state.alertId !== alertId) return;
-  set({ ...state, photo, photoUrl: photoUrl ?? state.photoUrl });
+/**
+ * fetch for the SOS routes: an expired or lost session cookie (401: a tab left open past the 12 h session, another
+ * app on the same host) must not stop an SOS. The session is renewed once for the crew member chosen in this tab
+ * (the same POST /api/session the start screen makes) and the request is sent again.
+ */
+async function sosFetch(url: string, init: RequestInit): Promise<Response> {
+  const res = await env.fetch(url, init);
+  if (res.status !== 401) return res;
+  const crewId = env.crewId();
+  if (!crewId) return res;
+  try {
+    const renewed = await env.fetch("/api/session", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ crewId }),
+    });
+    if (!renewed.ok) return res;
+  } catch {
+    return res;
+  }
+  return env.fetch(url, init);
+}
+
+function photoUrlOf(alertId: string): string {
+  return `/api/sos/${encodeURIComponent(alertId)}/photo`;
+}
+
+/** `photoUrl` undefined keeps the current one, null drops it */
+function updatePhoto(alertId: string, photo: SosPhotoUi, photoUrl?: string | null): void {
+  const cur = currentSent();
+  if (!cur || cur.alertId !== alertId) return;
+  const next: SentState = { ...cur, photo, photoUrl: photoUrl === undefined ? cur.photoUrl : photoUrl };
+  if (state.phase === "sent") {
+    set(next);
+  } else {
+    // a second press is on its way: the photo's news waits with the alert it belongs to
+    lastSent = next;
+    holdUrl(next.photoUrl);
+  }
+}
+
+/** what the server says the photo is now (the answer of the photo routes); null when it cannot be read */
+async function photoStatusOf(res: Response): Promise<SosPhotoStatus | null> {
+  try {
+    const body = (await res.json()) as Partial<SosAlert> | null;
+    return typeof body?.photoStatus === "string" ? body.photoStatus : null;
+  } catch {
+    return null;
+  }
 }
 
 async function takeAndSendPhoto(alertId: string): Promise<void> {
@@ -111,18 +224,22 @@ async function takeAndSendPhoto(alertId: string): Promise<void> {
   photoDone.add(alertId);
   updatePhoto(alertId, "taking");
   const still = await env.capture();
-  const url = `/api/sos/${encodeURIComponent(alertId)}/photo`;
+  const url = photoUrlOf(alertId);
   try {
     if (still.ok) {
-      const res = await env.fetch(url, {
+      const res = await sosFetch(url, {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "image/jpeg" },
         body: still.blob,
       });
-      updatePhoto(alertId, res.ok ? "attached" : "failed", res.ok ? env.objectUrl(still.blob) : null);
+      // attached only when the server says so (a photo deleted meanwhile, from another tab, stays deleted)
+      const status = res.ok ? await photoStatusOf(res) : null;
+      if (res.ok && (status === "attached" || status === null)) updatePhoto(alertId, "attached", env.objectUrl(still.blob));
+      else if (res.ok && status === "denied") updatePhoto(alertId, "deleted", null);
+      else updatePhoto(alertId, "failed", null);
     } else {
-      await env.fetch(url, {
+      await sosFetch(url, {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
@@ -141,14 +258,15 @@ function photoUiFor(status: SosPhotoStatus | null): SosPhotoUi {
 }
 
 function showSent(alertId: string, createdAt: string, duplicate: boolean, photoStatus: SosPhotoStatus | null): void {
-  const sameAlert = state.phase === "sent" && state.alertId === alertId;
+  const before = currentSent();
+  const same = before && before.alertId === alertId ? before : null;
   set({
     phase: "sent",
     alertId,
     createdAt,
     duplicate,
-    photo: sameAlert && state.phase === "sent" ? state.photo : photoUiFor(photoStatus),
-    photoUrl: sameAlert && state.phase === "sent" ? state.photoUrl : null,
+    photo: same ? same.photo : photoUiFor(photoStatus),
+    photoUrl: same ? same.photoUrl : null,
   });
   if (photoStatus === "pending" || photoStatus === null) void takeAndSendPhoto(alertId);
 }
@@ -159,7 +277,7 @@ export async function sendSosToEarth(opts: { checkInId: string | null; lang: Lan
   set({ phase: "sending" });
   let result: SosRaiseResult | null = null;
   try {
-    const res = await env.fetch("/api/sos", {
+    const res = await sosFetch("/api/sos", {
       method: "POST",
       credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
@@ -171,15 +289,20 @@ export async function sendSosToEarth(opts: { checkInId: string | null; lang: Lan
   }
   if (!result?.alert?.id) {
     set({ phase: "failed", checkInId: opts.checkInId, lang: opts.lang });
-    env.speak(sosSpoken("failed", opts.lang), opts.lang, null);
+    env.speak({ text: sosSpoken("failed", opts.lang), lang: opts.lang, checkInId: null, turnId: null, audioUrl: null });
     return;
   }
   const { alert, duplicate, spoken } = result;
-  const audioUrl =
-    spoken.turnId && opts.checkInId
-      ? `/api/checkins/${encodeURIComponent(opts.checkInId)}/turns/${encodeURIComponent(spoken.turnId)}/audio`
-      : null;
-  env.speak(spoken.text, spoken.language, audioUrl);
+  const voiced = spoken.turnId && opts.checkInId ? { checkInId: opts.checkInId, turnId: spoken.turnId } : null;
+  env.speak({
+    text: spoken.text,
+    lang: spoken.language,
+    checkInId: voiced?.checkInId ?? null,
+    turnId: voiced?.turnId ?? null,
+    audioUrl: voiced
+      ? `/api/checkins/${encodeURIComponent(voiced.checkInId)}/turns/${encodeURIComponent(voiced.turnId)}/audio`
+      : null,
+  });
   showSent(alert.id, alert.createdAt, duplicate, alert.photoStatus);
 }
 
@@ -192,7 +315,26 @@ export function noteSosFromTurn(event: Extract<TurnEvent, { type: "sos" }>, lang
   showSent(event.alertId, event.createdAt, event.duplicate, event.photoStatus);
 }
 
+/**
+ * "Delete photo" on the card: DELETE /api/sos/[id]/photo. Deleting… while it runs, then deleted (the thumbnail goes,
+ * Earth no longer has the photo, the alert stays), or deleteFailed with the photo still shown and a retry.
+ */
+export async function removeSosPhoto(): Promise<void> {
+  if (state.phase !== "sent" || (state.photo !== "attached" && state.photo !== "deleteFailed")) return;
+  const { alertId } = state;
+  updatePhoto(alertId, "deleting");
+  try {
+    const res = await sosFetch(photoUrlOf(alertId), { method: "DELETE", credentials: "same-origin" });
+    const status = res.ok ? await photoStatusOf(res) : null;
+    if (res.ok && status !== "attached") updatePhoto(alertId, "deleted", null);
+    else updatePhoto(alertId, "deleteFailed");
+  } catch {
+    updatePhoto(alertId, "deleteFailed");
+  }
+}
+
 export function dismissSos(): void {
   if (state.phase === "sending") return;
+  if (state.phase === "sent" && state.photo === "deleting") return; // the answer is still on its way
   set(SOS_IDLE);
 }

@@ -62,9 +62,15 @@ export function GuideStepView({
     headingRef.current?.focus();
   }, []);
 
+  // once per step: a refreshed copy of the same guide (the server's library arriving) does not start the line again
+  const scenarioId = scenario.id;
+  const steps = useRef(scenario.steps);
   useEffect(() => {
-    if (autoSpeak) speak(scenario, index);
-  }, [autoSpeak, speak, scenario, index]);
+    steps.current = scenario.steps;
+  }, [scenario.steps]);
+  useEffect(() => {
+    if (autoSpeak) speak({ id: scenarioId, steps: steps.current }, index);
+  }, [autoSpeak, speak, scenarioId, index]);
 
   const go = (n: number) => onStep(Math.min(total - 1, Math.max(0, n)));
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
