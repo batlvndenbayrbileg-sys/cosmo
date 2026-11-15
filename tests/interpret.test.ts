@@ -390,8 +390,12 @@ describe("temperature: edge cases", () => {
     expect(r.rejectedKeys).toEqual(["temperature_c"]);
   });
 
-  it("rejects a Celsius-looking 98 (no unit, no conversion)", () => {
-    expect(run("temperature", "98").rejectedKeys).toEqual(["temperature_c"]);
+  // changed 2026-11-15 (loose answers): a bare 98 can only be Fahrenheit, so it is converted with lower confidence and
+  // the acknowledgement says so (assumptions.ts); 50 is still out of range
+  it("reads a bare 98 as Fahrenheit, with lower confidence", () => {
+    const [rec] = run("temperature", "98").records;
+    expect(rec.value).toBe(36.7);
+    expect(rec.confidence).toBe(0.7);
   });
 
   it("converts an explicit Fahrenheit reading", () => {
@@ -470,10 +474,17 @@ describe("water: edge cases", () => {
     expect(run("water", "50").reason).toBe("ambiguous");
   });
 
-  it("glasses and bottles have no known size: ambiguous, never guessed", () => {
-    const r = run("water", "8 glasses");
-    expect(r.records).toEqual([]);
-    expect(r.reason).toBe("ambiguous");
+  // changed 2026-11-15 (loose answers): a glass is taken as 250 ml and a bottle as 500 ml, with lower confidence, and the
+  // acknowledgement says the assumption; drink bags (size on the label) still ask again
+  it("glasses and bottles are read with a stated rule of thumb", () => {
+    const [rec] = run("water", "8 glasses").records;
+    expect(rec.value).toBe(2000);
+    expect(rec.confidence).toBe(0.7);
+    expect(rec.sourceText).toBe("8 glasses");
+  });
+
+  it("drink bags have no known size: ambiguous", () => {
+    expect(run("water", "2 bags").reason).toBe("ambiguous");
   });
 });
 
@@ -962,8 +973,16 @@ describe("review: sleep clock times are not durations", () => {
     expectUnclear("sleep", text, "ambiguous");
   });
 
-  it.each(["6 to 7 hours", "between 6 and 7 hours", "5 or 6 hours"])("range %s -> ambiguous", (text) => {
-    expectUnclear("sleep", text, "ambiguous");
+  // changed 2026-11-15 (loose answers): a spoken range is read as its middle, with lower confidence, and the
+  // acknowledgement says so; decreasing clock times ("11 to 6") stay ambiguous above
+  it.each<[string, number]>([
+    ["6 to 7 hours", 6.5],
+    ["between 6 and 7 hours", 6.5],
+    ["5 or 6 hours", 5.5],
+  ])("range %s -> the middle, %s h", (text, hours) => {
+    const [rec] = run("sleep", text).records;
+    expect(rec.value).toBe(hours);
+    expect(rec.confidence).toBe(0.7);
   });
 
   it("a duration spoken next to a clock time wins and the clock time is ignored", () => {
