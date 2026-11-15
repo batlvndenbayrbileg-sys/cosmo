@@ -53,7 +53,7 @@ import { HybridAgent } from "./hybridAgent";
 import { createLocalAgent } from "./localLlm";
 import { localLlmConfig } from "./localLlmConfig";
 import { TieredAgent, logTier, type Tier } from "./tieredAgent";
-import { answerAskedQuestion, detectAskedQuestion, questionFacts, type AskedKind } from "./questions";
+import { answerAskedQuestion, detectAskedQuestion, isHealthTopic, questionFacts, questionTopicOf, type AskedKind } from "./questions";
 import type { Baseline } from "@/lib/health/baseline";
 import { buildResultsFacts, numeralsAreGrounded, type ResultsFacts } from "./resultsFacts";
 import { answerSignatureQuestion, insertBeforeDisclaimer, panelClockDay, signatureFollowUp } from "./signature";
@@ -204,12 +204,24 @@ export function isSaneReply(
   },
 ): boolean {
   const t = text.trim();
-  if (t.length === 0 || t.length > MAX_REPLY_CHARS) return false;
-  if (sentenceCount(t) > MAX_REPLY_SENTENCES) return false;
+  // an answer to a general question plus the question asked again gets the asked-answer room (3 sentences)
+  const general = isGeneralQuestion(ctx.userText, t);
+  if (t.length === 0 || t.length > (general ? MAX_ASKED_ANSWER_CHARS : MAX_REPLY_CHARS)) return false;
+  if (sentenceCount(t) > (general ? MAX_ASKED_ANSWER_SENTENCES : MAX_REPLY_SENTENCES)) return false;
   if (/\p{Extended_Pictographic}/u.test(t)) return false;
   if (FORBIDDEN_REPLY.test(t)) return false;
+  if (general) return true;
   const allowed = allowedNumerals(ctx.userText, ctx.recorded, ctx.question);
   return numeralsOf(t).every((n) => allowed.has(n));
+}
+
+/**
+ * A question that is not about health, the body or a measurement, answered without health words: its numbers are
+ * general knowledge (orbit speed, distances, time), not health data, so they need not come from the check-in.
+ */
+export function isGeneralQuestion(userText: string, answer: string): boolean {
+  const asked = detectAskedQuestion(userText, "en") ?? detectAskedQuestion(userText, "mn");
+  return asked !== null && asked !== "greeting" && !isHealthTopic(userText) && !isHealthTopic(answer);
 }
 
 const MAX_ASKED_ANSWER_CHARS = 360;
@@ -226,6 +238,9 @@ export function isSaneAskedAnswer(text: string, facts: string, userText: string,
   if (sentenceCount(t) > MAX_ASKED_ANSWER_SENTENCES) return false;
   if (/\p{Extended_Pictographic}/u.test(t)) return false;
   if (FORBIDDEN_REPLY.test(t)) return false;
+  // a general question ("how fast is the station?") may be answered with general-knowledge numbers; anything about
+  // health or a measurement keeps every number tied to the data
+  if (isGeneralQuestion(userText, t)) return true;
   const allowed = new Set([...numeralsOf(facts), ...numeralsOf(userText), ...numeralsOf(prompt)]);
   return numeralsOf(t).every((n) => allowed.has(n));
 }
@@ -245,14 +260,17 @@ export function askedQuestionReply(
   userText: string,
 ): string | null {
   const prompt = getQuestion(expected).prompts[lang];
+  // "how many hours should I sleep?" while water is open is about sleep: answered for sleep, then water asked again
+  const about = asked.kind === "repeat" || asked.kind === "greeting" ? expected : (questionTopicOf(userText) ?? expected);
   if (asked.answer && asked.kind !== "repeat") {
     const lead = leadingStatements(asked.answer);
-    if (lead.length > 0 && isSaneAskedAnswer(lead, questionFacts(expected, lang, baselines), userText, prompt)) {
+    const facts = join(questionFacts(about, lang, baselines), about === expected ? "" : questionFacts(expected, lang, baselines));
+    if (lead.length > 0 && isSaneAskedAnswer(lead, facts, userText, prompt)) {
       return join(lead, prompt);
     }
   }
   if (asked.kind === "other" && !detected) return null;
-  return join(answerAskedQuestion(asked.kind, expected, lang, baselines), prompt);
+  return join(answerAskedQuestion(asked.kind, about, lang, baselines), prompt);
 }
 
 /** model-phrased summary: every numeral must appear in the code-computed findings */
@@ -282,6 +300,11 @@ const TEMPLATES_EXTRA = {
   proposeAgain: {
     en: "No problem. Just tell me when you're ready, and we'll log today's measurements.",
     mn: "Зүгээр. Бэлэн болмогцоо хэлээрэй, өнөөдрийн хэмжилтүүдээ хамт хийцгээе.",
+  },
+  /** the open proposal, asked again after a question was answered */
+  proposeShort: {
+    en: "Shall we log today's measurements now?",
+    mn: "Одоо өнөөдрийн хэмжилтүүдээ тэмдэглэх үү?",
   },
   updated: { en: "Updated.", mn: "Заслаа." },
   /** the astronaut restated a value that is already recorded: it can be changed at the read-back */
@@ -646,7 +669,16 @@ async function* runTurnInner(args: RunTurnArgs, started: number): AsyncGenerator
     history,
     validate: (name: string, toolInput: unknown) =>
       executeTool(toolContext(true, ctx0.state, new Set(ctx0.filled)), name, toolInput),
-    questionFacts: expected ? questionFacts(expected, lang, baselines) : undefined,
+    // the open question's facts, plus those of the question the words name ("how long should I sleep?" while water is open)
+    questionFacts: expected
+      ? join(
+          questionFacts(expected, lang, baselines),
+          (() => {
+            const about = questionTopicOf(text);
+            return about && about !== expected ? questionFacts(about, lang, baselines) : "";
+          })(),
+        )
+      : undefined,
   };
   const decideStarted = performance.now();
   let used: Agent = primary;
@@ -721,6 +753,30 @@ async function* runTurnInner(args: RunTurnArgs, started: number): AsyncGenerator
   const effects: Effect[] = [];
   /** KPI_CAPTURE: the astronaut asked a question back; Cosmo answers it and asks the open question again */
   let askedReply: string | null = null;
+  /**
+   * A question about the blood panel, a blood draw or measuring in space, asked during the check-in (small talk or a
+   * question): Signature Triage answers it from code-computed facts (signature.ts) instead of it being set aside. Null
+   * for every other text, and after the check-in (that path below already answers it).
+   */
+  let midCheckInSignature: string | null = null;
+  if (
+    (ctx0.state === "GREETING" || ctx0.state === "SMALL_TALK" || ctx0.state === "KPI_CAPTURE") &&
+    detectAskedQuestion(text, lang) !== null &&
+    decision.records.length === 0
+  ) {
+    const sig = await answerSignatureQuestion({
+      crewId,
+      text,
+      lang,
+      ctx: { lang, today: panelClockDay(checkIn.localDate, env.missionStartDate), history: history14, todayValues: (await loadTodayValues(crewId, checkInId)).values },
+      history,
+      answer: used.answerAboutSignature && used === primary ? (a) => used.answerAboutSignature!(a) : undefined,
+    });
+    if (sig) {
+      midCheckInSignature = sig.text;
+      llmMs += sig.llmMs;
+    }
+  }
   const send = (event: MachineEvent): void => {
     const result = transition(ctx, event);
     ctx = result.ctx;
@@ -732,13 +788,26 @@ async function* runTurnInner(args: RunTurnArgs, started: number): AsyncGenerator
     case "SMALL_TALK": {
       const accepted = await apply(decision.records, "record_measurement");
       if (accepted.length > 0) send({ type: "MEASUREMENT_ACCEPTED", keys: accepted });
-      send({ type: "USER_TURN", start: decision.startAnswer ?? "unclear" });
+      if (midCheckInSignature) {
+        // a blood-panel / in-space question was answered; the proposal, if one is open, is asked again
+        askedReply = ctx0.proposed ? join(midCheckInSignature, TEMPLATES_EXTRA.proposeShort[lang]) : midCheckInSignature;
+        break;
+      }
+      // after "shall we log today's measurements?" a question back ("how fast is the station?") is answered and the
+      // proposal asked again; it is never taken for a yes
+      const start = decision.startAnswer ?? "unclear";
+      const askedBack = detectAskedQuestion(text, lang);
+      const questionBack = ctx0.proposed && start !== "yes" && askedBack !== null && askedBack !== "greeting";
+      send({ type: "USER_TURN", start: questionBack ? "no" : start });
       break;
     }
     case "KPI_CAPTURE": {
       const accepted = await apply(decision.records, "record_measurement");
       if (accepted.length > 0) {
         send({ type: "MEASUREMENT_ACCEPTED", keys: accepted });
+      } else if (midCheckInSignature && expected !== null) {
+        // "what does my blood panel mean?" mid check-in: Signature Triage answers, then the open question again
+        askedReply = join(midCheckInSignature, getQuestion(expected).prompts[lang]);
       } else if (expected !== null) {
         const restated = [...alreadyRecorded, ...(decision.restated ?? [])];
         const modelAsked = (decision.clarifications?.length ?? 0) > 0 || (decision.rejected?.length ?? 0) > 0;

@@ -28,12 +28,14 @@ const EN_QUESTION =
 const KIND_PATTERNS: Array<{ kind: AskedKind; mn: RegExp; en: RegExp }> = [
   {
     kind: "repeat",
-    mn: /(?:дахиад|дахин)\s+(?:хэл|асуу|давт)|давтаж|юу\s+гэсэн|сонсогдсонгүй|сонссонгүй|ойлгосонгүй|ойлгохгүй\s+байна/iu,
+    // "юу гэсэн" is "what did you say", but "юу гэсэн үг" is "what does it mean": a real question, not a repeat request
+    mn: /(?:дахиад|дахин)\s+(?:хэл|асуу|давт)|давтаж|юу\s+гэсэн(?!\s+үг)|сонсогдсонгүй|сонссонгүй|ойлгосонгүй|ойлгохгүй\s+байна/iu,
     en: /\b(?:repeat|say\s+(?:it|that)\s+again|again\?|pardon|what\s+was\s+the\s+question|didn'?t\s+(?:hear|get)|come\s+again)\b/iu,
   },
   {
     kind: "normal",
-    mn: /(?:байх\s+ёстой|хэвийн|норм|хэд\s+байвал|хэд\s+байх|хэр\s+байх|ямар\s+байх|хэдэн\s+байх|хэдтэй\s+байх|зөв\s+хэмжээ|сайн\s+нь)/iu,
+    // "...х ёстой" is "should ...": "унтах ёстой", "уух ёстой", "байх ёстой"
+    mn: /(?:[\p{L}]+х\s+ёстой|хэвийн|норм|хэд\s+байвал|хэд\s+байх|хэр\s+байх|ямар\s+байх|хэдэн\s+байх|хэдтэй\s+байх|зөв\s+хэмжээ|сайн\s+нь)/iu,
     en: /\b(?:should|normal|healthy|ideal|supposed\s+to|good\s+(?:range|number|value|level)|target|range|ok(?:ay)?\s+(?:range|value))\b/iu,
   },
   {
@@ -51,6 +53,35 @@ const KIND_PATTERNS: Array<{ kind: AskedKind; mn: RegExp; en: RegExp }> = [
 /** a greeting on its own ("Сайн уу", "Сайн байна уу", "hi Cosmo"): greeted back, not taken for a question */
 const GREETING_ONLY =
   /^(?:(?:сайн\s+(?:уу|байна\s+уу|байцгаана\s+уу)|сайн\s+байна|мэнд\s+(?:хүргэе|ээ)|hi|hello|hey|good\s+(?:morning|afternoon|evening))(?:[\s,]+(?:cosmo|космо))?)[\s.!?]*$/iu;
+
+/** words about the body, health, measurements or medicine (EN + MN): a question with any of these is a health question */
+const HEALTH_TOPIC =
+  /\b(?:blood|pressure|sugar|glucose|heart|pulse|bpm|temperature|fever|oxygen|spo2|saturation|sleep|slept|mood|headache|dizz\w*|nause\w*|symptom\w*|hydrat\w*|water|drink\w*|exercis\w*|workout|vision|eye\w*|medic\w*|dose|drug\w*|pill\w*|mg|mmhg|weight|calorie\w*|panel|il-?\d+|urine|lab|health\w*|body|pain|sick|ill|disease|diagnos\w*|vital\w*|stress|tired|fatigue)\b|цус|даралт|сахар|глюкоз|зүрх|судас|лугшилт|температур|халуу|хүчилтөрөгч|унт|нойр|сэтгэл|толгой|дотор\s+муу|бие|шингэн|дасгал|хараа|нүд|(?<![\p{L}])(?:ус|эм|эмийн)(?![\p{L}])|жин|илчлэг|шинжилгээ|шээс|өвд|өвчин|онош|эрүүл|ядар|стресс/iu;
+
+/** which check-in question a question back is about, by its words (EN + MN); first match wins */
+const QUESTION_TOPICS: Array<{ id: QuestionId; re: RegExp }> = [
+  { id: "blood_pressure", re: /blood\s+pressure|\bbp\b|даралт/iu },
+  { id: "glucose", re: /blood\s+sugar|glucose|sugar|сахар|глюкоз/iu },
+  { id: "heart_rate", re: /heart\s*rate|pulse|\bbpm\b|лугшилт|зүрхний\s+цохилт|зүрх/iu },
+  { id: "temperature", re: /temperature|fever|температур|халуу/iu },
+  { id: "sleep", re: /\bsleep|\bslept|унт|нойр/iu },
+  { id: "mood", re: /\bmood|сэтгэл/iu },
+  { id: "symptoms", re: /headache|dizz|nause|symptom|толгой|дотор\s+муу/iu },
+  { id: "water", re: /\bwater|drink|hydrat|(?<![\p{L}])ус(?![\p{L}])|шингэн/iu },
+  { id: "exercise", re: /exercis|workout|дасгал/iu },
+  { id: "vision", re: /vision|eyesight|\beye|хараа|нүд/iu },
+  { id: "workload", re: /workload|ачаалал/iu },
+];
+
+/** the check-in question a question back names ("how many hours should I SLEEP?" -> sleep), or null */
+export function questionTopicOf(text: string): QuestionId | null {
+  return QUESTION_TOPICS.find((t) => t.re.test(text))?.id ?? null;
+}
+
+/** true when the words are about health, the body or a measurement; numbers in answers to these must come from data */
+export function isHealthTopic(text: string): boolean {
+  return HEALTH_TOPIC.test(text);
+}
 
 /** The astronaut asked something (instead of answering), and what kind of thing; null when it is not a question. */
 export function detectAskedQuestion(text: string, lang: Lang): AskedKind | null {

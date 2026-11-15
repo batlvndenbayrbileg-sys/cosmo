@@ -38,17 +38,19 @@ function instructionFor(input: DirectiveInput): string {
     case "GREETING":
     case "SMALL_TALK": {
       const willPropose = state === "SMALL_TALK" && !ctx.proposed && ctx.smallTalkTurns + 1 >= 2;
-      const tail = willPropose
-        ? "After one warm sentence, propose logging today's measurements together (a short question)."
-        : "Reply with one warm sentence only. Do not propose the measurements yet.";
-      return `Small talk. ${tail} Record a value only if the astronaut volunteered one with its number.`;
+      const tail = ctx.proposed
+        ? "You already proposed logging today's measurements. If the astronaut asked you something, answer it first in one short sentence, then ask again whether to start."
+        : willPropose
+          ? "After one warm sentence, propose logging today's measurements together (a short question)."
+          : "Reply with one warm sentence only. Do not propose the measurements yet.";
+      return `Small talk. If the astronaut asks you a question (about space, the station, you, anything), answer it directly and briefly like a knowledgeable companion; never give medical advice. ${tail} Record a value only if the astronaut volunteered one with its number.`;
     }
     case "KPI_CAPTURE": {
       const q = expected ? getQuestion(expected) : null;
       const ask = q
         ? `Then ask about "${q.id}" unless the astronaut just answered it: "${q.prompts[lang]}"`
         : "Then ask the next missing question.";
-      return `Record every value the astronaut just said (any key in missing_keys) with record_measurement. Acknowledge in a few words. ${ask} If the astronaut asks YOU something instead of answering (what is normal, why you ask, how to measure it, or anything else), do NOT call request_clarification: answer the question in one or two short sentences, using only numbers from question_facts, then ask the expected question again. Never diagnose. Only if the answer is unclear or has no number and is not a question, call request_clarification for that key and ask again briefly. Do not call correct_measurement.`;
+      return `Record every value the astronaut just said (any key in missing_keys) with record_measurement. Acknowledge in a few words. ${ask} If the astronaut asks YOU something instead of answering (what is normal, why you ask, how to measure it, or anything else), do NOT call request_clarification: answer the question in one or two short sentences, then ask the expected question again. For a question about health, the body or a measurement, use only numbers from question_facts. For a general question (space, the station, orbit, you, the mission) answer directly from general knowledge like a knowledgeable companion; do not say you lack the data. Never diagnose. Only if the answer is unclear or has no number and is not a question, call request_clarification for that key and ask again briefly. Do not call correct_measurement.`;
     }
     case "CONFIRM":
       return "The system has read the recorded values back and asked whether everything is correct. If the astronaut confirms, call finish_confirmation with confirmed true. If they say a value is wrong and give the new value, call correct_measurement. If they say no without a value, call finish_confirmation with confirmed false and ask what to change. Do not read the values back yourself.";
