@@ -72,6 +72,28 @@ export function halfLifeBoundsR1toR45(panels: readonly PanelResult[]): Record<st
   return out;
 }
 
+/** two decimals, as the reference engine stores the half-life bounds (`round(h, 2)`) */
+const round2 = (x: number) => Math.round(x * 100) / 100;
+
+/**
+ * T10 fix: the leave-own-out half-life band of every crew member, computed from the bounds (reference
+ * `recovery.eta[crew].loo_half_life_band`): [min, max] of the other crew members' bounds, rounded to two decimals first
+ * as the reference does. `recoveryFor` reads the same band from the fixture (T4); a test checks the two are equal.
+ */
+export function looHalfLifeBands(
+  bounds: Readonly<Record<string, number>>,
+  crew: readonly string[] = REFERENCE_CREW,
+): Record<string, [number, number]> {
+  const out: Record<string, [number, number]> = {};
+  for (const c of crew) {
+    const others = Object.entries(bounds)
+      .filter(([k]) => k !== c)
+      .map(([, v]) => round2(v));
+    if (others.length) out[c] = [Math.min(...others), Math.max(...others)];
+  }
+  return out;
+}
+
 export interface RecoveryEstimate {
   /** FRI of the panel, one decimal (the value the half-lives are applied to) */
   fri0: number;
