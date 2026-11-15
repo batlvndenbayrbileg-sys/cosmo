@@ -7,7 +7,17 @@
 import { CORE_SIGNATURE, POST_TIMEPOINTS, REFERENCE_CREW, SUPPORTING_SIGNATURE, type ReferenceCrewId } from "./config";
 import { bareName, scale, scorePanel, zscore } from "./engine";
 import type { LabData } from "./load";
-import type { LabFileKind, MarkerKey, MarkerSeries, MarkerTier, PanelResult, QcEntry, Timepoint } from "./types";
+import { scorePanelWithSecondAssay } from "./secondAssay";
+import type {
+  LabFileKind,
+  MarkerKey,
+  MarkerSeries,
+  MarkerTier,
+  PanelResult,
+  QcEntry,
+  SecondAssayMatrix,
+  Timepoint,
+} from "./types";
 
 /** unit of a signature marker by source file (spec section 3) */
 export const MARKER_UNIT: Readonly<Record<LabFileKind, string>> = {
@@ -44,11 +54,16 @@ function fileOf(key: MarkerKey): LabFileKind {
   return key.slice(0, key.indexOf(":")) as LabFileKind;
 }
 
-/** everything the signature page shows, computed once on the server */
-export function buildSignatureView({ matrix, qcLog }: LabData): SignatureViewData {
+/**
+ * everything the signature page shows, computed once on the server; with `second` (the second-assay matrix, addendum
+ * T13) every panel also carries its two-key check (`PanelResult.secondAssay`)
+ */
+export function buildSignatureView({ matrix, qcLog }: LabData, second?: SecondAssayMatrix | null): SignatureViewData {
   const crew = [...REFERENCE_CREW];
   const panels: Record<string, PanelResult[]> = {};
-  for (const c of crew) panels[c] = POST_TIMEPOINTS.map((t) => scorePanel(matrix, c, t));
+  for (const c of crew) {
+    panels[c] = POST_TIMEPOINTS.map((t) => (second ? scorePanelWithSecondAssay(matrix, second, c, t) : scorePanel(matrix, c, t)));
+  }
 
   const markers: SignatureMarkerInfo[] = [];
   for (const [keys, tier] of [

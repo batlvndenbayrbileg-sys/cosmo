@@ -4,7 +4,14 @@ import { ChevronDown, ShieldQuestion } from "lucide-react";
 import { IconChip } from "@/components/dashboard/parts";
 import { useI18n } from "@/i18n/I18nProvider";
 import { T_HIGH, T_LOW } from "@/lib/signature/config";
-import { KIM_2024_DOI, SIGNATURE_DATASETS, buildEvidence } from "@/lib/signature/evidence";
+import {
+  AGREEMENT_RHO_GOOD,
+  KIM_2024_DOI,
+  SIGNATURE_DATASETS,
+  buildEvidence,
+  buildSecondAssayEvidence,
+  type SecondAssayEvidenceRow,
+} from "@/lib/signature/evidence";
 import { formatFri, markerName, numberList } from "./logic";
 
 const SUMMARY =
@@ -30,6 +37,13 @@ export function EvidenceCard() {
   const ev = buildEvidence();
   const qcValue = (v: number | null) => (v === null ? t("dashboard.signature.ev.qc.removed") : String(v));
   const l44 = Object.fromEntries(ev.l44.map((b) => [b.kind, b]));
+  // addendum T13: the second, independent assay (column, headline, L-44 check)
+  const sa = buildSecondAssayEvidence();
+  const saRow = Object.fromEntries(sa.rows.map((r) => [r.name, r])) as Record<string, SecondAssayEvidenceRow | undefined>;
+  const saCell = (r: SecondAssayEvidenceRow | undefined) =>
+    !r || r.kind === "clinical"
+      ? t("dashboard.signature.ev.sa.clinical")
+      : t(r.kind === "agrees" ? "dashboard.signature.ev.sa.agrees" : "dashboard.signature.ev.sa.not", { rho: String(r.rho) });
 
   return (
     <section aria-labelledby="sig-ev-title" data-slot="signature-evidence" className="glass-card flex min-w-0 flex-col gap-4 p-4 sm:p-5">
@@ -49,7 +63,8 @@ export function EvidenceCard() {
               <th scope="col" className="py-1.5 pr-2 font-medium">{t("dashboard.signature.ev.col.direction")}</th>
               <th scope="col" className="py-1.5 pr-2 font-medium">{t("dashboard.signature.ev.col.beyond")}</th>
               <th scope="col" className="py-1.5 pr-2 font-medium">{t("dashboard.signature.ev.col.folds")}</th>
-              <th scope="col" className="py-1.5 font-medium">{t("dashboard.signature.ev.col.kim")}</th>
+              <th scope="col" className="py-1.5 pr-2 font-medium">{t("dashboard.signature.ev.col.kim")}</th>
+              <th scope="col" className="py-1.5 font-medium">{t("dashboard.signature.ev.col.second")}</th>
             </tr>
           </thead>
           <tbody>
@@ -68,8 +83,11 @@ export function EvidenceCard() {
                 <td className="border-t border-[var(--aegis-hairline)] py-1.5 pr-2">
                   {t("dashboard.signature.ev.folds", { k: r.folds.k, n: r.folds.n })}
                 </td>
-                <td className="border-t border-[var(--aegis-hairline)] py-1.5">
+                <td className="border-t border-[var(--aegis-hairline)] py-1.5 pr-2">
                   {r.kim ? t("dashboard.signature.ev.kim.yes") : t("dashboard.signature.ev.kim.no")}
+                </td>
+                <td data-second-assay={saRow[r.name]?.kind ?? "clinical"} className="border-t border-[var(--aegis-hairline)] py-1.5 tnum">
+                  {saCell(saRow[r.name])}
                 </td>
               </tr>
             ))}
@@ -99,6 +117,22 @@ export function EvidenceCard() {
           text={t("dashboard.signature.ev.h.noiseText", { n: ev.noise.n, median: ev.noise.median, low: T_LOW, high: T_HIGH })}
         />
       </ul>
+      <div data-slot="signature-second-assay-evidence" className="flex flex-col gap-1 rounded-2xl bg-white/60 p-3 ring-1 ring-[var(--aegis-hairline)]">
+        <p className="text-[14px] font-medium leading-snug text-[var(--aegis-ink)] tnum">
+          {t("dashboard.signature.ev.sa.headline", { n: sa.matchedPairs, rho: String(sa.medianRho) })}
+        </p>
+        <p className="text-[12px] leading-snug text-[var(--aegis-label)]">
+          {t("dashboard.signature.ev.sa.text", {
+            k: sa.pairsAtGoodRho,
+            n: sa.matchedPairs,
+            good: String(AGREEMENT_RHO_GOOD),
+            list: sa.sameDirectionBoth.map((m) => markerName(m, lang)).join(", "),
+            panels: sa.il6Panels.n,
+            same: sa.il6Panels.sameSign,
+            spearman: String(sa.il6Panels.spearman),
+          })}
+        </p>
+      </div>
       <p className="-mt-1 text-[12px] leading-snug text-[var(--aegis-label)]">
         {t("dashboard.signature.ev.h.heldout", {
           heldout: ev.loco.heldoutR1.map(formatFri).join(", "),
@@ -158,6 +192,7 @@ export function EvidenceCard() {
               })}
             </li>
           ) : null}
+          <li>{t("dashboard.signature.ev.qc.l44second", { k: sa.l44.lowest, n: sa.l44.n, pct: sa.l44.sharePct })}</li>
         </ul>
       </details>
 

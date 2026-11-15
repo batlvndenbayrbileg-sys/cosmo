@@ -87,3 +87,15 @@ export function loadSecondAssay(): SecondAssayTable {
   cachedSecond ??= parseSecondAssay(fs.readFileSync(findSecondAssayFile(), "utf8"));
   return cachedSecond;
 }
+
+/**
+ * The second assay when its CSV is there, else null (the cards and Cosmo then fall back to the spec behaviour without
+ * the two-key check instead of failing; e.g. a deployment that did not trace the file).
+ */
+export function tryLoadSecondAssay(): SecondAssayTable | null {
+  try {
+    return loadSecondAssay();
+  } catch {
+    return null;
+  }
+}

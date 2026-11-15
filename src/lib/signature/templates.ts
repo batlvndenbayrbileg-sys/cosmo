@@ -243,13 +243,177 @@ function templateOther(f: SignatureFacts, lang: Lang): string {
   ]);
 }
 
-export type TriageSituation = "a" | "c1" | "c2" | "other";
+/* ───────────── addendum section 4: the dialogue with the second assay (replaces (a), (c1), (c2); adds (d)) ─────────────
+ * Used whenever the facts carry the second-assay cross-check (`facts.secondAssay`); a panel scored without the second
+ * assay keeps the spec section 7.1 dialogue above. Sentences copied verbatim from the addendum, numbers as placeholders;
+ * the variants for panels that do not fit an addendum sentence are recorded in docs/SIGNATURE_BUILD_NOTES.md (T13). */
 
-/** which spec situation a panel's facts fall in */
+/** IL-6 with its two-key result, for (a): "IL-6 is about 2.4 times your baseline, and a second, independent test ..." */
+function il6TwoKeySentence(f: SignatureFacts, lang: Lang): string | null {
+  const lead = f.secondAssay?.lead;
+  const fold = lead?.primaryFoldRounded ?? f.leadMarker?.foldRounded ?? null;
+  if (fold === null || Number(fold) < 1) {
+    const single = f.secondAssay?.badge === "SINGLE_ASSAY";
+    return join([
+      markersSentence(f.topMarkers, lang),
+      single && (lang === "mn" ? "Хоёр шинжилгээний зөвхөн нэг нь үүнийг харуулж байна." : "Only one of two tests shows this."),
+    ]);
+  }
+  if (lead?.status === "CONFIRMED") {
+    return lang === "mn"
+      ? `IL-6 таны суурь түвшнээс ойролцоогоор ${fold} дахин өндөр бөгөөд ижил цусан дээр хийсэн хоёр дахь, бие даасан шинжилгээ ч IL-6 өссөнийг баталж байна.`
+      : `IL-6 is about ${fold} times your baseline, and a second, independent test on the same blood also shows IL-6 up.`;
+  }
+  return lang === "mn"
+    ? `IL-6 таны суурь түвшнээс ойролцоогоор ${fold} дахин өндөр боловч хоёр шинжилгээний зөвхөн нэг нь үүнийг харуулж байна.`
+    : `IL-6 is about ${fold} times your baseline, but only one of two tests shows this.`;
+}
+
+function templateA2(f: SignatureFacts, lang: Lang): string {
+  const [lo, hi] = f.band ?? [f.fri ?? "", f.fri ?? ""];
+  const retest = f.recovery?.retestInDays;
+  if (lang === "mn") {
+    return join([
+      "Таны цусны шинэ шинжилгээ ирлээ.",
+      `Нислэгийн өмнөх өөрийн тань түвшинтэй харьцуулдаг зургаан үзүүлэлт нислэгийн дараах хариу урвалын хэв маягийг харуулж байна: индекс ${SCALE_MAX}-аас ${f.fri}, хэлбэлзэл нь ${mnAbl(lo)} ${hi}${f.borderline ? ", өөрөөр хэлбэл тод бүсийн захад байна" : ""}.`,
+      il6TwoKeySentence(f, lang),
+      "Inspiration4-ийн дөрвөн гишүүнд газардсаны маргааш мөн ийм чиглэлийн өөрчлөлт гарсан тул энэ бол хүлээгдэж буй дүр зураг, шинэ асуудал биш.",
+      "Миний санал: шингэнээ хэвийн ууж, шөнөдөө бүтэн унтаарай.",
+      retest
+        ? `Одоогоор нэмэлт цус авах шаардлагагүй, ${retest} хоногийн дараа давтан шинжилгээ өгье.`
+        : "Одоогоор нэмэлт цус авах шаардлагагүй.",
+      "Тэр хүртэл халуурах, хоолой өвдөх, арьсанд тууралт гарах шинж илэрвэл надад хэлээрэй.",
+      SIGNATURE_DISCLAIMER.mn,
+    ]);
+  }
+  return join([
+    "Your new blood panel is in.",
+    `The six markers I compare with your own pre-flight values show a flight-response pattern: Flight Response Index ${f.fri} out of ${SCALE_MAX}, range ${lo} to ${hi}${f.borderline ? ", so just inside the clear zone" : ""}.`,
+    il6TwoKeySentence(f, lang),
+    "All four Inspiration4 crew moved in this direction one day after landing, so this is the expected picture, not a new problem.",
+    retest
+      ? `My suggestion: normal fluids and a full night's sleep, no extra draw for now, and a re-test in ${retest} days.`
+      : "My suggestion: normal fluids and a full night's sleep, and no extra draw for now.",
+    "Tell me if you notice fever, a sore throat or a rash before then.",
+    SIGNATURE_DISCLAIMER.en,
+  ]);
+}
+
+function templateC1Addendum(f: SignatureFacts, lang: Lang): string {
+  if (lang === "mn") {
+    return join([
+      "Давтан шинжилгээний мэдээ сайн байна.",
+      `Таны индекс ${mnAbl(f.previousFri ?? "")} ${f.fri} болж буурсан тул эдгээр үзүүлэлт суурь түвшиндээ буцжээ.`,
+      il6Sentence(f, lang),
+      `Inspiration4-ийн дөрвөн гишүүний гурав нь ${FOLLOW_UP_DAY} дахь өдөр гэхэд энэ бүсэд буцсан байсан.`,
+      hasGlucoseNote(f) && "Нэг тэмдэглэл: энэ дээжийн глюкозын утга чанарын шалгалтад тэнцээгүй тул тооцоонд оруулаагүй.",
+      "Энэ удаагийн хувьд дахин цус авах шаардлагагүй.",
+      SIGNATURE_DISCLAIMER.mn,
+    ]);
+  }
+  return join([
+    "Good news from your re-test.",
+    `Your index is ${f.fri}, down from ${f.previousFri}, so these markers are back in your baseline zone.`,
+    il6Sentence(f, lang),
+    `Three of the four Inspiration4 crew were back in this zone by day ${FOLLOW_UP_DAY}.`,
+    hasGlucoseNote(f) && "One note: the glucose value in this sample failed a quality check and was left out.",
+    "No further draw is needed for this episode.",
+    SIGNATURE_DISCLAIMER.en,
+  ]);
+}
+
+/** (c2): "Two independent tests on the same blood agree: IL-6 is up on both, and IL-8 is about 47 times ..." */
+function twoKeyAgreeSentence(f: SignatureFacts, lang: Lang): string | null {
+  const sa = f.secondAssay;
+  if (!sa || sa.lead.status !== "CONFIRMED") return null;
+  const up = Number(sa.lead.primaryFoldRounded ?? "1") >= 1;
+  const il8 = sa.chemokine;
+  const il8Up =
+    il8.status === "CONFIRMED" && il8.primaryFoldRounded !== null && il8.secondFoldRounded !== null && Number(il8.primaryFoldRounded) > 1;
+  if (lang === "mn") {
+    const head = `Ижил цусан дээр хийсэн бие даасан хоёр шинжилгээ хоорондоо таарч байна: IL-6 хоёуланд нь ${up ? "өссөн" : "буурсан"}`;
+    return il8Up
+      ? `${head}, IL-8 нэгд нь суурь түвшнээс тань ${il8.primaryFoldRounded} орчим дахин, нөгөөд нь ${il8.secondFoldRounded} орчим дахин өндөр гарсан.`
+      : `${head}.`;
+  }
+  const head = `Two independent tests on the same blood agree: IL-6 is ${up ? "up" : "down"} on both`;
+  return il8Up
+    ? `${head}, and IL-8 is about ${il8.primaryFoldRounded} times your baseline on one and about ${il8.secondFoldRounded} times on the other.`
+    : `${head}.`;
+}
+
+function templateC2Addendum(f: SignatureFacts, lang: Lang): string {
+  const rose = f.previousFri !== null && f.fri !== null && Number(f.previousFri) < Number(f.fri);
+  const days = f.unexpectedRetestInDays ?? String(UNEXPECTED_RETEST_DAYS);
+  if (lang === "mn") {
+    return join([
+      "Энэ бол миний хүлээж байсан сэргэлт биш байна.",
+      rose
+        ? `Таны индекс ${mnAbl(f.previousFri as string)} ${f.fri} болж өссөн, газардсанаас хойш ${f.daysSinceLanding} хоног өнгөрсөн тул нислэгийн нөлөөний хугацаанаас гадуур байна.`
+        : `Таны индекс ${f.fri} байна, газардсанаас хойш ${f.daysSinceLanding} хоног өнгөрсөн тул нислэгийн нөлөөний хугацаанаас гадуур байна.`,
+      twoKeyAgreeSentence(f, lang),
+      "Шалтгааныг цусны үзүүлэлтээр тодорхойлох боломжгүй.",
+      "Одоо шинж тэмдгээ хамт шалгаад биеийн температураа хэмжье.",
+      `${days} хоногийн дараа давтан шинжилгээ өгч, дараагийн холболтоор нислэгийн эмчид мэдэгдэхийг зөвлөж байна.`,
+      SIGNATURE_DISCLAIMER.mn,
+    ]);
+  }
+  return join([
+    "This is not the recovery I expected.",
+    rose
+      ? `Your index went up from ${f.previousFri} to ${f.fri}, and we are ${f.daysSinceLanding} days past landing, outside the flight window.`
+      : `Your index is ${f.fri}, and we are ${f.daysSinceLanding} days past landing, outside the flight window.`,
+    twoKeyAgreeSentence(f, lang),
+    "Blood markers cannot tell me the cause.",
+    `Let's do a quick symptom check and take your temperature now, and I recommend a re-test in ${days} days and a note to the flight surgeon at the next contact.`,
+    SIGNATURE_DISCLAIMER.en,
+  ]);
+}
+
+/** (d): "But the two tests on this sample disagree: one shows IL-6 at about 2.2 times your baseline, the other ..." */
+function disagreeSentence(f: SignatureFacts, lang: Lang): string {
+  const lead = f.secondAssay?.lead;
+  const p = lead?.primaryFoldRounded ?? null;
+  const s = lead?.secondFoldRounded ?? null;
+  if (!lead || lead.status !== "NOT_CONFIRMED" || p === null || s === null || Number(p) < 1) {
+    return lang === "mn" ? "Гэвч хоёр шинжилгээний зөвхөн нэг нь үүнийг харуулж байна." : "But only one of two tests shows this.";
+  }
+  const below = Number(s) < 1;
+  if (lang === "mn") {
+    return `Гэвч энэ дээжийн хоёр шинжилгээ хоорондоо зөрж байна: нэг нь IL-6-г суурь түвшнээс тань ${p} орчим дахин өндөр, нөгөө нь ${below ? "суурь түвшнээс доогуур" : "бага зэрэг л өндөр"} гэж үзүүлсэн.`;
+  }
+  return `But the two tests on this sample disagree: one shows IL-6 at about ${p} times your baseline, the other shows it ${below ? "below baseline" : "only slightly above baseline"}.`;
+}
+
+function templateD(f: SignatureFacts, lang: Lang): string {
+  const days = f.unexpectedRetestInDays ?? String(UNEXPECTED_RETEST_DAYS);
+  if (lang === "mn") {
+    return join([
+      `Таны индекс ${f.fri} байна.`,
+      "Газардсанаас хойш ийм удсаны дараа энэ нь ердийн үед гэнэтийн идэвхжилд тооцогдоно.",
+      disagreeSentence(f, lang),
+      "Зөвхөн нэг шинжилгээ ингэж хэлж байгаа тул би одоохондоо үүн дээр тулгуурлан арга хэмжээ авахгүй.",
+      `${days} хоногийн дараа хэмжилтийг давтаад тэгээд шийдье.`,
+      SIGNATURE_DISCLAIMER.mn,
+    ]);
+  }
+  return join([
+    `Your index is ${f.fri}, which would normally count as unexpected activation this long after landing.`,
+    disagreeSentence(f, lang),
+    "With only one test saying so, I would not act on it yet.",
+    `Let's repeat the measurement in ${days} days and decide then.`,
+    SIGNATURE_DISCLAIMER.en,
+  ]);
+}
+
+/** "a" / "c1" / "c2" / "other" as in the spec; "d" (addendum): UNEXPECTED_ACTIVATION with a SINGLE_ASSAY badge */
+export type TriageSituation = "a" | "c1" | "c2" | "d" | "other";
+
+/** which spec (or addendum) situation a panel's facts fall in */
 export function triageSituation(f: SignatureFacts): TriageSituation {
   if (f.fri === null) return "other";
   if (f.class === "EXPECTED_FLIGHT_RESPONSE") return "a";
-  if (f.class === "UNEXPECTED_ACTIVATION") return "c2";
+  if (f.class === "UNEXPECTED_ACTIVATION") return f.secondAssay?.badge === "SINGLE_ASSAY" ? "d" : "c2";
   if (
     f.class === "BASELINE" &&
     f.previousFri !== null &&
@@ -266,11 +430,13 @@ export function triageSituation(f: SignatureFacts): TriageSituation {
 export function renderTriageTemplate(f: SignatureFacts, lang: Lang = f.lang): string {
   switch (triageSituation(f)) {
     case "a":
-      return templateA(f, lang);
+      return f.secondAssay ? templateA2(f, lang) : templateA(f, lang);
     case "c1":
-      return templateC1(f, lang);
+      return f.secondAssay ? templateC1Addendum(f, lang) : templateC1(f, lang);
     case "c2":
-      return templateC2(f, lang);
+      return f.secondAssay ? templateC2Addendum(f, lang) : templateC2(f, lang);
+    case "d":
+      return templateD(f, lang);
     case "other":
       return templateOther(f, lang);
   }

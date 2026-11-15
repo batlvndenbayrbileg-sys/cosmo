@@ -7,14 +7,23 @@
 import type { Lang } from "@/lib/types";
 import { dictionaries } from "@/i18n/dictionary";
 import { translate } from "@/i18n/translate";
-import { DSS_HISTORY_DAYS, T_HIGH, T_LOW, TIMEPOINTS, TIMEPOINT_DAY, WINDOW_DAYS, Z_CAP } from "@/lib/signature/config";
+import {
+  DSS_HISTORY_DAYS,
+  SINGLE_ASSAY_MARKERS,
+  T_HIGH,
+  T_LOW,
+  TIMEPOINTS,
+  TIMEPOINT_DAY,
+  WINDOW_DAYS,
+  Z_CAP,
+} from "@/lib/signature/config";
 import { recoveryFor, round1, type RecoveryEstimate } from "@/lib/signature/recovery";
 import { drawAdvice, drawStateFromPanels, type DrawAdvice } from "@/lib/signature/strain";
 import { baseline as baselineOf, preVals } from "@/lib/signature/engine";
 import { glucoseRemoved, markerLabel, spokenFold, spokenInt } from "@/lib/signature/facts";
 import { SIGNATURE_REFERENCE } from "@/lib/signature/reference";
 import type { SignatureMarkerInfo, SignatureViewData } from "@/lib/signature/view";
-import type { Envelope, MarkerTier, PanelResult, Timepoint, TriageClass } from "@/lib/signature/types";
+import type { Envelope, MarkerTier, PanelResult, SecondAssayBadge, Timepoint, TriageClass } from "@/lib/signature/types";
 
 /** UI string outside a React tree (the cards use the same keys through useI18n) */
 export function tr(lang: Lang, key: string, vars?: Record<string, string | number>): string {
@@ -363,4 +372,44 @@ export function drawerSeries(
   const points = TIMEPOINTS.map((tp) => ({ tp, day: TIMEPOINT_DAY[tp], value: s[tp] ?? null, post: TIMEPOINT_DAY[tp] > 0 }));
   const pre = preVals(s);
   return { points, baseline: pre.length ? baselineOf(pre) : null, unit: m.unit };
+}
+
+/* ───────────── second assay (addendum T13) ───────────── */
+
+export interface SecondAssayBadgeView {
+  badge: SecondAssayBadge;
+  /** teal outline when confirmed by two assays, amber outline for a single assay */
+  tone: "teal" | "amber";
+  label: string;
+  /** the two IL-6 folds (vs own pre-flight median on each platform) */
+  tooltip: string;
+}
+
+/** fold with two decimals, as the addendum table prints them (2.39 / 1.46) */
+function fold2(x: number): string {
+  return (Math.round(x * 100) / 100).toFixed(2);
+}
+
+/** the Triage card badge next to the class; null when the panel has no badge or was scored without the second assay */
+export function secondAssayBadgeView(panel: PanelResult, lang: Lang): SecondAssayBadgeView | null {
+  const sa = panel.secondAssay;
+  if (!sa || !sa.badge) return null;
+  const { primaryFold, secondFold } = sa.il6;
+  const tooltip =
+    primaryFold !== null && secondFold !== null
+      ? tr(lang, "dashboard.signature.sa.tooltip", { primary: fold2(primaryFold), second: fold2(secondFold) })
+      : tr(lang, "dashboard.signature.sa.tooltipNone");
+  return {
+    badge: sa.badge,
+    tone: sa.badge === "TWO_ASSAY_CONFIRMED" ? "teal" : "amber",
+    label: tr(lang, `dashboard.signature.sa.badge.${sa.badge}`),
+    tooltip,
+  };
+}
+
+const SINGLE_ASSAY_NAMES: ReadonlySet<string> = new Set(SINGLE_ASSAY_MARKERS.map((k) => k.slice(k.indexOf(":") + 1)));
+
+/** MCP-1, IL-10, IL-27: the second assay does not confirm them (Fingerprint card tag "single-assay marker") */
+export function isSingleAssayMarker(name: string): boolean {
+  return SINGLE_ASSAY_NAMES.has(name);
 }

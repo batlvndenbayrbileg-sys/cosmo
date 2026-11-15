@@ -7,8 +7,8 @@
 
 import { CORE_SIGNATURE, EXCLUDED_MARKERS, MIN_EFFECT, PRE_TIMEPOINTS, SUPPORTING_SIGNATURE } from "./config";
 import { bareName } from "./engine";
-import { SIGNATURE_REFERENCE } from "./reference";
-import type { MarkerTier, SignatureReference } from "./types";
+import { SECOND_ASSAY_REFERENCE, SIGNATURE_REFERENCE } from "./reference";
+import type { MarkerTier, SecondAssayReference, SignatureReference } from "./types";
 
 /** spec section 1.1: markers reported as significantly increased at R+1 by Kim et al. 2024 (ref. [4]) */
 export const KIM_2024_COVERED: ReadonlySet<string> = new Set(["il_6", "mcp_1", "il_10", "il_27"]);
@@ -150,5 +150,58 @@ export function buildEvidence(ref: SignatureReference = SIGNATURE_REFERENCE): Ev
       sharePct: Math.round(b.share * 100),
     })),
     l44ChancePct: Math.round(100 / PRE_TIMEPOINTS.length),
+  };
+}
+
+/* ───────────── second assay (addendum sections 1 and 3.2; read from src/data/signature_second_assay.json) ───────────── */
+
+/** the rank-correlation level the second fixture counts pairs at (`agreement["pairs_with_rho_ge_0.5"]`) */
+export const AGREEMENT_RHO_GOOD = 0.5;
+
+/** "Second assay" column: agrees (same direction in 4/4 at R+1 on both platforms), not confirmed, or no second method */
+export type SecondAssayEvidenceKind = "agrees" | "not_confirmed" | "clinical";
+
+export interface SecondAssayEvidenceRow {
+  name: string;
+  kind: SecondAssayEvidenceKind;
+  /** mean within-person rank correlation between the two platforms; null without a second platform */
+  rho: number | null;
+}
+
+export interface SecondAssayEvidence {
+  rows: SecondAssayEvidenceRow[];
+  /** analytes measured on both platforms */
+  matchedPairs: number;
+  /** typical (median) within-person agreement */
+  medianRho: number;
+  pairsAtGoodRho: number;
+  /** markers moving the same way in all crew at R+1 on both platforms (bare names) */
+  sameDirectionBoth: string[];
+  l44: { lowest: number; n: number; sharePct: number };
+  il6Panels: { sameSign: number; n: number; spearman: number };
+}
+
+export function buildSecondAssayEvidence(
+  ref: SecondAssayReference = SECOND_ASSAY_REFERENCE,
+  base: SignatureReference = SIGNATURE_REFERENCE,
+): SecondAssayEvidence {
+  const both = new Set(ref.same_direction_4of4_on_both_assays_at_R1);
+  const rows: SecondAssayEvidenceRow[] = DISPLAY_ORDER.filter((name) => name in base.evidence).map((name) => {
+    const rho = ref.agreement.rho[name];
+    if (rho === undefined) return { name, kind: "clinical", rho: null };
+    return { name, kind: both.has(name) ? "agrees" : "not_confirmed", rho };
+  });
+  return {
+    rows,
+    matchedPairs: ref.agreement.matched_pairs,
+    medianRho: ref.agreement.median_within_person_rho,
+    pairsAtGoodRho: ref.agreement["pairs_with_rho_ge_0.5"],
+    sameDirectionBoth: [...ref.same_direction_4of4_on_both_assays_at_R1],
+    l44: {
+      lowest: ref.L44_lowest_on_second_assay.lowest,
+      n: ref.L44_lowest_on_second_assay.n,
+      sharePct: Math.round(ref.L44_lowest_on_second_assay.share * 100),
+    },
+    il6Panels: { sameSign: ref.il6_16_panels.same_sign, n: Object.keys(ref.panels).length, spearman: ref.il6_16_panels.spearman },
   };
 }

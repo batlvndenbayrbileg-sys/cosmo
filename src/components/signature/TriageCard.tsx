@@ -4,6 +4,7 @@ import { Gauge } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { IconChip } from "@/components/dashboard/parts";
 import { useI18n } from "@/i18n/I18nProvider";
 import { T_HIGH, T_LOW, TIMEPOINT_DAY } from "@/lib/signature/config";
@@ -17,6 +18,7 @@ import {
   noiseCaption,
   noiseStrip,
   reasonText,
+  secondAssayBadgeView,
   trackPct,
   triageTrack,
   type BadgeTone,
@@ -36,6 +38,12 @@ export const BADGE_TONE: Record<BadgeTone, string> = {
   red: "border-[#f0b7b7] bg-[var(--status-alert-soft)] text-[var(--status-alert-ink)]",
   amber: "border-[#ecd3a1] bg-[var(--status-watch-soft)] text-[var(--status-watch-ink)]",
   slate: "border-[#d5dbe4] bg-[var(--status-nodata-soft)] text-[var(--status-nodata-ink)]",
+};
+
+/** second-assay badge (addendum T13): outline only, teal when confirmed by two assays, amber for a single assay */
+const SECOND_ASSAY_TONE: Record<"teal" | "amber", string> = {
+  teal: "border-[#5fb8aa] text-[#0f6b62]",
+  amber: "border-[#d9a441] text-[var(--status-watch-ink)]",
 };
 
 /** the 12 no-flight control scores as a strip plot on the same 0-100 scale */
@@ -92,6 +100,7 @@ export function TriageCard({
   const track = triageTrack(panel);
   const strip = noiseStrip();
   const cls = classLabel(panel.cls, lang);
+  const sa = secondAssayBadgeView(panel, lang);
 
   return (
     <section
@@ -113,6 +122,27 @@ export function TriageCard({
             <Badge variant="outline" className={cn("h-6 px-2.5 text-[12px]", BADGE_TONE.amber)}>
               {t("dashboard.signature.borderline")}
             </Badge>
+          ) : null}
+          {sa ? (
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <span
+                    tabIndex={0}
+                    data-slot="signature-second-assay"
+                    data-badge={sa.badge}
+                    aria-label={`${t("dashboard.signature.sa.label")}: ${sa.label}. ${sa.tooltip}`}
+                    className={cn(
+                      "inline-flex h-6 items-center rounded-4xl border bg-transparent px-2.5 text-[12px] font-medium outline-none focus-visible:ring-3 focus-visible:ring-ring/60",
+                      SECOND_ASSAY_TONE[sa.tone],
+                    )}
+                  />
+                }
+              >
+                {sa.label}
+              </TooltipTrigger>
+              <TooltipContent>{sa.tooltip}</TooltipContent>
+            </Tooltip>
           ) : null}
         </span>
       </header>

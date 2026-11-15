@@ -149,6 +149,24 @@ export const signatureStrings: AreaDicts = {
     "dashboard.signature.ev.dataset": "NASA OSDR {id}, DOI {doi}",
     "dashboard.signature.ev.kimRef": "Kim J. et al., Nature Communications 2024, DOI {doi}",
     "dashboard.signature.ev.n": "n = {n}, descriptive only.",
+
+    "dashboard.signature.sa.label": "Second assay",
+    "dashboard.signature.sa.badge.TWO_ASSAY_CONFIRMED": "Confirmed by two assays",
+    "dashboard.signature.sa.badge.SINGLE_ASSAY": "Single assay",
+    "dashboard.signature.sa.tooltip":
+      "IL-6 against the own pre-flight median: x{primary} on the first assay, x{second} on the second, independent assay of the same blood",
+    "dashboard.signature.sa.tooltipNone": "IL-6: no second measurement of this sample",
+    "dashboard.signature.fp.singleAssay": "single-assay marker",
+    "dashboard.signature.fp.singleAssayNote": "Single-assay markers: {list}. The second, independent assay does not confirm their rise.",
+    "dashboard.signature.ev.col.second": "Second assay",
+    "dashboard.signature.ev.sa.agrees": "agrees, {rho}",
+    "dashboard.signature.ev.sa.not": "not confirmed ({rho})",
+    "dashboard.signature.ev.sa.clinical": "single clinical method",
+    "dashboard.signature.ev.sa.headline": "{n} proteins measured twice: typical agreement {rho}",
+    "dashboard.signature.ev.sa.text":
+      "Only {k} of {n} pairs agree at {good} or better. Same direction in all crew at R+1 on both assays: {list}. IL-6 over the {panels} post-flight panels: same sign on both in {same}, rank correlation {spearman}.",
+    "dashboard.signature.ev.qc.l44second":
+      "Second assay: L-44 is the lowest pre-flight draw in {k} of {n} series ({pct} %), so the L-44 low batch is an artefact of the first platform.",
   },
   mn: {
     "dashboard.signature.title": "Цусны дохионы ангилал",
@@ -295,5 +313,23 @@ export const signatureStrings: AreaDicts = {
     "dashboard.signature.ev.dataset": "NASA OSDR {id}, DOI {doi}",
     "dashboard.signature.ev.kimRef": "Kim J. нар, Nature Communications 2024, DOI {doi}",
     "dashboard.signature.ev.n": "n = {n}, зөвхөн тодорхойлох шинжилгээ.",
+
+    "dashboard.signature.sa.label": "Хоёр дахь шинжилгээ",
+    "dashboard.signature.sa.badge.TWO_ASSAY_CONFIRMED": "Хоёр шинжилгээгээр батлагдсан",
+    "dashboard.signature.sa.badge.SINGLE_ASSAY": "Ганц шинжилгээ",
+    "dashboard.signature.sa.tooltip":
+      "IL-6 нислэгийн өмнөх өөрийн медиантай харьцуулахад: эхний шинжилгээгээр x{primary}, ижил цусан дээр хийсэн хоёр дахь, бие даасан шинжилгээгээр x{second}",
+    "dashboard.signature.sa.tooltipNone": "IL-6: энэ дээжийг хоёр дахь удаа хэмжээгүй",
+    "dashboard.signature.fp.singleAssay": "ганц шинжилгээний үзүүлэлт",
+    "dashboard.signature.fp.singleAssayNote": "Ганц шинжилгээний үзүүлэлт: {list}. Хоёр дахь, бие даасан шинжилгээ тэдгээрийн өсөлтийг батлаагүй.",
+    "dashboard.signature.ev.col.second": "Хоёр дахь шинжилгээ",
+    "dashboard.signature.ev.sa.agrees": "таарч байна, {rho}",
+    "dashboard.signature.ev.sa.not": "батлагдаагүй ({rho})",
+    "dashboard.signature.ev.sa.clinical": "ганц эмнэлзүйн арга",
+    "dashboard.signature.ev.sa.headline": "{n} уургийг хоёр удаа хэмжсэн: ердийн тохирол {rho}",
+    "dashboard.signature.ev.sa.text":
+      "{n} хосоос зөвхөн {k} нь {good} ба түүнээс дээш тохирсон. R+1 үед хоёр шинжилгээнд бүх гишүүнд ижил чиглэлтэй: {list}. Нислэгийн дараах {panels} шинжилгээнд IL-6 хоёр шинжилгээнд {same} удаа ижил тэмдэгтэй, зэрэглэлийн корреляц {spearman}.",
+    "dashboard.signature.ev.qc.l44second":
+      "Хоёр дахь шинжилгээнд L-44 нь {n} цувралаас {k}-д ({pct} %) нислэгийн өмнөх хамгийн бага утга байсан тул L-44 бага багц нь эхний платформын алдаа.",
   },
 };

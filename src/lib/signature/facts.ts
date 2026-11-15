@@ -87,6 +87,31 @@ export const ACTIONS: Readonly<Record<TriageClass, Readonly<Record<Lang, readonl
   },
 };
 
+/**
+ * Addendum section 2, the action rows that depend on the second assay (ASSUMPTION wording, as the spec table):
+ * UNEXPECTED + TWO_ASSAY_CONFIRMED keeps the spec row; UNEXPECTED + SINGLE_ASSAY repeats the measurement and does not
+ * escalate; EXPECTED + SINGLE_ASSAY is the EXPECTED row plus one sentence.
+ */
+export const SECOND_ASSAY_ACTIONS = {
+  unexpectedSingle: {
+    en: [`repeat the measurement in ${UNEXPECTED_RETEST_DAYS} days`, "no escalation until a second measurement agrees"],
+    mn: [`${UNEXPECTED_RETEST_DAYS} хоногийн дараа хэмжилтийг давтах`, "хоёр дахь хэмжилт таарах хүртэл дээш мэдэгдэхгүй"],
+  },
+  singleAssayNote: {
+    en: "only one of two tests shows this",
+    mn: "хоёр шинжилгээний зөвхөн нэг нь үүнийг харуулж байна",
+  },
+} as const satisfies Record<string, Readonly<Record<Lang, string | readonly string[]>>>;
+
+/** the action list of a panel: spec section 7.3 by class, with the addendum section 2 rows when a badge is set */
+export function actionsFor(cls: TriageClass, badge: SecondAssayBadge | null | undefined, lang: Lang): readonly string[] {
+  if (badge === "SINGLE_ASSAY" && cls === "UNEXPECTED_ACTIVATION") return SECOND_ASSAY_ACTIONS.unexpectedSingle[lang];
+  if (badge === "SINGLE_ASSAY" && cls === "EXPECTED_FLIGHT_RESPONSE") {
+    return [...ACTIONS.EXPECTED_FLIGHT_RESPONSE[lang], SECOND_ASSAY_ACTIONS.singleAssayNote[lang]];
+  }
+  return ACTIONS[cls][lang];
+}
+
 /* ───────────── formatting: the exact strings that are spoken ───────────── */
 
 /** integer (FRI, band, days, kits) */
@@ -305,7 +330,7 @@ export function buildFacts(panel: PanelResult, context: FactsContext): Signature
     unexpectedRetestInDays,
     otherLargeChanges,
     qcNotes: qcNotesFor(panel, context.qcLog ?? [], lang),
-    actions: ACTIONS[panel.cls][lang],
+    actions: actionsFor(panel.cls, sa?.badge, lang),
     secondAssay,
     disclaimer: SIGNATURE_DISCLAIMER[lang],
     allowedNumbers: [...allowed],

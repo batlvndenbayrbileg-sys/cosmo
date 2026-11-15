@@ -11,7 +11,15 @@ import { OTHER_LARGE_FOLD, Z_CAP } from "@/lib/signature/config";
 import type { SignatureViewData } from "@/lib/signature/view";
 import type { PanelResult } from "@/lib/signature/types";
 import { cn } from "@/lib/utils";
-import { drawerSeries, fingerprintRows, formatLabValue, markerTooltip, otherChanges, type FingerprintRow } from "./logic";
+import {
+  drawerSeries,
+  fingerprintRows,
+  formatLabValue,
+  isSingleAssayMarker,
+  markerTooltip,
+  otherChanges,
+  type FingerprintRow,
+} from "./logic";
 
 const CORE_FILL = "var(--aegis-accent-deep)";
 const SUPP_FILL = "#9dbcf6";
@@ -117,6 +125,8 @@ export function FingerprintCard({ view, panel }: { view: SignatureViewData; pane
   const [open, setOpen] = useState<FingerprintRow | null>(null);
   const rows = fingerprintRows(view, panel, lang);
   const others = otherChanges(panel);
+  // addendum T13: MCP-1, IL-10, IL-27 are not confirmed by the second assay (shown when the panel carries the check)
+  const singleAssay = panel.secondAssay ? rows.filter((r) => isSingleAssayMarker(r.name)) : [];
   const data: ChartRow[] = rows.map((r) => ({
     name: r.name,
     label: r.label,
@@ -176,6 +186,25 @@ export function FingerprintCard({ view, panel }: { view: SignatureViewData; pane
         </li>
       </ul>
 
+      {singleAssay.length > 0 ? (
+        <div data-slot="signature-single-assay" className="flex flex-col gap-1.5">
+          <ul className="flex flex-wrap gap-1.5">
+            {singleAssay.map((r) => (
+              <li
+                key={r.name}
+                className="inline-flex h-6 items-center gap-1 rounded-full border border-[#d9a441] px-2 text-[11px] text-[var(--status-watch-ink)]"
+              >
+                <span className="font-medium">{r.label}</span>
+                <span>· {t("dashboard.signature.fp.singleAssay")}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="text-[11px] leading-snug text-[var(--aegis-label)]">
+            {t("dashboard.signature.fp.singleAssayNote", { list: singleAssay.map((r) => r.label).join(", ") })}
+          </p>
+        </div>
+      ) : null}
+
       {/* the values behind the chart, for screen readers and as the keyboard path to the drawer */}
       <div className="sr-only">
         <table>
@@ -192,7 +221,8 @@ export function FingerprintCard({ view, panel }: { view: SignatureViewData; pane
             {rows.map((r) => (
               <tr key={r.name}>
                 <th scope="row">
-                  {r.label} ({t(`dashboard.signature.fp.${r.tier}`)})
+                  {r.label} ({t(`dashboard.signature.fp.${r.tier}`)}
+                  {panel.secondAssay && isSingleAssayMarker(r.name) ? `, ${t("dashboard.signature.fp.singleAssay")}` : ""})
                 </th>
                 <td>
                   {r.bar === null ? "–" : r.bar.toFixed(2)}

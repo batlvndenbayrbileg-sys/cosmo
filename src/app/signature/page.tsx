@@ -2,7 +2,7 @@ import { SignatureView } from "@/components/signature/SignatureView";
 import { POST_TIMEPOINTS, REFERENCE_CREW } from "@/lib/signature/config";
 import type { Timepoint } from "@/lib/signature/types";
 import { buildSignatureView } from "@/lib/signature/view";
-import { getLabData } from "@/server/signature/files";
+import { getLabData, tryLoadSecondAssay } from "@/server/signature/files";
 
 const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
@@ -23,7 +23,7 @@ export default async function SignaturePage({
   const checkInId = first(params.checkInId);
   const crew = crewParam && (REFERENCE_CREW as readonly string[]).includes(crewParam) ? crewParam : "C003";
   const tp = (tpParam && (POST_TIMEPOINTS as readonly string[]).includes(tpParam) ? tpParam : "R+1") as Timepoint;
-  const data = buildSignatureView(getLabData());
+  const data = buildSignatureView(getLabData(), tryLoadSecondAssay()?.matrix);
   return (
     <SignatureView
       data={data}

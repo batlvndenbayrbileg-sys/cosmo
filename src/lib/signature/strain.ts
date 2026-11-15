@@ -205,8 +205,13 @@ export interface ImportResult {
   state: DrawState;
   /** "A5" when the new panel is UNEXPECTED_ACTIVATION */
   rule: "A5" | null;
-  /** A5: symptom check now */
+  /** A5: symptom check now (not for a SINGLE_ASSAY panel: addendum section 2, repeat the measurement only) */
   symptomCheck: boolean;
+  /**
+   * A5: notify the flight surgeon at the next contact. Addendum T13: only when the panel is TWO_ASSAY_CONFIRMED; a
+   * panel scored without the second assay keeps the spec rule (every UNEXPECTED_ACTIVATION panel).
+   */
+  escalate: boolean;
   /** the re-test day set by this panel (A5: +3 days; EXPECTED: first re-test of section 4.8), null when none */
   retestDay: number | null;
 }
@@ -237,7 +242,8 @@ export function importPanel(state: DrawState, panel: PanelResult): ImportResult 
       skipRecheckDay: null,
     },
     rule,
-    symptomCheck: rule === "A5",
+    symptomCheck: rule === "A5" && panel.secondAssay?.badge !== "SINGLE_ASSAY",
+    escalate: rule === "A5" && (panel.secondAssay === undefined || panel.secondAssay.badge === "TWO_ASSAY_CONFIRMED"),
     retestDay,
   };
 }

@@ -30,7 +30,8 @@ import {
 } from "@/lib/signature/templates";
 import { drawAdvice, drawStateFromPanels, dssSeries, strainDayFromKpis, strainDaysFromHistory } from "@/lib/signature/strain";
 import type { PanelResult, Timepoint } from "@/lib/signature/types";
-import { getLabData } from "@/server/signature/files";
+import { scorePanelWithSecondAssay } from "@/lib/signature/secondAssay";
+import { getLabData, tryLoadSecondAssay } from "@/server/signature/files";
 import { namesConditionOrDrug } from "./companion";
 
 /**
@@ -109,7 +110,9 @@ export function referencePanels(crew: ReferenceCrewId): PanelResult[] {
   let panels = panelCache.get(crew);
   if (!panels) {
     const { matrix } = getLabData();
-    panels = POST_TIMEPOINTS.map((t) => scorePanel(matrix, crew, t));
+    // addendum T13: with the second assay the facts carry the two-key check and the addendum dialogue applies
+    const second = tryLoadSecondAssay()?.matrix;
+    panels = POST_TIMEPOINTS.map((t) => (second ? scorePanelWithSecondAssay(matrix, second, crew, t) : scorePanel(matrix, crew, t)));
     panelCache.set(crew, panels);
   }
   return panels;
